@@ -1,0 +1,62 @@
+# HireSense
+
+## Current milestone
+
+- Candidate-only registration
+- Email/password sign-in
+- JWT authentication
+- One seeded Interviewer account
+- Role-based dashboards and navigation
+- Persistent PostgreSQL storage
+
+## Requirements
+
+Docker Desktop running with Linux containers.
+
+## Startup
+
+1. Copy `.env.example` to `.env`.
+2. Set your own database password, JWT secret and interviewer password.
+3. Run:
+
+```powershell
+docker compose up --build
+```
+
+Application: http://localhost:5173
+API documentation: http://localhost:8000/docs
+Health check: http://localhost:8000/api/health
+
+The backend creates tables and seeds the Interviewer automatically.
+All public registrations create Candidates.
+
+## Tests
+
+```powershell
+docker compose exec backend python -m pytest -q
+```
+
+Tests use isolated SQLite databases and do not modify PostgreSQL.
+
+## Stop
+
+```powershell
+docker compose down
+```
+
+Database data persists in the named Docker volume.
+
+Do not use `docker compose down -v` unless you intend to delete the database.
+
+## Notes
+
+- Changing INTERVIEWER_PASSWORD after the first startup does not change
+  the existing account's password.
+- Table creation does not migrate existing schemas. Add Alembic when
+  database migrations are needed.
+- JWTs use sessionStorage for this local milestone.
+- Logout removes the browser session but does not revoke a previously
+  issued token. Tokens expire after their configured lifetime.
+- Before public deployment, add HTTPS, rate limiting, password reset
+  and a reviewed session/token-revocation design.
+- Copilot and recruitment features are deferred.
