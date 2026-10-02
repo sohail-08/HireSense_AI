@@ -1,0 +1,41 @@
+from functools import lru_cache
+
+from pydantic import EmailStr, Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    database_url: str
+    jwt_secret_key: SecretStr
+    access_token_expire_minutes: int = Field(default=60, ge=1, le=1440)
+
+    interviewer_name: str = "HireSense Interviewer"
+    interviewer_email: EmailStr
+    interviewer_password: SecretStr
+
+    frontend_url: str = "http://localhost:5173"
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_secret(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value()) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must contain at least 32 characters"
+            )
+        return value
+
+    @field_validator("interviewer_password")
+    @classmethod
+    def validate_password(cls, value: SecretStr) -> SecretStr:
+        if not 10 <= len(value.get_secret_value()) <= 128:
+            raise ValueError(
+                "INTERVIEWER_PASSWORD must be 10–128 characters"
+            )
+        return value
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
