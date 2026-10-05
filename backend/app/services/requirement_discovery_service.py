@@ -3,17 +3,25 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agents.requirement_discovery import RequirementDiscoveryGraph, RequirementModel
+from app.config import get_settings
 from app.models.job import RequirementProfile, RequirementProfileStatus
+from app.models.knowledge import KnowledgeSourceType
 from app.models.requirement_session import (
     RequirementDiscoverySession,
     RequirementDiscoveryStatus,
 )
+from app.rag.service import KnowledgeBaseService, RetrievedKnowledgeChunk
 from app.schemas.requirements import RequirementProfileDraft
 
 
 class RequirementDiscoveryService:
-    def __init__(self, model: RequirementModel):
-        self.graph = RequirementDiscoveryGraph(model)
+    def __init__(
+        self,
+        model: RequirementModel,
+        knowledge_base: KnowledgeBaseService | None = None,
+    ):
+        self.model = model
+        self.knowledge_base = knowledge_base or KnowledgeBaseService()
 
     def chat(
         self,
@@ -42,7 +50,13 @@ class RequirementDiscoveryService:
         if session.status == RequirementDiscoveryStatus.CONFIRMED:
             state = session.state_json
         else:
-            state = self.graph.invoke(
+            graph = RequirementDiscoveryGraph(
+                self.model,
+                knowledge_retriever=lambda profile: self._retrieve_knowledge(
+                    db, profile
+                ),
+            )
+            state = graph.invoke(
                 message,
                 state=(session.state_json or None),
             )
@@ -75,6 +89,18 @@ class RequirementDiscoveryService:
                         item.model_dump(mode="json")
                         for item in profile.selection_criteria
                     ],
+                    source_references=state.get("source_references", []),
+                    generation_metadata={
+                        "chat_model": get_settings().ollama_chat_model,
+                        "embedding_model": get_settings().ollama_embedding_model,
+                        "prompt_version": "requirement-discovery-v2",
+                        "knowledge_status": state.get(
+                            "knowledge_status", "not_searched"
+                        ),
+                    },
+                    interviewer_overrides={
+                        "messages": state.get("interviewer_overrides", [])
+                    },
                     status=RequirementProfileStatus.CONFIRMED,
                     created_by_user_id=interviewer_user_id,
                 )
@@ -90,6 +116,8 @@ class RequirementDiscoveryService:
 
     @staticmethod
     def _session_status(status: str) -> RequirementDiscoveryStatus:
+        if status == "awaiting_changes":
+            return RequirementDiscoveryStatus.ACTIVE
         try:
             return RequirementDiscoveryStatus(status)
         except ValueError:
@@ -104,4 +132,34 @@ class RequirementDiscoveryService:
             "profile": profile,
             "missing_fields": state.get("missing_fields", []),
             "error": state.get("error"),
+            "error_code": state.get("error_code"),
+            "knowledge_status": state.get(
+                "knowledge_status", "not_searched"
+            ),
+            "proposal_ready": state.get("proposal_ready", False),
+            "source_references": state.get("source_references", []),
         }
+
+    def _retrieve_knowledge(
+        self,
+        db: Session,
+        profile: RequirementProfileDraft,
+    ) -> list[RetrievedKnowledgeChunk]:
+        query = " ".join(
+            part for part in [profile.title or "", profile.summary or ""] if part
+        )
+        previous_jds = self.knowledge_base.search(
+            db,
+            query,
+            top_k=2,
+            min_score=0.1,
+            source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
+        )
+        policies = self.knowledge_base.search(
+            db,
+            query,
+            top_k=2,
+            min_score=0.1,
+            source_type=KnowledgeSourceType.COMPANY_POLICY,
+        )
+        return previous_jds + policies

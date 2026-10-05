@@ -22,7 +22,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "llama3.1:8b"
-    ollama_timeout_seconds: float = Field(default=60, ge=1, le=600)
+    ollama_embedding_model: str = "nomic-embed-text:latest"
+    ollama_timeout_seconds: float = Field(default=240, ge=1, le=600)
 
     @field_validator("jwt_secret_key")
     @classmethod

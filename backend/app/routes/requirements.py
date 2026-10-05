@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.agents.requirement_discovery import OllamaRequirementModel
 from app.database import get_db
 from app.models.user import User
+from app.rag.embeddings import OllamaEmbeddingProvider
+from app.rag.service import KnowledgeBaseService
 from app.schemas.requirements import (
     RequirementChatRequest,
     RequirementChatResponse,
@@ -24,7 +26,10 @@ def chat_about_requirements(
     db: Session = Depends(get_db),
     interviewer: User = Depends(require_interviewer),
 ):
-    service = RequirementDiscoveryService(OllamaRequirementModel())
+    service = RequirementDiscoveryService(
+        OllamaRequirementModel(),
+        KnowledgeBaseService(OllamaEmbeddingProvider()),
+    )
     try:
         session, result = service.chat(
             db,
@@ -51,4 +56,8 @@ def chat_about_requirements(
         missing_fields=result["missing_fields"],
         requirement_profile_id=session.requirement_profile_id,
         error=result["error"],
+        error_code=result["error_code"],
+        knowledge_status=result["knowledge_status"],
+        proposal_ready=result["proposal_ready"],
+        source_references=result["source_references"],
     )

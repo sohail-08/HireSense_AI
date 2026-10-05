@@ -10,8 +10,9 @@
 - Persistent PostgreSQL storage
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents
-- Knowledge-base document ingestion and offline retrieval foundation
-- Ollama-configured LangGraph requirement discovery workflow
+- Semantic company-knowledge ingestion using Ollama embeddings
+- RAG-backed LangGraph requirement discovery and JD generation
+- Interviewer UI for company knowledge, requirement review and JD approval
 
 ## Requirements
 
@@ -35,12 +36,46 @@ The backend runs migrations and seeds the Interviewer automatically.
 All public registrations create Candidates.
 
 The requirement-discovery chatbot uses Ollama on the host machine. Start
-Ollama and pull the configured model before using `POST /api/requirements/chat`:
+Ollama and pull both configured models before using the knowledge and
+requirement endpoints:
 
 ```powershell
 ollama serve
 ollama pull llama3.1:8b
+ollama pull nomic-embed-text
 ```
+
+When the backend runs in Docker, `OLLAMA_DOCKER_BASE_URL` must point to the
+host service. The default is `http://host.docker.internal:11434`; local
+non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
+
+## Job-description workflow
+
+1. Sign in as the Interviewer and open **Jobs**.
+2. Expand **Add company knowledge** and add one or more previous job
+   descriptions and company hiring policies.
+3. Start a new chat and describe the role, for example: `I want to hire a
+   backend engineer.`
+4. HireSense retrieves related company sources and proposes a complete
+   requirement profile. Choose **Use company defaults** or describe changes.
+5. Generate the job description, edit it if needed, and approve the draft.
+
+For a repeatable local demo, load the six clearly labelled fictional Northstar
+Digital documents included with the project:
+
+```powershell
+docker compose exec backend python -m app.seed_knowledge
+```
+
+The command is idempotent: rerunning it reports the documents as already
+present instead of creating duplicates. The dataset contains four historical
+engineering JDs and two hiring-policy documents. It is development/demo data
+only and must not be represented as real company policy.
+
+The chatbot does not treat the LLM's own completeness claim as authoritative.
+The backend checks required skills, qualifications, experience and selection
+criteria before confirmation is enabled. Confirmed profiles retain source
+references, model metadata and interviewer overrides for traceability.
 
 On startup, the backend runs `alembic upgrade head` before starting FastAPI.
 The first migration creates the existing authentication schema on a clean
@@ -72,9 +107,8 @@ Do not use `docker compose down -v` unless you intend to delete the database.
 - Changing INTERVIEWER_PASSWORD after the first startup does not change
   the existing account's password.
 - Database changes must be introduced through Alembic migrations.
-- Increment 3 stores company-policy and previous-job-description chunks in the
-  database and uses a deterministic local embedding provider for offline tests.
-  The `EmbeddingProvider` interface can later be backed by a semantic model.
+- Offline tests use deterministic embeddings; the running application uses
+  `nomic-embed-text` through Ollama for semantic retrieval.
 - Candidate documents will be stored under the private `private_storage`
   Docker volume. Do not place CVs, credentials or exported candidate data in
   the repository.

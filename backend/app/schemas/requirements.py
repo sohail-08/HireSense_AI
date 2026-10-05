@@ -64,6 +64,10 @@ class RequirementChatResponse(BaseModel):
     missing_fields: list[RequirementField]
     requirement_profile_id: int | None = None
     error: str | None = None
+    error_code: str | None = None
+    knowledge_status: Literal["not_searched", "found", "empty", "error"]
+    proposal_ready: bool = False
+    source_references: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class OllamaMessage(BaseModel):

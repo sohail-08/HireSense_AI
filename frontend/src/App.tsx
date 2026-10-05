@@ -17,6 +17,7 @@ import { InterviewerLayout } from "./layouts/InterviewerLayout";
 
 import { CandidateDashboard } from "./pages/CandidateDashboard";
 import { InterviewerDashboard } from "./pages/InterviewerDashboard";
+import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
@@ -78,9 +79,7 @@ export default function App() {
 
           <Route
             path="jobs"
-            element={
-              <PlaceholderPage title="Jobs" />
-            }
+            element={<JobDescriptionPage />}
           />
 
           <Route

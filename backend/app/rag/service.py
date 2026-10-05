@@ -73,7 +73,14 @@ class KnowledgeBaseService:
             source_type=source_type,
             source_uri=source_uri,
             content_hash=content_hash,
-            metadata_json=metadata or {},
+            metadata_json={
+                **(metadata or {}),
+                "embedding_model": getattr(
+                    self.embedding_provider,
+                    "model",
+                    self.embedding_provider.__class__.__name__,
+                ),
+            },
             created_by_user_id=created_by_user_id,
         )
         db.add(document)
@@ -91,7 +98,12 @@ class KnowledgeBaseService:
                     chunk_index=index,
                     content=chunk,
                     embedding=self.embedding_provider.embed(chunk),
-                    metadata_json={"title": document.title},
+                    metadata_json={
+                        "title": document.title,
+                        "embedding_model": document.metadata_json[
+                            "embedding_model"
+                        ],
+                    },
                 )
             )
 
@@ -127,6 +139,8 @@ class KnowledgeBaseService:
             return []
         matches: list[RetrievedKnowledgeChunk] = []
         for chunk, document in db.execute(statement):
+            if len(query_embedding) != len(chunk.embedding):
+                continue
             score = cosine_similarity(query_embedding, chunk.embedding)
             if score >= min_score:
                 matches.append(
@@ -144,3 +158,21 @@ class KnowledgeBaseService:
 
         matches.sort(key=lambda match: match.score, reverse=True)
         return matches[:top_k]
+
+    @staticmethod
+    def list_documents(db: Session) -> list[KnowledgeDocument]:
+        return list(
+            db.scalars(
+                select(KnowledgeDocument).order_by(
+                    KnowledgeDocument.created_at.desc()
+                )
+            )
+        )
+
+    @staticmethod
+    def delete_document(db: Session, document_id: int) -> None:
+        document = db.get(KnowledgeDocument, document_id)
+        if document is None:
+            raise LookupError("Knowledge document not found")
+        db.delete(document)
+        db.commit()

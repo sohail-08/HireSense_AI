@@ -31,6 +31,9 @@ class RequirementProfileResponse(RequirementProfileCreate):
     created_by_user_id: int | None
     created_at: datetime
     updated_at: datetime
+    source_references: list[dict[str, Any]]
+    generation_metadata: dict[str, Any]
+    interviewer_overrides: dict[str, Any]
 
 
 class JobDescriptionCreate(BaseModel):

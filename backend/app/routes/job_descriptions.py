@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.agents.job_description import OllamaJobDescriptionModel
 from app.database import get_db
 from app.models.user import User
+from app.rag.embeddings import OllamaEmbeddingProvider
+from app.rag.service import KnowledgeBaseService
 from app.schemas.job import (
     JobDescriptionGenerateRequest,
     JobDescriptionResponse,
@@ -20,7 +22,10 @@ router = APIRouter(
 
 
 def _service() -> JobDescriptionService:
-    return JobDescriptionService(OllamaJobDescriptionModel())
+    return JobDescriptionService(
+        OllamaJobDescriptionModel(),
+        KnowledgeBaseService(OllamaEmbeddingProvider()),
+    )
 
 
 @router.post(

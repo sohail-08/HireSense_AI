@@ -145,3 +145,14 @@ def test_requirement_discovery_migration_creates_session_table(tmp_path):
             for column in inspector.get_columns("requirement_discovery_sessions")
         }
     )
+
+    assert {
+        "source_references",
+        "generation_metadata",
+        "interviewer_overrides",
+    }.issubset(
+        {
+            column["name"]
+            for column in inspector.get_columns("requirement_profiles")
+        }
+    )

@@ -56,6 +56,15 @@ class RequirementProfile(Base):
     selection_criteria: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON, default=list
     )
+    source_references: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list
+    )
+    generation_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict
+    )
+    interviewer_overrides: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict
+    )
     status: Mapped[RequirementProfileStatus] = mapped_column(
         SqlEnum(
             RequirementProfileStatus,

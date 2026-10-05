@@ -11,6 +11,7 @@ from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
 from app.routes.job_descriptions import router as job_descriptions_router
+from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
 from app.seed_interviewer import seed_interviewer
 from app.storage import ensure_storage_root
@@ -51,6 +52,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(job_descriptions_router)
+app.include_router(knowledge_router)
 app.include_router(requirements_router)
 
 
