@@ -7,10 +7,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import Base, SessionLocal, engine, get_db
+from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
 from app.seed_interviewer import seed_interviewer
+from app.storage import ensure_storage_root
 
 
 configure_logging()
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    ensure_storage_root()
 
     with SessionLocal() as db:
         seed_interviewer(db)
@@ -42,7 +43,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_url],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

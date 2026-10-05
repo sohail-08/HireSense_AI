@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:5173"
 
+    storage_root: str = "storage"
+    cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
+
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_secret(cls, value: SecretStr) -> SecretStr:

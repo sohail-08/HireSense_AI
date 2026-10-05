@@ -14,4 +14,11 @@ logs/
 storage/
 *.log
 
+# Local databases and private integration credentials
+*.db
+*.sqlite
+*.sqlite3
+google-service-account*.json
+service-account-key*.json
+
 .DS_Store

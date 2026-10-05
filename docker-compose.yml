@@ -34,9 +34,14 @@ services:
       INTERVIEWER_EMAIL: ${INTERVIEWER_EMAIL:?Set INTERVIEWER_EMAIL in .env}
       INTERVIEWER_PASSWORD: ${INTERVIEWER_PASSWORD:?Set INTERVIEWER_PASSWORD in .env}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/app/storage}
+      CV_MAX_FILE_SIZE_MB: ${CV_MAX_FILE_SIZE_MB:-10}
 
     ports:
       - "127.0.0.1:8000:8000"
+
+    volumes:
+      - private_storage:/app/storage
 
     depends_on:
       postgres:
@@ -69,3 +74,4 @@ services:
 
 volumes:
   postgres_data:
+  private_storage:
