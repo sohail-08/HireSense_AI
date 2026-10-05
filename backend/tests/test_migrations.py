@@ -5,6 +5,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 from app.database import Base
+from app.models.user import User
 
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
@@ -42,10 +43,49 @@ def test_baseline_migration_creates_schema(tmp_path):
 def test_baseline_migration_adopts_existing_schema(tmp_path):
     database_url = f"sqlite:///{tmp_path / 'existing.db'}"
     engine = create_engine(database_url)
-    Base.metadata.create_all(engine)
+    User.__table__.create(engine)
 
     run_upgrade(database_url)
 
     inspector = inspect(engine)
     assert "alembic_version" in inspector.get_table_names()
     assert "users" in inspector.get_table_names()
+
+
+def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'domain.db'}"
+
+    run_upgrade(database_url)
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+
+    assert {
+        "requirement_profiles",
+        "job_descriptions",
+        "job_postings",
+        "candidates",
+        "candidate_applications",
+        "cv_documents",
+    }.issubset(inspector.get_table_names())
+
+    assert {
+        "id",
+        "title",
+        "required_skills",
+        "preferred_skills",
+        "qualifications",
+        "selection_criteria",
+        "status",
+    }.issubset(
+        {column["name"] for column in inspector.get_columns("requirement_profiles")}
+    )
+    assert {
+        "application_id",
+        "candidate_id",
+        "storage_path",
+        "sha256",
+        "status",
+    }.issubset(
+        {column["name"] for column in inspector.get_columns("cv_documents")}
+    )
