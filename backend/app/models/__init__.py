@@ -14,6 +14,7 @@ from app.models.job import (
     RequirementProfile,
     RequirementProfileStatus,
 )
+from app.models.knowledge import KnowledgeChunk, KnowledgeDocument, KnowledgeSourceType
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -27,6 +28,9 @@ __all__ = [
     "JobDescriptionStatus",
     "JobPosting",
     "JobPostingStatus",
+    "KnowledgeChunk",
+    "KnowledgeDocument",
+    "KnowledgeSourceType",
     "RequirementProfile",
     "RequirementProfileStatus",
     "User",

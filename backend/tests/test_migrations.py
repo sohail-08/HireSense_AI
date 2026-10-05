@@ -89,3 +89,36 @@ def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
     }.issubset(
         {column["name"] for column in inspector.get_columns("cv_documents")}
     )
+
+
+def test_knowledge_base_migration_creates_document_and_chunk_tables(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'knowledge.db'}"
+
+    run_upgrade(database_url)
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+
+    assert {
+        "knowledge_documents",
+        "knowledge_chunks",
+    }.issubset(inspector.get_table_names())
+    assert {
+        "title",
+        "source_type",
+        "content_hash",
+        "metadata_json",
+    }.issubset(
+        {
+            column["name"]
+            for column in inspector.get_columns("knowledge_documents")
+        }
+    )
+    assert {
+        "document_id",
+        "chunk_index",
+        "content",
+        "embedding",
+    }.issubset(
+        {column["name"] for column in inspector.get_columns("knowledge_chunks")}
+    )

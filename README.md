@@ -10,6 +10,7 @@
 - Persistent PostgreSQL storage
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents
+- Knowledge-base document ingestion and offline retrieval foundation
 
 ## Requirements
 
@@ -62,6 +63,9 @@ Do not use `docker compose down -v` unless you intend to delete the database.
 - Changing INTERVIEWER_PASSWORD after the first startup does not change
   the existing account's password.
 - Database changes must be introduced through Alembic migrations.
+- Increment 3 stores company-policy and previous-job-description chunks in the
+  database and uses a deterministic local embedding provider for offline tests.
+  The `EmbeddingProvider` interface can later be backed by a semantic model.
 - Candidate documents will be stored under the private `private_storage`
   Docker volume. Do not place CVs, credentials or exported candidate data in
   the repository.
