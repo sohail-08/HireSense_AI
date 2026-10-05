@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
 
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_chat_model: str = "llama3.1:8b"
+    ollama_timeout_seconds: float = Field(default=60, ge=1, le=600)
+
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_secret(cls, value: SecretStr) -> SecretStr:

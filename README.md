@@ -11,6 +11,7 @@
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents
 - Knowledge-base document ingestion and offline retrieval foundation
+- Ollama-configured LangGraph requirement discovery workflow
 
 ## Requirements
 
@@ -32,6 +33,14 @@ Health check: http://localhost:8000/api/health
 
 The backend runs migrations and seeds the Interviewer automatically.
 All public registrations create Candidates.
+
+The requirement-discovery chatbot uses Ollama on the host machine. Start
+Ollama and pull the configured model before using `POST /api/requirements/chat`:
+
+```powershell
+ollama serve
+ollama pull llama3.1:8b
+```
 
 On startup, the backend runs `alembic upgrade head` before starting FastAPI.
 The first migration creates the existing authentication schema on a clean

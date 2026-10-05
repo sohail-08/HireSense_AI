@@ -15,6 +15,10 @@ from app.models.job import (
     RequirementProfileStatus,
 )
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument, KnowledgeSourceType
+from app.models.requirement_session import (
+    RequirementDiscoverySession,
+    RequirementDiscoveryStatus,
+)
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -31,6 +35,8 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeDocument",
     "KnowledgeSourceType",
+    "RequirementDiscoverySession",
+    "RequirementDiscoveryStatus",
     "RequirementProfile",
     "RequirementProfileStatus",
     "User",

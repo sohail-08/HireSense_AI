@@ -122,3 +122,26 @@ def test_knowledge_base_migration_creates_document_and_chunk_tables(tmp_path):
     }.issubset(
         {column["name"] for column in inspector.get_columns("knowledge_chunks")}
     )
+
+
+def test_requirement_discovery_migration_creates_session_table(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'requirement-session.db'}"
+
+    run_upgrade(database_url)
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+
+    assert "requirement_discovery_sessions" in inspector.get_table_names()
+    assert {
+        "id",
+        "interviewer_user_id",
+        "requirement_profile_id",
+        "status",
+        "state_json",
+    }.issubset(
+        {
+            column["name"]
+            for column in inspector.get_columns("requirement_discovery_sessions")
+        }
+    )
