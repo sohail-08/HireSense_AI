@@ -8,6 +8,7 @@ from app.models.job import (
     JobPostingStatus,
     RequirementProfileStatus,
 )
+from app.schemas.requirements import RequirementItem
 
 
 class RequirementProfileCreate(BaseModel):
@@ -51,6 +52,42 @@ class JobDescriptionResponse(JobDescriptionCreate):
     created_by_user_id: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class JobDescriptionDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=2, max_length=200)
+    summary: str = Field(min_length=1, max_length=10_000)
+    responsibilities: list[str] = Field(min_length=1, max_length=30)
+    required_skills: list[RequirementItem] = Field(default_factory=list)
+    preferred_skills: list[RequirementItem] = Field(default_factory=list)
+    qualifications: list[RequirementItem] = Field(default_factory=list)
+    experience_requirement: str = Field(min_length=1, max_length=2000)
+    selection_criteria: list[str] = Field(min_length=1, max_length=20)
+
+
+class JobDescriptionGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requirement_profile_id: int = Field(gt=0)
+
+
+class JobDescriptionUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    content: str | None = Field(default=None, min_length=1)
+    structured_content: JobDescriptionDraft | None = None
+
+
+class JobDescriptionEvidence(BaseModel):
+    document_id: int
+    document_title: str
+    chunk_id: int
+    chunk_index: int
+    score: float
+    source_uri: str | None
 
 
 class JobPostingCreate(BaseModel):
