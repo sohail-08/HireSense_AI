@@ -1,12 +1,10 @@
 import json
 from typing import Protocol
 
-import httpx
-
 from app.config import get_settings
+from app.llm.gemini import GeminiStructuredClient
 from app.rag.service import RetrievedKnowledgeChunk
 from app.schemas.job import JobDescriptionDraft
-from app.schemas.requirements import OllamaMessage
 
 
 class JobDescriptionModel(Protocol):
@@ -19,18 +17,16 @@ class JobDescriptionModel(Protocol):
         ...
 
 
-class OllamaJobDescriptionModel:
+class GeminiJobDescriptionModel:
     def __init__(
         self,
         *,
-        base_url: str | None = None,
+        client: GeminiStructuredClient | None = None,
         model: str | None = None,
-        timeout_seconds: float | None = None,
     ):
         settings = get_settings()
-        self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
-        self.model = model or settings.ollama_chat_model
-        self.timeout_seconds = timeout_seconds or settings.ollama_timeout_seconds
+        self.client = client or GeminiStructuredClient()
+        self.model = model or settings.gemini_chat_model
 
     def generate(
         self,
@@ -62,30 +58,17 @@ preferred skills must remain preferred. Return only JSON matching the requested 
             + "\n\nRetrieved source context:\n"
             + evidence_text
         )
-        payload = {
-            "model": self.model,
-            "messages": [
-                OllamaMessage(role="system", content=system_prompt).model_dump(),
-                OllamaMessage(role="user", content=user_prompt).model_dump(),
-            ],
-            "stream": False,
-            "format": JobDescriptionDraft.model_json_schema(),
-            "options": {"temperature": 0},
-        }
-
         try:
-            response = httpx.post(
-                f"{self.base_url}/api/chat",
-                json=payload,
-                timeout=self.timeout_seconds,
+            result = self.client.generate_json(
+                model=self.model,
+                system_instruction=system_prompt,
+                prompt=user_prompt,
+                schema=JobDescriptionDraft.model_json_schema(),
             )
-            response.raise_for_status()
-            response_data = response.json()
-            content = response_data.get("message", {}).get("content", "")
-            return JobDescriptionDraft.model_validate(json.loads(content))
-        except (httpx.HTTPError, json.JSONDecodeError, ValueError) as exc:
+            return JobDescriptionDraft.model_validate(result)
+        except ValueError as exc:
             raise RuntimeError(
-                "Ollama could not return a valid job-description draft"
+                "Gemini returned an invalid job-description draft"
             ) from exc
 
 

@@ -70,15 +70,9 @@ class RequirementChatResponse(BaseModel):
     source_references: list[dict[str, Any]] = Field(default_factory=list)
 
 
-class OllamaMessage(BaseModel):
+class RequirementConversationMessage(BaseModel):
     role: Literal["system", "user", "assistant"]
     content: str
-
-
-class OllamaStructuredResponse(BaseModel):
-    profile: RequirementProfileDraft
-    missing_fields: list[RequirementField] = Field(default_factory=list)
-    follow_up_question: str | None = None
 
 
 def draft_to_storage(profile: RequirementProfileDraft) -> dict[str, Any]:

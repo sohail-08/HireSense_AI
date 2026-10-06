@@ -91,7 +91,8 @@ class RequirementDiscoveryService:
                     ],
                     source_references=state.get("source_references", []),
                     generation_metadata={
-                        "chat_model": get_settings().ollama_chat_model,
+                        "generation_provider": "gemini",
+                        "chat_model": get_settings().gemini_chat_model,
                         "embedding_model": get_settings().ollama_embedding_model,
                         "prompt_version": "requirement-discovery-v2",
                         "knowledge_status": state.get(

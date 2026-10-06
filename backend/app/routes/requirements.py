@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.agents.requirement_discovery import OllamaRequirementModel
+from app.agents.requirement_discovery import GeminiRequirementModel
 from app.database import get_db
 from app.models.user import User
 from app.rag.embeddings import OllamaEmbeddingProvider
@@ -27,7 +27,7 @@ def chat_about_requirements(
     interviewer: User = Depends(require_interviewer),
 ):
     service = RequirementDiscoveryService(
-        OllamaRequirementModel(),
+        GeminiRequirementModel(),
         KnowledgeBaseService(OllamaEmbeddingProvider()),
     )
     try:

@@ -21,9 +21,15 @@ class Settings(BaseSettings):
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "llama3.1:8b"
     ollama_embedding_model: str = "nomic-embed-text:latest"
-    ollama_timeout_seconds: float = Field(default=240, ge=1, le=600)
+    ollama_timeout_seconds: float = Field(default=60, ge=1, le=600)
+
+    gemini_api_key: SecretStr | None = None
+    gemini_api_base_url: str = (
+        "https://generativelanguage.googleapis.com/v1beta"
+    )
+    gemini_chat_model: str = "gemini-3.5-flash-lite"
+    gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
 
     @field_validator("jwt_secret_key")
     @classmethod

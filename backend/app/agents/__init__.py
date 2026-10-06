@@ -1,19 +1,19 @@
 from app.agents.job_description import (
+    GeminiJobDescriptionModel,
     JobDescriptionModel,
-    OllamaJobDescriptionModel,
     render_job_description,
 )
 from app.agents.requirement_discovery import (
-    OllamaRequirementModel,
+    GeminiRequirementModel,
     RequirementDiscoveryGraph,
     RequirementModel,
 )
 
 __all__ = [
-    "OllamaRequirementModel",
+    "GeminiRequirementModel",
     "RequirementDiscoveryGraph",
     "RequirementModel",
     "JobDescriptionModel",
-    "OllamaJobDescriptionModel",
+    "GeminiJobDescriptionModel",
     "render_job_description",
 ]

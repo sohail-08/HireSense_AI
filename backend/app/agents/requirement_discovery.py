@@ -1,16 +1,14 @@
-import json
 import logging
 from collections.abc import Callable
 from typing import Any, Protocol, TypedDict
 
-import httpx
 from langgraph.graph import END, START, StateGraph
 
 from app.config import get_settings
+from app.llm.gemini import GeminiStructuredClient
 from app.rag.service import RetrievedKnowledgeChunk
 from app.schemas.requirements import (
-    OllamaMessage,
-    OllamaStructuredResponse,
+    RequirementConversationMessage,
     RequirementExtraction,
     RequirementProfileDraft,
 )
@@ -23,7 +21,7 @@ class RequirementModel(Protocol):
     def extract(
         self,
         *,
-        messages: list[OllamaMessage],
+        messages: list[RequirementConversationMessage],
         current_profile: RequirementProfileDraft,
         evidence: list[dict[str, Any]],
     ) -> RequirementExtraction:
@@ -106,23 +104,21 @@ def required_missing_fields(profile: RequirementProfileDraft) -> list[str]:
     return missing
 
 
-class OllamaRequirementModel:
+class GeminiRequirementModel:
     def __init__(
         self,
         *,
-        base_url: str | None = None,
+        client: GeminiStructuredClient | None = None,
         model: str | None = None,
-        timeout_seconds: float | None = None,
     ):
         settings = get_settings()
-        self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
-        self.model = model or settings.ollama_chat_model
-        self.timeout_seconds = timeout_seconds or settings.ollama_timeout_seconds
+        self.client = client or GeminiStructuredClient()
+        self.model = model or settings.gemini_chat_model
 
     def extract(
         self,
         *,
-        messages: list[OllamaMessage],
+        messages: list[RequirementConversationMessage],
         current_profile: RequirementProfileDraft,
         evidence: list[dict[str, Any]],
     ) -> RequirementExtraction:
@@ -143,36 +139,18 @@ class OllamaRequirementModel:
                 f"{message.role}: {message.content}" for message in messages
             )
         )
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "format": OllamaStructuredResponse.model_json_schema(),
-            "options": {"temperature": 0},
-        }
-
         try:
-            response = httpx.post(
-                f"{self.base_url}/api/chat",
-                json=payload,
-                timeout=self.timeout_seconds,
+            result = self.client.generate_json(
+                model=self.model,
+                system_instruction=SYSTEM_PROMPT,
+                prompt=prompt,
+                schema=RequirementExtraction.model_json_schema(),
             )
-            response.raise_for_status()
-            content = response.json().get("message", {}).get("content", "")
-            extraction = OllamaStructuredResponse.model_validate(
-                json.loads(content)
-            )
-        except httpx.HTTPError as exc:
-            raise RuntimeError("Ollama chat service is unavailable") from exc
-        except (json.JSONDecodeError, ValueError) as exc:
+            return RequirementExtraction.model_validate(result)
+        except ValueError as exc:
             raise RuntimeError(
-                "Ollama returned an invalid requirement profile"
+                "Gemini returned an invalid requirement profile"
             ) from exc
-
-        return RequirementExtraction.model_validate(extraction.model_dump())
 
 
 class RequirementDiscoveryGraph:
@@ -268,7 +246,7 @@ class RequirementDiscoveryGraph:
         try:
             extraction = self.model.extract(
                 messages=[
-                    OllamaMessage.model_validate(message)
+                    RequirementConversationMessage.model_validate(message)
                     for message in state.get("messages", [])
                 ],
                 current_profile=current_profile,
@@ -278,7 +256,7 @@ class RequirementDiscoveryGraph:
             logger.exception("Requirement extraction failed")
             return {
                 "error": str(exc),
-                "error_code": "ollama_unavailable",
+                "error_code": "generation_failed",
                 "status": "error",
                 "confirmed": False,
             }
@@ -415,8 +393,8 @@ class RequirementDiscoveryGraph:
             )
         else:
             message = (
-                "I could not process that message because the local AI service is "
-                "unavailable or returned invalid data. Please retry."
+                "I could not process that message because Gemini is unavailable, "
+                "the API quota was exceeded, or the response was invalid. Please retry."
             )
         messages = list(state.get("messages", []))
         messages.append({"role": "assistant", "content": message})

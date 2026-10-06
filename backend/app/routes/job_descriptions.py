@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.agents.job_description import OllamaJobDescriptionModel
+from app.agents.job_description import GeminiJobDescriptionModel
 from app.database import get_db
 from app.models.user import User
 from app.rag.embeddings import OllamaEmbeddingProvider
@@ -23,7 +23,7 @@ router = APIRouter(
 
 def _service() -> JobDescriptionService:
     return JobDescriptionService(
-        OllamaJobDescriptionModel(),
+        GeminiJobDescriptionModel(),
         KnowledgeBaseService(OllamaEmbeddingProvider()),
     )
 
