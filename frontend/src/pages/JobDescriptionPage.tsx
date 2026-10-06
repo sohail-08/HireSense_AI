@@ -12,6 +12,7 @@ import {
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
 import type {
+  DiscordPostingAssistantResponse,
   JobDescriptionDraft,
   JobDescriptionEvidence,
   JobDescriptionResponse,
@@ -24,6 +25,7 @@ import type {
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  outcome?: "success" | "failure";
 };
 
 const initialAssistantMessage =
@@ -107,6 +109,7 @@ export function JobDescriptionPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [generationLoading, setGenerationLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [postingRefreshKey, setPostingRefreshKey] = useState(0);
   const [error, setError] = useState<string>();
   const [knowledgeTitle, setKnowledgeTitle] = useState("");
   const [knowledgeContent, setKnowledgeContent] = useState("");
@@ -166,6 +169,40 @@ export function JobDescriptionPage() {
     ]);
   }
 
+  function addTaskMessage(
+    outcome: "success" | "failure",
+    content: string,
+  ) {
+    setMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        outcome,
+        content: `${outcome === "success" ? "Success" : "Failed"}: ${content}`,
+      },
+    ]);
+  }
+
+  async function refreshWorkflowContents() {
+    setPostingRefreshKey((current) => current + 1);
+    try {
+      const items = await apiRequest<JobDescriptionResponse[]>(
+        "/job-descriptions",
+      );
+      setJobDescriptions(items);
+      if (jobDescription) {
+        const refreshed = items.find((item) => item.id === jobDescription.id);
+        if (refreshed) {
+          setJobDescription(refreshed);
+          setDraftTitle(refreshed.title);
+          setDraftContent(refreshed.content);
+        }
+      }
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    }
+  }
+
   function selectJobDescription(item: JobDescriptionResponse) {
     setJobDescription(item);
     setDraftTitle(item.title);
@@ -186,6 +223,35 @@ export function JobDescriptionPage() {
     setInput("");
 
     try {
+      if (jobDescription?.status === "approved") {
+        const response = await apiRequest<DiscordPostingAssistantResponse>(
+          "/job-postings/discord/assistant",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              job_description_id: jobDescription.id,
+              message: trimmedMessage,
+            }),
+          },
+        );
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content:
+              response.status === "published"
+                ? `Success: ${response.assistant_message}`
+                : response.assistant_message,
+            outcome:
+              response.status === "published" ? "success" : undefined,
+          },
+        ]);
+        if (response.posting) {
+          await refreshWorkflowContents();
+        }
+        return;
+      }
+
       const response = await apiRequest<RequirementChatResponse>(
         "/requirements/chat",
         {
@@ -216,7 +282,12 @@ export function JobDescriptionPage() {
         setError(response.error);
       }
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", message);
+      if (jobDescription?.status === "approved") {
+        await refreshWorkflowContents();
+      }
     } finally {
       setChatLoading(false);
     }
@@ -234,6 +305,7 @@ export function JobDescriptionPage() {
     setProposalReady(false);
     setRequirementProfileId(undefined);
     setJobDescription(undefined);
+    setPostingRefreshKey((current) => current + 1);
     setDraftTitle("");
     setDraftContent("");
     setError(undefined);
@@ -314,8 +386,14 @@ export function JobDescriptionPage() {
       setDraftTitle(response.title);
       setDraftContent(response.content);
       upsertJobDescription(response);
+      addTaskMessage(
+        "success",
+        `Job description “${response.title}” was generated.`,
+      );
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", `Could not generate the job description. ${message}`);
     } finally {
       setGenerationLoading(false);
     }
@@ -341,8 +419,11 @@ export function JobDescriptionPage() {
       setDraftTitle(response.title);
       setDraftContent(response.content);
       upsertJobDescription(response);
+      addTaskMessage("success", "Job-description edits were saved.");
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", `Could not save the job description. ${message}`);
     } finally {
       setSaveLoading(false);
     }
@@ -360,8 +441,15 @@ export function JobDescriptionPage() {
       );
       setJobDescription(response);
       upsertJobDescription(response);
+      addTaskMessage(
+        "success",
+        "The job description was approved. You can now tell me to post this job.",
+      );
+      await refreshWorkflowContents();
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", `Could not approve the job description. ${message}`);
     } finally {
       setSaveLoading(false);
     }
@@ -379,8 +467,14 @@ export function JobDescriptionPage() {
       );
       upsertJobDescription(response);
       selectJobDescription(response);
+      addTaskMessage(
+        "success",
+        `Created editable version ${response.version} of “${response.title}”.`,
+      );
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", `Could not create an editable version. ${message}`);
     } finally {
       setSaveLoading(false);
     }
@@ -410,8 +504,14 @@ export function JobDescriptionPage() {
         setDraftTitle("");
         setDraftContent("");
       }
+      addTaskMessage(
+        "success",
+        `Deleted “${item.title}” version ${item.version}.`,
+      );
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      addTaskMessage("failure", `Could not delete the job description. ${message}`);
     } finally {
       setDeletingJobId(undefined);
     }
@@ -642,9 +742,11 @@ export function JobDescriptionPage() {
         <section className="flex min-h-[640px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-900">Requirement chat</h2>
+              <h2 className="font-semibold text-slate-900">HireSense assistant</h2>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                {knowledgeStatus === "found"
+                {jobDescription?.status === "approved"
+                  ? "Job posting mode"
+                  : knowledgeStatus === "found"
                   ? "Previous job descriptions found"
                   : knowledgeStatus === "empty"
                     ? "No matching data"
@@ -654,7 +756,7 @@ export function JobDescriptionPage() {
               </span>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              Required details are collected before the profile can be confirmed.
+              One central assistant handles requirements and approved-job posting.
             </p>
           </div>
 
@@ -670,7 +772,11 @@ export function JobDescriptionPage() {
                   className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                     message.role === "user"
                       ? "rounded-br-sm bg-blue-600 text-white"
-                      : "rounded-bl-sm bg-slate-100 text-slate-700"
+                      : message.outcome === "success"
+                        ? "rounded-bl-sm border border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : message.outcome === "failure"
+                          ? "rounded-bl-sm border border-red-200 bg-red-50 text-red-800"
+                          : "rounded-bl-sm bg-slate-100 text-slate-700"
                   }`}
                 >
                   {message.content}
@@ -680,12 +786,14 @@ export function JobDescriptionPage() {
 
             {chatLoading ? (
               <p className="text-sm text-slate-500" role="status">
-                Searching previous job descriptions and preparing a proposal…
+                {jobDescription?.status === "approved"
+                  ? "Processing the job-posting task…"
+                  : "Searching previous job descriptions and preparing a proposal…"}
               </p>
             ) : null}
           </div>
 
-          {requirementSources.length ? (
+          {jobDescription?.status !== "approved" && requirementSources.length ? (
             <div className="border-t border-slate-200 bg-blue-50/60 px-5 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                 Sources used for this proposal
@@ -700,7 +808,7 @@ export function JobDescriptionPage() {
             </div>
           ) : null}
 
-          {formattedMissingFields.length ? (
+          {jobDescription?.status !== "approved" && formattedMissingFields.length ? (
             <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
               Still needed: {formattedMissingFields.join(", ")}.
             </p>
@@ -714,20 +822,39 @@ export function JobDescriptionPage() {
               htmlFor="requirement-message"
               className="sr-only"
             >
-              Requirement message
+              Assistant message
             </label>
             <div className="flex gap-2">
               <input
                 id="requirement-message"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="e.g. Python and FastAPI are required…"
-                disabled={chatLoading || Boolean(requirementProfileId)}
+                placeholder={
+                  jobDescription?.status === "approved"
+                    ? 'e.g. “Post this job”'
+                    : requirementProfileId
+                      ? "Generate and approve a job description to continue…"
+                      : "e.g. Python and FastAPI are required…"
+                }
+                disabled={
+                  chatLoading ||
+                  Boolean(
+                    requirementProfileId &&
+                    jobDescription?.status !== "approved",
+                  )
+                }
                 className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               />
               <button
                 type="submit"
-                disabled={chatLoading || !input.trim() || Boolean(requirementProfileId)}
+                disabled={
+                  chatLoading ||
+                  !input.trim() ||
+                  Boolean(
+                    requirementProfileId &&
+                    jobDescription?.status !== "approved",
+                  )
+                }
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Send
@@ -907,7 +1034,10 @@ export function JobDescriptionPage() {
                 )}
 
                 {jobDescription.status === "approved" ? (
-                  <DiscordJobPostPanel jobDescription={jobDescription} />
+                  <DiscordJobPostPanel
+                    jobDescription={jobDescription}
+                    refreshKey={postingRefreshKey}
+                  />
                 ) : null}
 
                 <div className="rounded-xl bg-slate-50 p-4">

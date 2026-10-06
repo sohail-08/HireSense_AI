@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.agents.job_posting import GeminiPostingCommandModel
 from app.config import get_settings
 from app.database import get_db
 from app.integrations.discord import (
@@ -11,11 +12,14 @@ from app.integrations.discord import (
 from app.models.user import User
 from app.schemas.job_posting import (
     DiscordJobPostResponse,
+    DiscordPostingAssistantRequest,
+    DiscordPostingAssistantResponse,
     DiscordPostDefaultsResponse,
     DiscordPostPreviewRequest,
     DiscordPublishRequest,
 )
 from app.security import require_interviewer
+from app.services.job_posting_assistant_service import JobPostingAssistantService
 from app.services.job_posting_service import (
     DiscordJobPostingService,
     PublicationConflictError,
@@ -31,6 +35,46 @@ router = APIRouter(
 
 def _service() -> DiscordJobPostingService:
     return DiscordJobPostingService()
+
+
+def _assistant_service() -> JobPostingAssistantService:
+    return JobPostingAssistantService(GeminiPostingCommandModel())
+
+
+@router.post(
+    "/discord/assistant",
+    response_model=DiscordPostingAssistantResponse,
+)
+def chat_with_discord_posting_assistant(
+    data: DiscordPostingAssistantRequest,
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    try:
+        return _assistant_service().chat(
+            db,
+            job_description_id=data.job_description_id,
+            interviewer_user_id=interviewer.id,
+            message=data.message,
+            posting_id=data.posting_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except (PublicationConflictError, StaleJobDescriptionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except DiscordConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=exc.safe_message) from None
+    except DiscordDeliveryUncertainError as exc:
+        raise HTTPException(status_code=504, detail=exc.safe_message) from None
+    except DiscordPublishError as exc:
+        raise HTTPException(status_code=502, detail=exc.safe_message) from None
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"The job-posting assistant is unavailable: {exc}",
+        ) from None
 
 
 @router.get(

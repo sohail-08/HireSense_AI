@@ -1,4 +1,5 @@
 import json
+from datetime import date, timedelta
 
 import httpx
 import pytest
@@ -9,6 +10,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
+from app.agents.job_posting import (
+    JobPostingAssistantGraph,
+    PostingCommandExtraction,
+)
 from app.integrations.discord import (
     DiscordConfigurationError,
     DiscordDeliveryUncertainError,
@@ -35,6 +40,7 @@ from app.services.job_posting_service import (
     PublicationConflictError,
     StaleJobDescriptionError,
 )
+from app.services.job_posting_assistant_service import JobPostingAssistantService
 
 
 class StubPublisher:
@@ -47,6 +53,14 @@ class StubPublisher:
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return self.outcome
+
+
+class StubPostingCommandModel:
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+
+    def extract(self, **_kwargs):
+        return self.outcomes.pop(0)
 
 
 def _database():
@@ -165,6 +179,89 @@ def test_composer_omits_empty_optional_fields_and_enforces_limits():
             ),
         )
 
+
+def test_posting_assistant_graph_collects_only_link_and_deadline():
+    deadline = date.today() + timedelta(days=14)
+    graph = JobPostingAssistantGraph(
+        StubPostingCommandModel(
+            [
+                PostingCommandExtraction(
+                    action="provide_details",
+                    application_url="https://forms.example.com/apply",
+                    application_deadline=deadline,
+                )
+            ]
+        )
+    )
+
+    state = graph.invoke(message="Use this application link and deadline")
+
+    assert state["application_url"] == "https://forms.example.com/apply"
+    assert state["application_deadline"] == deadline.isoformat()
+    assert state["missing_fields"] == []
+
+
+def test_posting_assistant_asks_then_previews_and_publishes_after_approval():
+    engine, sessions = _database()
+    deadline = date.today() + timedelta(days=14)
+    publisher = StubPublisher(DiscordPublishResult("333", "222", "111"))
+    command_model = StubPostingCommandModel(
+        [
+            PostingCommandExtraction(action="start"),
+            PostingCommandExtraction(
+                action="provide_details",
+                application_url="https://forms.example.com/apply",
+                application_deadline=deadline,
+            ),
+            PostingCommandExtraction(action="approve"),
+        ]
+    )
+    service = JobPostingAssistantService(
+        command_model,
+        DiscordJobPostingService(publisher=publisher),
+    )
+
+    with sessions() as db:
+        interviewer, _, job = _records(db)
+        requested = service.chat(
+            db,
+            job_description_id=job.id,
+            interviewer_user_id=interviewer.id,
+            message="Post this job",
+        )
+        assert requested["status"] == "awaiting_details"
+        assert requested["missing_fields"] == [
+            "application_url",
+            "application_deadline",
+        ]
+
+        prepared = service.chat(
+            db,
+            job_description_id=job.id,
+            interviewer_user_id=interviewer.id,
+            message=(
+                "Use https://forms.example.com/apply and "
+                f"{deadline.isoformat()}"
+            ),
+        )
+        posting = prepared["posting"]
+        assert prepared["status"] == "awaiting_approval"
+        assert posting.status is JobPostingStatus.DRAFT
+        assert posting.application_url == "https://forms.example.com/apply"
+        assert posting.application_deadline == deadline
+        assert publisher.calls == []
+
+        published = service.chat(
+            db,
+            job_description_id=job.id,
+            interviewer_user_id=interviewer.id,
+            posting_id=posting.id,
+            message="approve",
+        )
+        assert published["status"] == "published"
+        assert published["posting"].status is JobPostingStatus.PUBLISHED
+        assert len(publisher.calls) == 1
+    engine.dispose()
 
 def test_confirmed_publication_is_saved_with_discord_link():
     engine, sessions = _database()

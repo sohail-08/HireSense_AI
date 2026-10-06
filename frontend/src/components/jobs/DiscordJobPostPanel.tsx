@@ -64,8 +64,10 @@ function statusStyle(status: DiscordJobPost["status"]): string {
 
 export function DiscordJobPostPanel({
   jobDescription,
+  refreshKey = 0,
 }: {
   jobDescription: JobDescriptionResponse;
+  refreshKey?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PostForm>(emptyForm);
@@ -97,6 +99,12 @@ export function DiscordJobPostPanel({
           setSavedPreview(editablePreview);
           setForm(formFromPost(editablePreview));
           setPreviewCurrent(true);
+          if (
+            editablePreview.application_url &&
+            editablePreview.application_deadline
+          ) {
+            setOpen(true);
+          }
         } else {
           setSavedPreview(posts[0]);
           setForm(formFromDefaults(defaults));
@@ -112,7 +120,7 @@ export function DiscordJobPostPanel({
     return () => {
       active = false;
     };
-  }, [jobDescription.id]);
+  }, [jobDescription.id, refreshKey]);
 
   const footerRows = useMemo(
     () => [

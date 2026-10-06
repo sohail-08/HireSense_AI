@@ -157,3 +157,16 @@ export interface DiscordJobPost {
   created_at: string;
   updated_at: string;
 }
+
+export type DiscordPostingAssistantStatus =
+  | "awaiting_details"
+  | "awaiting_approval"
+  | "awaiting_changes"
+  | "published";
+
+export interface DiscordPostingAssistantResponse {
+  status: DiscordPostingAssistantStatus;
+  assistant_message: string;
+  missing_fields: ("application_url" | "application_deadline")[];
+  posting: DiscordJobPost | null;
+}

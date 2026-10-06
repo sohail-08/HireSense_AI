@@ -109,13 +109,23 @@ docker compose up -d --build --force-recreate backend
 To publish:
 
 1. Open an approved job description under **Jobs**.
-2. Choose **Prepare job post**.
-3. Edit the heading, manual application link, contact email, location,
-   deadline, and instructions. Empty optional fields are omitted.
-4. Review the Discord preview and choose **Save reviewed preview**.
-5. Choose **Publish to Discord** and confirm the publication.
+2. In the central **HireSense assistant** chat, enter a command such as
+   **Post this job**. The same chat is used for requirement discovery and job
+   posting; no separate posting chatbot is shown.
+3. Provide the application link and application deadline when the assistant
+   asks. The heading, contact email, location, and instructions come from the
+   configured reusable defaults.
+4. Review the automatically refreshed Discord preview. Tell the assistant about
+   any application-link or deadline change if needed.
+5. Type **approve** to publish the reviewed preview automatically. Typed
+   approval is the explicit publication confirmation. Successful and failed
+   tasks are reported in the central chat, and publication status is refreshed.
 6. Review the saved `published`, `failed`, or `uncertain` status after the
    request or after refreshing the page.
+
+The existing **Prepare job post** editor remains available for manual preview
+creation. It can edit all configured footer values and uses the same protected
+preview and publication services as the assistant.
 
 HireSense publishes one message using Discord content plus one embed, sends
 `allowed_mentions.parse` as an empty list, and requests confirmation with

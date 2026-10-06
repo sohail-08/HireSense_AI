@@ -53,6 +53,21 @@ class DiscordPublishRequest(BaseModel):
     confirmed: Literal[True]
 
 
+class DiscordPostingAssistantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_description_id: int = Field(gt=0)
+    posting_id: int | None = Field(default=None, gt=0)
+    message: str = Field(min_length=1, max_length=10_000)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def normalize_message(cls, value):
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+
 class DiscordPostDefaultsResponse(BaseModel):
     heading: str
     application_url: str | None
@@ -89,3 +104,15 @@ class DiscordJobPostResponse(BaseModel):
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class DiscordPostingAssistantResponse(BaseModel):
+    status: Literal[
+        "awaiting_details",
+        "awaiting_approval",
+        "awaiting_changes",
+        "published",
+    ]
+    assistant_message: str
+    missing_fields: list[Literal["application_url", "application_deadline"]]
+    posting: DiscordJobPostResponse | None = None
