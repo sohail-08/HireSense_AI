@@ -10,7 +10,6 @@ from app.database import Base
 
 
 class KnowledgeSourceType(str, Enum):
-    COMPANY_POLICY = "company_policy"
     PREVIOUS_JOB_DESCRIPTION = "previous_job_description"
 
 

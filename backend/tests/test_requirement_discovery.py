@@ -137,7 +137,7 @@ def test_requirement_discovery_service_persists_confirmed_profile(tmp_path):
         assert saved_profile.required_skills[0]["name"] == "Python"
 
 
-def test_requirement_graph_builds_proposal_from_company_knowledge():
+def test_requirement_graph_builds_proposal_from_previous_job_descriptions():
     complete_profile = _complete_profile()
     model = FakeRequirementModel(
         [

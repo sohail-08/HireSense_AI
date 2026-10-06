@@ -60,9 +60,7 @@ export interface RequirementChatResponse {
   source_references: JobDescriptionEvidence[];
 }
 
-export type KnowledgeSourceType =
-  | "company_policy"
-  | "previous_job_description";
+export type KnowledgeSourceType = "previous_job_description";
 
 export interface KnowledgeDocumentResponse {
   id: number;
@@ -90,7 +88,7 @@ export interface JobDescriptionDraft {
 export interface JobDescriptionEvidence {
   document_id: number;
   document_title: string;
-  source_type: string;
+  source_type: KnowledgeSourceType;
   chunk_id: number;
   chunk_index: number;
   score: number;

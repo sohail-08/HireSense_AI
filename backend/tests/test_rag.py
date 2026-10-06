@@ -37,36 +37,39 @@ def test_knowledge_ingestion_deduplicates_and_retrieves_source(tmp_path):
     )
 
     with Session(engine) as session:
-        policy = service.ingest_document(
+        previous_jd = service.ingest_document(
             session,
-            title="Engineering Hiring Policy",
+            title="Backend Engineer JD 2025",
             content=(
                 "Backend candidates must demonstrate Python API experience. "
                 "Candidates should explain testing and deployment decisions."
             ),
-            source_type=KnowledgeSourceType.COMPANY_POLICY,
-            source_uri="policy://engineering-hiring",
+            source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
+            source_uri="previous-jd://backend-engineer-2025",
         )
         duplicate = service.ingest_document(
             session,
-            title="Same policy with another title",
+            title="Same previous JD with another title",
             content=(
                 "Backend candidates must demonstrate Python API experience. "
                 "Candidates should explain testing and deployment decisions."
             ),
-            source_type=KnowledgeSourceType.COMPANY_POLICY,
+            source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
         )
 
-        assert duplicate.id == policy.id
-        assert len(policy.chunks) >= 1
+        assert duplicate.id == previous_jd.id
+        assert len(previous_jd.chunks) >= 1
 
         results = service.search(
             session,
             "Python API experience",
-            source_type=KnowledgeSourceType.COMPANY_POLICY,
+            source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
         )
 
         assert results
-        assert results[0].document_id == policy.id
-        assert results[0].source_type is KnowledgeSourceType.COMPANY_POLICY
+        assert results[0].document_id == previous_jd.id
+        assert (
+            results[0].source_type
+            is KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION
+        )
         assert "Python" in results[0].content

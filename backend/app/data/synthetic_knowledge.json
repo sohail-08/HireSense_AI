@@ -52,27 +52,29 @@
     "content": "Role: Machine Learning Engineer, Talent Intelligence. Summary: Develop and evaluate responsible NLP and retrieval systems for recruitment workflows. Responsibilities: prepare governed datasets; train and evaluate models; implement retrieval pipelines; expose models through APIs; monitor quality and drift; document experiments; and partner with product, engineering, and compliance. Required skills: Python, machine learning fundamentals, NLP, information retrieval, data validation, SQL, experiment tracking, and API development. Preferred skills: PyTorch, Hugging Face, vector databases, RAG evaluation, FastAPI, Docker, and cloud deployment. Qualifications: bachelor's or master's degree in Computer Science, Data Science, Statistics, or a related discipline, or equivalent applied experience. Experience: minimum 3 years in software or machine-learning engineering, including at least 1 year deploying ML systems. Selection criteria: experimental rigor, evaluation design, production engineering, responsible-AI awareness, communication, and collaboration. Interview process: project deep dive, Python and data exercise, ML-system design interview, responsible-AI scenario, and behavioral interview."
   },
   {
-    "title": "Northstar Digital Engineering Hiring Policy - 2025",
-    "source_type": "company_policy",
-    "source_uri": "synthetic://policy/engineering-hiring-2025",
+    "title": "DevOps Engineer - Cloud Platform - 2024",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/devops-engineer-cloud-platform-2024",
     "metadata": {
       "synthetic": true,
       "fictional_company": "Northstar Digital",
-      "policy_owner": "People Operations",
-      "effective_year": 2025
+      "department": "Platform Engineering",
+      "location": "Remote within Bangladesh",
+      "approved_year": 2024
     },
-    "content": "Purpose: provide a consistent, fair, and evidence-based process for engineering hiring at the fictional company Northstar Digital. Every job description must distinguish required skills from preferred skills and must state responsibilities, qualification alternatives, experience expectations, and selection criteria. Equivalent professional experience must be considered when a degree is not legally or operationally necessary. Requirements must be demonstrably related to the role. Interview panels must use the same published criteria for every candidate in the same hiring round. At least two trained reviewers must contribute to the final decision. Reviewers must record job-related evidence and must not use protected characteristics, photographs, age assumptions, family status, disability, religion, gender, ethnicity, or other non-job-related information. Candidate data must be accessed only for recruitment, stored in approved systems, and retained according to the applicable retention schedule. AI-generated recommendations are decision support only; a human interviewer remains accountable for shortlisting and final decisions. Reasonable accommodations must be offered throughout the selection process."
+    "content": "Role: DevOps Engineer, Cloud Platform. Summary: Improve the reliability, security, and delivery speed of Northstar Digital cloud services. Responsibilities: maintain CI/CD pipelines; manage infrastructure as code; improve monitoring and alerting; support incident response; automate environment provisioning; review production readiness; and partner with development teams on deployment practices. Required skills: Linux, AWS, Docker, Terraform, CI/CD, Git, networking fundamentals, and production troubleshooting. Preferred skills: Kubernetes, Helm, Python or Bash scripting, Prometheus, Grafana, OpenTelemetry, and PostgreSQL operations. Qualifications: bachelor's degree in Computer Science, Engineering, or a related discipline, or equivalent professional experience. Experience: minimum 3 years in DevOps, site reliability, cloud infrastructure, or a similar role. Selection criteria: infrastructure design, automation quality, security awareness, incident reasoning, communication, and operational ownership. Interview process: experience review, practical infrastructure exercise, cloud-system design discussion, and behavioral interview."
   },
   {
-    "title": "Northstar Digital Engineering Interview Rubric - 2025",
-    "source_type": "company_policy",
-    "source_uri": "synthetic://policy/engineering-interview-rubric-2025",
+    "title": "QA Automation Engineer - Web Platform - 2025",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/qa-automation-engineer-web-platform-2025",
     "metadata": {
       "synthetic": true,
       "fictional_company": "Northstar Digital",
-      "policy_owner": "Engineering Enablement",
-      "effective_year": 2025
+      "department": "Quality Engineering",
+      "location": "Dhaka (Hybrid)",
+      "approved_year": 2025
     },
-    "content": "Engineering candidates are assessed using five evidence categories. Technical fundamentals: demonstrates accurate knowledge of the languages, frameworks, data stores, and engineering practices required by the role. Problem solving: clarifies assumptions, decomposes problems, evaluates trade-offs, and validates the solution. Quality and reliability: considers testing, security, observability, failure handling, maintainability, and operational impact. Communication and collaboration: explains decisions clearly, listens, incorporates feedback, and works constructively across disciplines. Learning and ownership: identifies gaps honestly, learns from incidents, follows through, and improves systems. Each category is rated from 1 to 4 using written behavioral anchors. A rating must include interview evidence; intuition-only ratings are not acceptable. Required-skill gaps must be recorded separately from preferred-skill gaps. A candidate is not rejected solely for lacking a preferred skill. For backend roles, the standard assessment normally includes a role-relevant coding exercise and a system-design discussion."
+    "content": "Role: QA Automation Engineer, Web Platform. Summary: Build reliable automated quality checks for Northstar Digital web applications and APIs. Responsibilities: design test strategies; create and maintain browser and API automation; investigate failures; improve test data and environments; contribute to release readiness; track quality risks; and collaborate with engineers and product managers. Required skills: automated testing, Playwright or Cypress, API testing, JavaScript or TypeScript, SQL, Git, defect analysis, and CI pipeline integration. Preferred skills: Python, performance testing, accessibility testing, Docker, contract testing, and cloud-based test environments. Qualifications: bachelor's degree in a computing discipline, a relevant diploma, or equivalent professional experience. Experience: minimum 2 years in software quality engineering or test automation. Selection criteria: test design, debugging ability, automation maintainability, risk assessment, attention to detail, and cross-team communication. Interview process: testing portfolio review, practical automation exercise, quality-strategy interview, and behavioral interview."
   }
 ]

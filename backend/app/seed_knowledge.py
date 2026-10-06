@@ -16,6 +16,10 @@ from app.schemas.knowledge import KnowledgeDocumentCreate
 
 
 DATASET_PATH = Path(__file__).parent / "data" / "synthetic_knowledge.json"
+LEGACY_SYNTHETIC_SOURCE_URIS = (
+    "synthetic://policy/engineering-hiring-2025",
+    "synthetic://policy/engineering-interview-rubric-2025",
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,20 @@ def seed_synthetic_knowledge(
     service = KnowledgeBaseService(
         embedding_provider or OllamaEmbeddingProvider()
     )
+    legacy_documents = list(
+        db.scalars(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.source_uri.in_(
+                    LEGACY_SYNTHETIC_SOURCE_URIS
+                )
+            )
+        )
+    )
+    for document in legacy_documents:
+        db.delete(document)
+    if legacy_documents:
+        db.commit()
+
     interviewer_id = db.scalar(
         select(User.id).where(User.role == UserRole.INTERVIEWER)
     )

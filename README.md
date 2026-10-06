@@ -12,7 +12,7 @@
 - Private named-volume foundation for candidate documents
 - Semantic company-knowledge ingestion using Ollama embeddings
 - Gemini-powered, RAG-backed requirement discovery and JD generation
-- Interviewer UI for company knowledge, requirement review and JD approval
+- Interviewer UI for previous-JD knowledge, requirement review and JD approval
 
 ## Requirements
 
@@ -53,7 +53,7 @@ docker compose up -d --build --force-recreate backend
 ```
 
 Semantic knowledge embeddings remain local through Ollama. Start Ollama and
-pull the embedding model before ingesting or retrieving company knowledge:
+pull the embedding model before ingesting or retrieving previous job descriptions:
 
 ```powershell
 ollama serve
@@ -71,12 +71,12 @@ confidential company material through the unpaid tier.
 ## Job-description workflow
 
 1. Sign in as the Interviewer and open **Jobs**.
-2. Expand **Add company knowledge** and add one or more previous job
-   descriptions and company hiring policies.
+2. Expand **Add previous job description** and add one or more approved
+   historical job descriptions.
 3. Start a new chat and describe the role, for example: `I want to hire a
    backend engineer.`
-4. HireSense retrieves related company sources and proposes a complete
-   requirement profile. Choose **Use company defaults** or describe changes.
+4. HireSense retrieves related previous job descriptions and proposes a complete
+   requirement profile. Choose **Use previous JD defaults** or describe changes.
 5. Generate the job description, edit it if needed, and approve the draft.
 6. Use **Created job descriptions** to reopen saved records after a reload.
    Drafts can be edited directly; editing an approved JD creates a new draft
@@ -90,9 +90,9 @@ docker compose exec backend python -m app.seed_knowledge
 ```
 
 The command is idempotent: rerunning it reports the documents as already
-present instead of creating duplicates. The dataset contains four historical
-engineering JDs and two hiring-policy documents. It is development/demo data
-only and must not be represented as real company policy.
+present instead of creating duplicates. The dataset contains six historical
+engineering job descriptions. It is development/demo data only and must not be
+represented as real company information.
 
 The chatbot does not treat the LLM's own completeness claim as authoritative.
 The backend checks required skills, qualifications, experience and selection

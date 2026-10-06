@@ -85,9 +85,9 @@ def test_job_description_generation_retrieves_evidence_and_supports_review(tmp_p
 
         KnowledgeBaseService().ingest_document(
             session,
-            title="Engineering hiring policy",
+            title="Backend Engineer JD 2025",
             content="Backend roles require Python API development and testing.",
-            source_type=KnowledgeSourceType.COMPANY_POLICY,
+            source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
             created_by_user_id=interviewer.id,
         )
 
@@ -100,7 +100,7 @@ def test_job_description_generation_retrieves_evidence_and_supports_review(tmp_p
         assert job_description.status is JobDescriptionStatus.DRAFT
         assert job_description.version == 1
         assert job_description.source_references
-        assert model.evidence_seen[0].document_title == "Engineering hiring policy"
+        assert model.evidence_seen[0].document_title == "Backend Engineer JD 2025"
 
         updated = service.update_draft(
             session,

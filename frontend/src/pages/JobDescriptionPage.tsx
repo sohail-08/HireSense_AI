@@ -15,7 +15,6 @@ import type {
   JobDescriptionEvidence,
   JobDescriptionResponse,
   KnowledgeDocumentResponse,
-  KnowledgeSourceType,
   RequirementChatResponse,
   RequirementChatStatus,
   RequirementProfileDraft,
@@ -27,7 +26,7 @@ type ChatMessage = {
 };
 
 const initialAssistantMessage =
-  "Tell me the role you want to hire for. I’ll search previous job descriptions and company policies, then propose requirements for you to accept or change.";
+  "Tell me the role you want to hire for. I’ll search previous job descriptions, then propose requirements for you to accept or change.";
 
 const fieldLabels: Record<string, string> = {
   title: "role/title",
@@ -110,8 +109,6 @@ export function JobDescriptionPage() {
   const [error, setError] = useState<string>();
   const [knowledgeTitle, setKnowledgeTitle] = useState("");
   const [knowledgeContent, setKnowledgeContent] = useState("");
-  const [knowledgeType, setKnowledgeType] =
-    useState<KnowledgeSourceType>("previous_job_description");
   const [knowledgeLoading, setKnowledgeLoading] = useState(false);
   const [knowledgeNotice, setKnowledgeNotice] = useState<string>();
   const [knowledgeDocuments, setKnowledgeDocuments] =
@@ -258,7 +255,6 @@ export function JobDescriptionPage() {
           body: JSON.stringify({
             title: knowledgeTitle,
             content: knowledgeContent,
-            source_type: knowledgeType,
             metadata: {},
           }),
         },
@@ -464,44 +460,26 @@ export function JobDescriptionPage() {
 
       <details className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer px-5 py-4 font-semibold text-slate-900">
-          Add company knowledge
+          Add previous job description
           <span className="ml-2 text-sm font-normal text-slate-500">
-            Previous JDs and hiring policies
+            Used as RAG knowledge for future job descriptions
           </span>
         </summary>
         <form
           onSubmit={addKnowledgeDocument}
           className="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-2"
         >
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="knowledge-type" className="text-sm font-medium text-slate-700">
-                Document type
-              </label>
-              <select
-                id="knowledge-type"
-                value={knowledgeType}
-                onChange={(event) =>
-                  setKnowledgeType(event.target.value as KnowledgeSourceType)
-                }
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="previous_job_description">Previous job description</option>
-                <option value="company_policy">Company hiring policy</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="knowledge-title" className="text-sm font-medium text-slate-700">
-                Title
-              </label>
-              <input
-                id="knowledge-title"
-                value={knowledgeTitle}
-                onChange={(event) => setKnowledgeTitle(event.target.value)}
-                placeholder="Backend Engineer JD 2025"
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
+          <div>
+            <label htmlFor="knowledge-title" className="text-sm font-medium text-slate-700">
+              Job description title
+            </label>
+            <input
+              id="knowledge-title"
+              value={knowledgeTitle}
+              onChange={(event) => setKnowledgeTitle(event.target.value)}
+              placeholder="Backend Engineer JD 2025"
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
           </div>
           <div>
             <label htmlFor="knowledge-content" className="text-sm font-medium text-slate-700">
@@ -512,7 +490,7 @@ export function JobDescriptionPage() {
               value={knowledgeContent}
               onChange={(event) => setKnowledgeContent(event.target.value)}
               rows={7}
-              placeholder="Paste the approved previous JD or company policy here."
+              placeholder="Paste the approved previous job description here."
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
@@ -547,9 +525,7 @@ export function JobDescriptionPage() {
                       <p className="truncate text-sm font-medium text-slate-800">
                         {document.title}
                       </p>
-                      <p className="text-xs text-slate-500">
-                        {document.source_type.replaceAll("_", " ")}
-                      </p>
+                      <p className="text-xs text-slate-500">Previous job description</p>
                     </div>
                     <button
                       type="button"
@@ -563,7 +539,7 @@ export function JobDescriptionPage() {
               </ul>
             ) : (
               <p className="mt-2 text-sm text-slate-500">
-                No company knowledge has been added yet.
+                No previous job descriptions have been added yet.
               </p>
             )}
           </div>
@@ -668,7 +644,7 @@ export function JobDescriptionPage() {
               <h2 className="font-semibold text-slate-900">Requirement chat</h2>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
                 {knowledgeStatus === "found"
-                  ? "Company data found"
+                  ? "Previous job descriptions found"
                   : knowledgeStatus === "empty"
                     ? "No matching data"
                     : knowledgeStatus === "error"
@@ -703,7 +679,7 @@ export function JobDescriptionPage() {
 
             {chatLoading ? (
               <p className="text-sm text-slate-500" role="status">
-                Searching company knowledge and preparing a proposal…
+                Searching previous job descriptions and preparing a proposal…
               </p>
             ) : null}
           </div>
@@ -716,8 +692,7 @@ export function JobDescriptionPage() {
               <ul className="mt-2 space-y-1 text-xs text-slate-600">
                 {requirementSources.map((source) => (
                   <li key={`${source.document_id}-${source.chunk_id}`}>
-                    {source.document_title} · {source.source_type.replaceAll("_", " ")} ·
-                    relevance {source.score.toFixed(2)}
+                    {source.document_title} · relevance {source.score.toFixed(2)}
                   </li>
                 ))}
               </ul>
@@ -761,11 +736,11 @@ export function JobDescriptionPage() {
             {canConfirm ? (
               <button
                 type="button"
-                onClick={() => void sendMessage("use company defaults")}
+                onClick={() => void sendMessage("use previous JD defaults")}
                 disabled={chatLoading}
                 className="mt-3 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Use company defaults
+                Use previous JD defaults
               </button>
             ) : null}
           </form>
@@ -975,8 +950,8 @@ export function JobDescriptionPage() {
                             {source.document_title}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {source.source_type.replaceAll("_", " ")} · chunk{" "}
-                            {source.chunk_index + 1} · relevance {source.score.toFixed(2)}
+                            Chunk {source.chunk_index + 1} · relevance{" "}
+                            {source.score.toFixed(2)}
                           </p>
                         </li>
                       ))}

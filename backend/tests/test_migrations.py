@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from app.database import Base
 from app.models.user import User
@@ -11,10 +13,10 @@ from app.models.user import User
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 
 
-def run_upgrade(database_url: str) -> None:
+def run_upgrade(database_url: str, revision: str = "head") -> None:
     config = Config(str(ALEMBIC_INI))
     config.attributes["database_url"] = database_url
-    command.upgrade(config, "head")
+    command.upgrade(config, revision)
 
 
 def test_baseline_migration_creates_schema(tmp_path):
@@ -156,3 +158,44 @@ def test_requirement_discovery_migration_creates_session_table(tmp_path):
             for column in inspector.get_columns("requirement_profiles")
         }
     )
+
+
+def test_knowledge_source_migration_unifies_existing_records(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'unified-knowledge.db'}"
+    run_upgrade(database_url, "0005_requirement_provenance")
+    engine = create_engine(database_url)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO knowledge_documents "
+                "(title, source_type, content_hash, metadata_json, "
+                "created_at, updated_at) VALUES "
+                "('Legacy source', 'company_policy', :content_hash, '{}', "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"content_hash": "a" * 64},
+        )
+
+    run_upgrade(database_url)
+
+    with engine.begin() as connection:
+        source_type = connection.scalar(
+            text(
+                "SELECT source_type FROM knowledge_documents "
+                "WHERE title = 'Legacy source'"
+            )
+        )
+        assert source_type == "previous_job_description"
+
+        with pytest.raises(IntegrityError):
+            connection.execute(
+                text(
+                    "INSERT INTO knowledge_documents "
+                    "(title, source_type, content_hash, metadata_json, "
+                    "created_at, updated_at) VALUES "
+                    "('Invalid source', 'company_policy', :content_hash, '{}', "
+                    "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                ),
+                {"content_hash": "b" * 64},
+            )

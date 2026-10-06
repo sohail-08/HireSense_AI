@@ -149,18 +149,10 @@ class RequirementDiscoveryService:
         query = " ".join(
             part for part in [profile.title or "", profile.summary or ""] if part
         )
-        previous_jds = self.knowledge_base.search(
+        return self.knowledge_base.search(
             db,
             query,
-            top_k=2,
+            top_k=4,
             min_score=0.1,
             source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
         )
-        policies = self.knowledge_base.search(
-            db,
-            query,
-            top_k=2,
-            min_score=0.1,
-            source_type=KnowledgeSourceType.COMPANY_POLICY,
-        )
-        return previous_jds + policies

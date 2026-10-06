@@ -45,7 +45,7 @@ def test_domain_models_persist_relationships(tmp_path):
             title="Backend Engineer",
             content="Build reliable backend services.",
             structured_content={"responsibilities": ["Build APIs"]},
-            source_references=[{"source": "company-policy.md", "chunk": 1}],
+            source_references=[{"source": "backend-engineer-jd.md", "chunk": 1}],
             created_by_user_id=interviewer.id,
         )
         session.add(description)

@@ -43,12 +43,12 @@ class GeminiJobDescriptionModel:
             for index, item in enumerate(evidence, start=1)
         )
         if not evidence_text:
-            evidence_text = "No policy or previous-JD context was retrieved."
+            evidence_text = "No previous-job-description context was retrieved."
 
         system_prompt = """You are HireSense's job-description writer.
 Generate a professional job-description draft from the structured requirement profile.
-Use the retrieved source context only as supporting company guidance. Do not invent
-requirements, benefits, compensation, legal claims, or policies that are not present
+Use the retrieved previous-job-description context only as supporting guidance. Do not invent
+requirements, benefits, compensation, legal claims, or constraints that are not present
 in the profile or context. Required skills and qualifications must remain required;
 preferred skills must remain preferred. Return only JSON matching the requested schema.
 """
