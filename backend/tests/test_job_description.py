@@ -124,6 +124,28 @@ def test_job_description_generation_retrieves_evidence_and_supports_review(tmp_p
         )
         assert approved.status is JobDescriptionStatus.APPROVED
 
+        listed = service.list_for_interviewer(
+            session,
+            interviewer_user_id=interviewer.id,
+        )
+        assert [item.id for item in listed] == [approved.id]
+
+        revision = service.revise(
+            session,
+            job_description_id=approved.id,
+            interviewer_user_id=interviewer.id,
+        )
+        assert revision.status is JobDescriptionStatus.DRAFT
+        assert revision.version == 2
+        assert revision.content == approved.content
+
+        service.delete(
+            session,
+            job_description_id=revision.id,
+            interviewer_user_id=interviewer.id,
+        )
+        assert session.get(type(revision), revision.id) is None
+
         with pytest.raises(ValueError, match="Only draft"):
             service.approve(
                 session,

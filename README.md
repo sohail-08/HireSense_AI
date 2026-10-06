@@ -11,7 +11,7 @@
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents
 - Semantic company-knowledge ingestion using Ollama embeddings
-- RAG-backed LangGraph requirement discovery and JD generation
+- Gemini-powered, RAG-backed requirement discovery and JD generation
 - Interviewer UI for company knowledge, requirement review and JD approval
 
 ## Requirements
@@ -21,7 +21,8 @@ Docker Desktop running with Linux containers.
 ## Startup
 
 1. Copy `.env.example` to `.env`.
-2. Set your own database password, JWT secret and interviewer password.
+2. Set your own database password, JWT secret, interviewer password and
+   `GEMINI_API_KEY` in the root `.env` file.
 3. Run:
 
 ```powershell
@@ -35,19 +36,37 @@ Health check: http://localhost:8000/api/health
 The backend runs migrations and seeds the Interviewer automatically.
 All public registrations create Candidates.
 
-The requirement-discovery chatbot uses Ollama on the host machine. Start
-Ollama and pull both configured models before using the knowledge and
-requirement endpoints:
+Requirement extraction and job-description generation use the Gemini API.
+Create a key in Google AI Studio and place it only in the root `.env` file:
+
+```dotenv
+GEMINI_API_KEY=your-real-api-key
+GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
+```
+
+Do not put the key in `frontend/.env`, source code, or any variable beginning
+with `VITE_`; those values can be exposed to the browser. After changing the
+key, recreate the backend container:
+
+```powershell
+docker compose up -d --build --force-recreate backend
+```
+
+Semantic knowledge embeddings remain local through Ollama. Start Ollama and
+pull the embedding model before ingesting or retrieving company knowledge:
 
 ```powershell
 ollama serve
-ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ```
 
 When the backend runs in Docker, `OLLAMA_DOCKER_BASE_URL` must point to the
 host service. The default is `http://host.docker.internal:11434`; local
 non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
+
+The Gemini unpaid tier should be used only with synthetic or non-sensitive
+demo content. Do not submit real CVs, candidate personal information, or
+confidential company material through the unpaid tier.
 
 ## Job-description workflow
 
@@ -59,6 +78,9 @@ non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
 4. HireSense retrieves related company sources and proposes a complete
    requirement profile. Choose **Use company defaults** or describe changes.
 5. Generate the job description, edit it if needed, and approve the draft.
+6. Use **Created job descriptions** to reopen saved records after a reload.
+   Drafts can be edited directly; editing an approved JD creates a new draft
+   version so the approved version remains unchanged.
 
 For a repeatable local demo, load the six clearly labelled fictional Northstar
 Digital documents included with the project:

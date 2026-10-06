@@ -167,3 +167,40 @@ def test_requirement_graph_builds_proposal_from_company_knowledge():
     assert result["missing_fields"] == []
     assert result["source_references"][0]["document_id"] == 7
     assert result["profile"]["required_skills"][0]["name"] == "Python"
+
+
+def test_requirement_graph_acknowledges_interviewer_revision():
+    initial_profile = RequirementProfileDraft(
+        **{
+            **_complete_profile().model_dump(),
+            "title": "Frontend Engineer",
+            "required_skills": [
+                {"name": "TypeScript"},
+                {"name": "React"},
+            ],
+        }
+    )
+    revised_profile = RequirementProfileDraft(
+        **{
+            **initial_profile.model_dump(),
+            "required_skills": [{"name": "React"}],
+        }
+    )
+    model = FakeRequirementModel(
+        [
+            RequirementExtraction(profile=initial_profile),
+            RequirementExtraction(profile=revised_profile),
+        ]
+    )
+    graph = RequirementDiscoveryGraph(model, knowledge_retriever=lambda _profile: [])
+
+    first = graph.invoke("I want to hire a frontend engineer")
+    revised = graph.invoke("Remove TypeScript from required skills", first)
+
+    assert revised["profile_updated"] is True
+    assert revised["profile"]["required_skills"] == [
+        {"name": "React", "details": None}
+    ]
+    assert revised["assistant_message"].startswith(
+        "I applied your requested change"
+    )

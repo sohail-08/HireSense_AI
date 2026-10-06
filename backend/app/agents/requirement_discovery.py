@@ -51,6 +51,7 @@ class RequirementDiscoveryState(TypedDict, total=False):
     source_references: list[dict[str, Any]]
     proposal_ready: bool
     interviewer_overrides: list[str]
+    profile_updated: bool
 
 
 SYSTEM_PROMPT = """You are HireSense's interviewer-facing job requirement assistant.
@@ -206,6 +207,7 @@ class RequirementDiscoveryGraph:
             "source_references": [],
             "proposal_ready": False,
             "interviewer_overrides": [],
+            "profile_updated": False,
         }
         if state:
             initial_state.update(state)
@@ -227,6 +229,7 @@ class RequirementDiscoveryGraph:
             "interviewer_overrides": overrides,
             "error": None,
             "error_code": None,
+            "profile_updated": False,
         }
 
     def _extract_requirements(
@@ -261,11 +264,15 @@ class RequirementDiscoveryGraph:
                 "confirmed": False,
             }
 
+        updated_profile = extraction.profile.model_dump(mode="json")
         return {
-            "profile": extraction.profile.model_dump(mode="json"),
+            "profile": updated_profile,
             "follow_up_question": extraction.follow_up_question,
             "status": "active",
             "confirmed": False,
+            "profile_updated": (
+                updated_profile != current_profile.model_dump(mode="json")
+            ),
         }
 
     def _retrieve_knowledge(
@@ -354,6 +361,12 @@ class RequirementDiscoveryGraph:
             }
 
         missing = state.get("missing_fields", [])
+        is_revision = bool(state.get("interviewer_overrides"))
+        revision_prefix = (
+            "I applied your requested change to the requirement proposal. "
+            if state.get("profile_updated")
+            else "I reviewed your requested change. "
+        )
         if missing:
             question = state.get("follow_up_question") or (
                 "Please provide the following information that was not available "
@@ -364,15 +377,22 @@ class RequirementDiscoveryGraph:
                 if state.get("knowledge_status") == "found"
                 else "I could not find a complete previous profile for this role. "
             )
-            message = prefix + question
+            message = (revision_prefix if is_revision else prefix) + question
             status = "awaiting_changes"
         else:
-            source_count = len(state.get("source_references", []))
-            message = (
-                f"I found {source_count} relevant company source"
-                f"{'s' if source_count != 1 else ''} and prepared a requirement proposal. "
-                "Choose 'Use company defaults' or tell me what you want to change."
-            )
+            if is_revision:
+                message = (
+                    revision_prefix
+                    + "Review the updated profile, then choose 'Use company defaults' "
+                    "or tell me another change."
+                )
+            else:
+                source_count = len(state.get("source_references", []))
+                message = (
+                    f"I found {source_count} relevant company source"
+                    f"{'s' if source_count != 1 else ''} and prepared a requirement proposal. "
+                    "Choose 'Use company defaults' or tell me what you want to change."
+                )
             status = "awaiting_confirmation"
 
         messages = list(state.get("messages", []))

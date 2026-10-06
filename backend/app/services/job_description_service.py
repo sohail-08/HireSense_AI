@@ -96,6 +96,26 @@ class JobDescriptionService:
             raise LookupError("Job description not found")
         return job_description
 
+    @staticmethod
+    def list_for_interviewer(
+        db: Session,
+        *,
+        interviewer_user_id: int,
+    ) -> list[JobDescription]:
+        return list(
+            db.scalars(
+                select(JobDescription)
+                .where(
+                    JobDescription.created_by_user_id
+                    == interviewer_user_id
+                )
+                .order_by(
+                    JobDescription.updated_at.desc(),
+                    JobDescription.id.desc(),
+                )
+            )
+        )
+
     def update_draft(
         self,
         db: Session,
@@ -145,6 +165,63 @@ class JobDescriptionService:
         db.commit()
         db.refresh(job_description)
         return job_description
+
+    def revise(
+        self,
+        db: Session,
+        *,
+        job_description_id: int,
+        interviewer_user_id: int,
+    ) -> JobDescription:
+        approved = self.get_for_interviewer(
+            db,
+            job_description_id=job_description_id,
+            interviewer_user_id=interviewer_user_id,
+        )
+        if approved.status != JobDescriptionStatus.APPROVED:
+            raise ValueError(
+                "Only approved job descriptions need an editable revision"
+            )
+
+        latest_version = db.scalar(
+            select(func.max(JobDescription.version)).where(
+                JobDescription.requirement_profile_id
+                == approved.requirement_profile_id
+            )
+        )
+        revision = JobDescription(
+            requirement_profile_id=approved.requirement_profile_id,
+            title=approved.title,
+            content=approved.content,
+            structured_content=dict(approved.structured_content),
+            source_references=list(approved.source_references),
+            version=(latest_version or approved.version) + 1,
+            status=JobDescriptionStatus.DRAFT,
+            created_by_user_id=interviewer_user_id,
+        )
+        db.add(revision)
+        db.commit()
+        db.refresh(revision)
+        return revision
+
+    def delete(
+        self,
+        db: Session,
+        *,
+        job_description_id: int,
+        interviewer_user_id: int,
+    ) -> None:
+        job_description = self.get_for_interviewer(
+            db,
+            job_description_id=job_description_id,
+            interviewer_user_id=interviewer_user_id,
+        )
+        if job_description.postings:
+            raise ValueError(
+                "A job description with job postings cannot be deleted"
+            )
+        db.delete(job_description)
+        db.commit()
 
     @staticmethod
     def _profile_payload(profile: RequirementProfile) -> dict[str, Any]:

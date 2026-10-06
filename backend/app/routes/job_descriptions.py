@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.agents.job_description import GeminiJobDescriptionModel
@@ -50,6 +50,17 @@ def generate_job_description(
         raise HTTPException(status_code=422, detail=str(exc)) from None
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
+
+
+@router.get("", response_model=list[JobDescriptionResponse])
+def list_job_descriptions(
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    return _service().list_for_interviewer(
+        db,
+        interviewer_user_id=interviewer.id,
+    )
 
 
 @router.get("/{job_description_id}", response_model=JobDescriptionResponse)
@@ -104,3 +115,47 @@ def approve_job_description(
         raise HTTPException(status_code=404, detail=str(exc)) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+@router.post(
+    "/{job_description_id}/revise",
+    response_model=JobDescriptionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def revise_job_description(
+    job_description_id: int,
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    try:
+        return _service().revise(
+            db,
+            job_description_id=job_description_id,
+            interviewer_user_id=interviewer.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+@router.delete(
+    "/{job_description_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_job_description(
+    job_description_id: int,
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    try:
+        _service().delete(
+            db,
+            job_description_id=job_description_id,
+            interviewer_user_id=interviewer.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

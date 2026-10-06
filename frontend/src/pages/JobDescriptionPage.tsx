@@ -98,6 +98,10 @@ export function JobDescriptionPage() {
   const [requirementProfileId, setRequirementProfileId] = useState<number>();
   const [jobDescription, setJobDescription] =
     useState<JobDescriptionResponse>();
+  const [jobDescriptions, setJobDescriptions] =
+    useState<JobDescriptionResponse[]>([]);
+  const [jobListLoading, setJobListLoading] = useState(true);
+  const [deletingJobId, setDeletingJobId] = useState<number>();
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -127,6 +131,23 @@ export function JobDescriptionPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    apiRequest<JobDescriptionResponse[]>("/job-descriptions")
+      .then((items) => {
+        if (active) setJobDescriptions(items);
+      })
+      .catch((requestError) => {
+        if (active) setError(getErrorMessage(requestError));
+      })
+      .finally(() => {
+        if (active) setJobListLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const canConfirm = Boolean(
     sessionId &&
       profile &&
@@ -139,6 +160,20 @@ export function JobDescriptionPage() {
     () => missingFields.map((field) => fieldLabels[field] ?? field),
     [missingFields],
   );
+
+  function upsertJobDescription(item: JobDescriptionResponse) {
+    setJobDescriptions((current) => [
+      item,
+      ...current.filter((existing) => existing.id !== item.id),
+    ]);
+  }
+
+  function selectJobDescription(item: JobDescriptionResponse) {
+    setJobDescription(item);
+    setDraftTitle(item.title);
+    setDraftContent(item.content);
+    setError(undefined);
+  }
 
   async function sendMessage(message: string) {
     const trimmedMessage = message.trim();
@@ -281,6 +316,7 @@ export function JobDescriptionPage() {
       setJobDescription(response);
       setDraftTitle(response.title);
       setDraftContent(response.content);
+      upsertJobDescription(response);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -307,6 +343,7 @@ export function JobDescriptionPage() {
       setJobDescription(response);
       setDraftTitle(response.title);
       setDraftContent(response.content);
+      upsertJobDescription(response);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -325,10 +362,61 @@ export function JobDescriptionPage() {
         { method: "POST" },
       );
       setJobDescription(response);
+      upsertJobDescription(response);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
       setSaveLoading(false);
+    }
+  }
+
+  async function createEditableRevision(item: JobDescriptionResponse) {
+    if (saveLoading) return;
+
+    setError(undefined);
+    setSaveLoading(true);
+    try {
+      const response = await apiRequest<JobDescriptionResponse>(
+        `/job-descriptions/${item.id}/revise`,
+        { method: "POST" },
+      );
+      upsertJobDescription(response);
+      selectJobDescription(response);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setSaveLoading(false);
+    }
+  }
+
+  async function deleteJobDescription(item: JobDescriptionResponse) {
+    if (
+      deletingJobId ||
+      !window.confirm(
+        `Delete “${item.title}” version ${item.version}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setError(undefined);
+    setDeletingJobId(item.id);
+    try {
+      await apiRequest<void>(`/job-descriptions/${item.id}`, {
+        method: "DELETE",
+      });
+      setJobDescriptions((current) =>
+        current.filter((existing) => existing.id !== item.id),
+      );
+      if (jobDescription?.id === item.id) {
+        setJobDescription(undefined);
+        setDraftTitle("");
+        setDraftContent("");
+      }
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setDeletingJobId(undefined);
     }
   }
 
@@ -481,6 +569,97 @@ export function JobDescriptionPage() {
           </div>
         </form>
       </details>
+
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">
+              Created job descriptions
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Saved drafts and approved versions remain available after reload.
+            </p>
+          </div>
+          <span className="text-sm font-medium text-slate-500">
+            {jobDescriptions.length} saved
+          </span>
+        </div>
+
+        {jobListLoading ? (
+          <p className="mt-4 text-sm text-slate-500" role="status">
+            Loading saved job descriptions…
+          </p>
+        ) : jobDescriptions.length ? (
+          <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {jobDescriptions.map((item) => {
+              const selected = jobDescription?.id === item.id;
+              return (
+                <li
+                  key={item.id}
+                  className={`rounded-xl border p-4 ${
+                    selected
+                      ? "border-blue-400 bg-blue-50/50 ring-2 ring-blue-100"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Version {item.version} · Updated{" "}
+                        {new Date(item.updated_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        item.status === "approved"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {item.status === "approved" ? "Approved" : "Draft"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => selectJobDescription(item)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      {selected ? "Selected" : item.status === "draft" ? "Edit" : "View"}
+                    </button>
+                    {item.status === "approved" ? (
+                      <button
+                        type="button"
+                        onClick={() => void createEditableRevision(item)}
+                        disabled={saveLoading}
+                        className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                      >
+                        Edit as new draft
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void deleteJobDescription(item)}
+                      disabled={deletingJobId === item.id}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deletingJobId === item.id ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="mt-4 rounded-xl bg-slate-50 px-4 py-5 text-sm text-slate-500">
+            No job descriptions have been created yet.
+          </p>
+        )}
+      </section>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="flex min-h-[640px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -669,7 +848,9 @@ export function JobDescriptionPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold text-slate-900">Job description draft</h2>
+                <h2 className="font-semibold text-slate-900">
+                  {jobDescription ? "Job description" : "Job description draft"}
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   Generate only after confirming the requirement profile.
                 </p>
@@ -738,7 +919,16 @@ export function JobDescriptionPage() {
                       Approve JD
                     </button>
                   </div>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void createEditableRevision(jobDescription)}
+                    disabled={saveLoading}
+                    className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+                  >
+                    {saveLoading ? "Creating draft…" : "Edit as new draft"}
+                  </button>
+                )}
 
                 <div className="rounded-xl bg-slate-50 p-4">
                   <h3 className="text-sm font-semibold text-slate-900">
