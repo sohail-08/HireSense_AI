@@ -1,3 +1,4 @@
+from datetime import date
 from functools import lru_cache
 
 from pydantic import EmailStr, Field, SecretStr, field_validator
@@ -30,6 +31,45 @@ class Settings(BaseSettings):
     )
     gemini_chat_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
+
+    discord_webhook_url: SecretStr | None = None
+    discord_timeout_seconds: float = Field(default=15, ge=1, le=60)
+    discord_rate_limit_max_wait_seconds: float = Field(
+        default=5,
+        ge=0,
+        le=30,
+    )
+    discord_default_heading: str = Field(
+        default="BJIT is Hiring!",
+        min_length=1,
+        max_length=2000,
+    )
+    job_post_default_application_url: str | None = None
+    job_post_default_contact_email: EmailStr | None = None
+    job_post_default_location: str | None = Field(
+        default=None,
+        max_length=500,
+    )
+    job_post_default_application_deadline: date | None = None
+    job_post_default_instructions: str | None = Field(
+        default=None,
+        max_length=1024,
+    )
+
+    @field_validator(
+        "discord_webhook_url",
+        "job_post_default_application_url",
+        "job_post_default_contact_email",
+        "job_post_default_location",
+        "job_post_default_application_deadline",
+        "job_post_default_instructions",
+        mode="before",
+    )
+    @classmethod
+    def empty_optional_value(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("jwt_secret_key")
     @classmethod

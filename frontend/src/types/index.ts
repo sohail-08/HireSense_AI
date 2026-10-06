@@ -113,3 +113,47 @@ export interface JobDescriptionResponse {
   created_at: string;
   updated_at: string;
 }
+
+export type JobPostingStatus =
+  | "draft"
+  | "publishing"
+  | "published"
+  | "closed"
+  | "failed"
+  | "uncertain";
+
+export interface DiscordPostDefaults {
+  heading: string;
+  application_url: string | null;
+  contact_email: string | null;
+  location: string | null;
+  application_deadline: string | null;
+  additional_instructions: string | null;
+  webhook_configured: boolean;
+}
+
+export interface DiscordJobPost {
+  id: number;
+  job_description_id: number;
+  platform: "discord";
+  heading: string | null;
+  application_url: string | null;
+  contact_email: string | null;
+  location: string | null;
+  application_deadline: string | null;
+  additional_instructions: string | null;
+  reviewed_content: string | null;
+  discord_payload: Record<string, unknown> | null;
+  job_description_version: number | null;
+  status: JobPostingStatus;
+  external_post_id: string | null;
+  external_server_id: string | null;
+  external_channel_id: string | null;
+  external_url: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  attempt_started_at: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

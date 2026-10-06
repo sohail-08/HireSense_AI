@@ -13,6 +13,7 @@
 - Semantic company-knowledge ingestion using Ollama embeddings
 - Gemini-powered, RAG-backed requirement discovery and JD generation
 - Interviewer UI for previous-JD knowledge, requirement review and JD approval
+- Reviewed Discord job-post previews with persistent publication status
 
 ## Requirements
 
@@ -81,6 +82,55 @@ confidential company material through the unpaid tier.
 6. Use **Created job descriptions** to reopen saved records after a reload.
    Drafts can be edited directly; editing an approved JD creates a new draft
    version so the approved version remains unchanged.
+
+## Discord job posting
+
+Create an incoming webhook for the standard Discord text channel that should
+receive job posts. Put the URL only in the root `.env` file:
+
+```dotenv
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-id/your-token
+DISCORD_DEFAULT_HEADING=BJIT is Hiring!
+JOB_POST_DEFAULT_APPLICATION_URL=
+JOB_POST_DEFAULT_CONTACT_EMAIL=
+JOB_POST_DEFAULT_LOCATION=
+JOB_POST_DEFAULT_APPLICATION_DEADLINE=
+JOB_POST_DEFAULT_INSTRUCTIONS=
+```
+
+The webhook is a backend secret. Do not place it in `frontend/.env`, a
+`VITE_*` variable, source code, screenshots, or logs. Recreate the backend
+after changing it:
+
+```powershell
+docker compose up -d --build --force-recreate backend
+```
+
+To publish:
+
+1. Open an approved job description under **Jobs**.
+2. Choose **Prepare job post**.
+3. Edit the heading, manual application link, contact email, location,
+   deadline, and instructions. Empty optional fields are omitted.
+4. Review the Discord preview and choose **Save reviewed preview**.
+5. Choose **Publish to Discord** and confirm the publication.
+6. Review the saved `published`, `failed`, or `uncertain` status after the
+   request or after refreshing the page.
+
+HireSense publishes one message using Discord content plus one embed, sends
+`allowed_mentions.parse` as an empty list, and requests confirmation with
+`wait=true`. It rejects oversized posts rather than truncating the approved job
+description. Discord currently limits message content to 2,000 characters,
+embed titles to 256, embed descriptions to 4,096, individual field values to
+1,024, and combined embed text to 6,000 characters. See Discord's official
+[webhook](https://docs.discord.com/developers/resources/webhook) and
+[message](https://docs.discord.com/developers/resources/message) documentation.
+
+Known limitations: this increment targets one standard text-channel webhook.
+It does not create Google Forms, collect responses or CVs, parse documents, or
+rank candidates. A network timeout after sending is recorded as `uncertain`;
+check Discord before explicitly preparing another publication. A Discord link
+is shown only when Discord returns server, channel, and message identifiers.
 
 For a repeatable local demo, load the six clearly labelled fictional Northstar
 Digital documents included with the project:

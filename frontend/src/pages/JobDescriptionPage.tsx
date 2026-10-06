@@ -10,6 +10,7 @@ import {
   apiRequest,
 } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
+import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
 import type {
   JobDescriptionDraft,
   JobDescriptionEvidence,
@@ -904,6 +905,10 @@ export function JobDescriptionPage() {
                     {saveLoading ? "Creating draft…" : "Edit as new draft"}
                   </button>
                 )}
+
+                {jobDescription.status === "approved" ? (
+                  <DiscordJobPostPanel jobDescription={jobDescription} />
+                ) : null}
 
                 <div className="rounded-xl bg-slate-50 p-4">
                   <h3 className="text-sm font-semibold text-slate-900">

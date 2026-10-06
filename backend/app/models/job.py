@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,9 +23,11 @@ class JobDescriptionStatus(str, Enum):
 
 class JobPostingStatus(str, Enum):
     DRAFT = "draft"
+    PUBLISHING = "publishing"
     PUBLISHED = "published"
     CLOSED = "closed"
     FAILED = "failed"
+    UNCERTAIN = "uncertain"
 
 
 def _values(enum_type: type[Enum]) -> list[str]:
@@ -145,6 +147,7 @@ class JobDescription(Base):
 class JobPosting(Base):
     __tablename__ = "job_postings"
     __table_args__ = (
+        Index("ix_job_postings_job_description_id", "job_description_id"),
         Index("ix_job_postings_status", "status"),
         Index("ix_job_postings_platform", "platform"),
     )
@@ -157,11 +160,50 @@ class JobPosting(Base):
     application_url: Mapped[str | None] = mapped_column(
         String(2048), nullable=True
     )
+    heading: Mapped[str | None] = mapped_column(
+        String(2000), nullable=True
+    )
+    contact_email: Mapped[str | None] = mapped_column(
+        String(254), nullable=True
+    )
+    location: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+    application_deadline: Mapped[date | None] = mapped_column(
+        Date, nullable=True
+    )
+    additional_instructions: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    reviewed_content: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    discord_payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    job_description_version: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    job_description_content_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
     external_post_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    external_server_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    external_channel_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True
     )
     external_url: Mapped[str | None] = mapped_column(
         String(2048), nullable=True
+    )
+    error_code: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    error_message: Mapped[str | None] = mapped_column(
+        Text, nullable=True
     )
     status: Mapped[JobPostingStatus] = mapped_column(
         SqlEnum(
@@ -173,6 +215,9 @@ class JobPosting(Base):
         default=JobPostingStatus.DRAFT,
     )
     published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attempt_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(

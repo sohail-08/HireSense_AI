@@ -91,6 +91,18 @@ def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
     }.issubset(
         {column["name"] for column in inspector.get_columns("cv_documents")}
     )
+    assert {
+        "heading",
+        "reviewed_content",
+        "discord_payload",
+        "job_description_version",
+        "external_server_id",
+        "external_channel_id",
+        "attempt_started_at",
+        "error_code",
+    }.issubset(
+        {column["name"] for column in inspector.get_columns("job_postings")}
+    )
 
 
 def test_knowledge_base_migration_creates_document_and_chunk_tables(tmp_path):
