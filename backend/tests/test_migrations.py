@@ -160,6 +160,23 @@ def test_requirement_discovery_migration_creates_session_table(tmp_path):
         }
     )
 
+    assert "supervisor_sessions" in inspector.get_table_names()
+    assert {
+        "id",
+        "interviewer_user_id",
+        "requirement_session_id",
+        "requirement_profile_id",
+        "job_description_id",
+        "job_posting_id",
+        "phase",
+        "state_json",
+    }.issubset(
+        {
+            column["name"]
+            for column in inspector.get_columns("supervisor_sessions")
+        }
+    )
+
     assert {
         "source_references",
         "generation_metadata",

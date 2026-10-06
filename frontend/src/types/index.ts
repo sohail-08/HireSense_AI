@@ -170,3 +170,42 @@ export interface DiscordPostingAssistantResponse {
   missing_fields: ("application_url" | "application_deadline")[];
   posting: DiscordJobPost | null;
 }
+
+export type SupervisorPhase =
+  | "requirements"
+  | "requirement_confirmation"
+  | "requirement_confirmed"
+  | "job_description_draft"
+  | "job_description_approved"
+  | "posting_details"
+  | "posting_approval"
+  | "published"
+  | "error";
+
+export interface SupervisorMessage {
+  role: "user" | "assistant";
+  content: string;
+  outcome: "info" | "success" | "failure";
+}
+
+export interface SupervisorRequirementState {
+  profile: RequirementProfileDraft;
+  missing_fields: string[];
+  knowledge_status: "not_searched" | "found" | "empty" | "error";
+  proposal_ready: boolean;
+  source_references: JobDescriptionEvidence[];
+}
+
+export interface SupervisorChatResponse {
+  session_id: string;
+  phase: SupervisorPhase;
+  route: string;
+  assistant_message: string;
+  outcome: "info" | "success" | "failure";
+  messages: SupervisorMessage[];
+  requirement_profile_id: number | null;
+  requirement_state: SupervisorRequirementState;
+  job_description: JobDescriptionResponse | null;
+  job_posting: DiscordJobPost | null;
+  refresh_required: boolean;
+}

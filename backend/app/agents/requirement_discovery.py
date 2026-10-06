@@ -76,8 +76,12 @@ def _is_confirmation(message: str) -> bool:
     return normalized in {
         "yes",
         "confirm",
+        "confirm the requirements",
+        "confirm requirements",
         "confirmed",
         "approve",
+        "approve the requirements",
+        "approve requirements",
         "approved",
         "looks good",
         "go ahead",
@@ -87,6 +91,7 @@ def _is_confirmation(message: str) -> bool:
         "use the previous job description defaults",
         "use previous data",
         "use the previous data",
+        "use these requirements",
     }
 
 

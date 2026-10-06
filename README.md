@@ -12,6 +12,7 @@
 - Private named-volume foundation for candidate documents
 - Semantic company-knowledge ingestion using Ollama embeddings
 - Gemini-powered, RAG-backed requirement discovery and JD generation
+- Persisted LangGraph supervisor with LLM intent routing and shared workflow state
 - Interviewer UI for previous-JD knowledge, requirement review and JD approval
 - Reviewed Discord job-post previews with persistent publication status
 
@@ -74,14 +75,23 @@ confidential company material through the unpaid tier.
 1. Sign in as the Interviewer and open **Jobs**.
 2. Expand **Add previous job description** and add one or more approved
    historical job descriptions.
-3. Start a new chat and describe the role, for example: `I want to hire a
+3. Use the central supervisor chat and describe the role, for example: `I want to hire a
    backend engineer.`
 4. HireSense retrieves related previous job descriptions and proposes a complete
    requirement profile. Choose **Use previous JD defaults** or describe changes.
-5. Generate the job description, edit it if needed, and approve the draft.
+5. Tell the supervisor to **generate the job description**. Request edits in
+   natural language, such as `Remove Kubernetes from preferred skills`, then
+   explicitly tell it to **approve the job description**.
 6. Use **Created job descriptions** to reopen saved records after a reload.
    Drafts can be edited directly; editing an approved JD creates a new draft
    version so the approved version remains unchanged.
+
+The supervisor uses Gemini to route every chat message to the requirement,
+JD-generation, JD-editing, JD-approval, or Discord-posting workflow. Its
+persistent session stores the requirement session, confirmed profile, active
+JD, active posting, current phase, and conversation history. The browser keeps
+the supervisor session ID in session storage so refreshing the page restores
+the same workflow.
 
 ## Discord job posting
 

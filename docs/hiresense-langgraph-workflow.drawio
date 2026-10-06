@@ -58,4 +58,57 @@
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram id="supervisor" name="LangGraph Supervisor">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="s0"/>
+        <mxCell id="s1" parent="s0"/>
+        <mxCell id="s-start" value="START" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="40" y="390" width="70" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-route" value="route_request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=14;" vertex="1" parent="s1">
+          <mxGeometry x="170" y="395" width="170" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-requirements" value="requirement_workflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="70" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-generate" value="generate_job_description" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="165" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-edit" value="edit_job_description" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="260" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-approve-jd" value="approve_job_description" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="355" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-posting" value="posting_workflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="450" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-help" value="explain_state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="545" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-error" value="route_error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="470" y="640" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s-end" value="END" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="s1">
+          <mxGeometry x="850" y="390" width="70" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="se-start-route" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="s1" source="s-start" target="s-route"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-req" value="requirements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-requirements"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-gen" value="generate_job_description" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-generate"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-edit" value="edit_job_description" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-edit"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-approve" value="approve_job_description" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-approve-jd"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-post" value="job_posting" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-posting"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-help" value="help" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-route" target="s-help"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-route-error" value="route_error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="s1" source="s-route" target="s-error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-req-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-requirements" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-gen-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-generate" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-edit-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-edit" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-approve-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-approve-jd" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-post-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-posting" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-help-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="s1" source="s-help" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se-error-end" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="s1" source="s-error" target="s-end"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
 </mxfile>

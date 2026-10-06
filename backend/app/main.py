@@ -14,6 +14,7 @@ from app.routes.job_descriptions import router as job_descriptions_router
 from app.routes.job_postings import router as job_postings_router
 from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
+from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
 from app.storage import ensure_storage_root
 
@@ -56,6 +57,7 @@ app.include_router(job_descriptions_router)
 app.include_router(job_postings_router)
 app.include_router(knowledge_router)
 app.include_router(requirements_router)
+app.include_router(supervisor_router)
 
 
 @app.get("/api/health", tags=["Health"])

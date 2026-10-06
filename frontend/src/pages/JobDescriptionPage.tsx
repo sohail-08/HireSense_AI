@@ -12,14 +12,14 @@ import {
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
 import type {
-  DiscordPostingAssistantResponse,
   JobDescriptionDraft,
   JobDescriptionEvidence,
   JobDescriptionResponse,
   KnowledgeDocumentResponse,
-  RequirementChatResponse,
   RequirementChatStatus,
   RequirementProfileDraft,
+  SupervisorChatResponse,
+  SupervisorPhase,
 } from "../types";
 
 type ChatMessage = {
@@ -30,6 +30,7 @@ type ChatMessage = {
 
 const initialAssistantMessage =
   "Tell me the role you want to hire for. I’ll search previous job descriptions, then propose requirements for you to accept or change.";
+const supervisorSessionKey = "hiresense_supervisor_session_id";
 
 const fieldLabels: Record<string, string> = {
   title: "role/title",
@@ -37,6 +38,30 @@ const fieldLabels: Record<string, string> = {
   qualifications: "qualifications",
   experience: "experience requirement",
   selection_criteria: "selection criteria",
+};
+
+const phaseLabels: Record<SupervisorPhase, string> = {
+  requirements: "Requirement discovery",
+  requirement_confirmation: "Confirm requirements",
+  requirement_confirmed: "Ready to generate JD",
+  job_description_draft: "JD review",
+  job_description_approved: "Ready to post",
+  posting_details: "Posting details",
+  posting_approval: "Confirm publication",
+  published: "Published",
+  error: "Needs attention",
+};
+
+const phasePlaceholders: Record<SupervisorPhase, string> = {
+  requirements: "e.g. I want to hire a backend engineer…",
+  requirement_confirmation: "Confirm the requirements or request a change…",
+  requirement_confirmed: "e.g. Generate the job description…",
+  job_description_draft: "Edit or approve the current job description…",
+  job_description_approved: "e.g. Post this job to Discord…",
+  posting_details: "Provide the application link and deadline…",
+  posting_approval: "Approve the post or request a change…",
+  published: "Ask about the completed workflow…",
+  error: "Retry the task or ask what to do next…",
 };
 
 function getErrorMessage(error: unknown): string {
@@ -92,8 +117,8 @@ export function JobDescriptionPage() {
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [chatStatus, setChatStatus] =
     useState<RequirementChatStatus>("active");
-  const [knowledgeStatus, setKnowledgeStatus] =
-    useState<RequirementChatResponse["knowledge_status"]>("not_searched");
+  const [supervisorPhase, setSupervisorPhase] =
+    useState<SupervisorPhase>("requirements");
   const [requirementSources, setRequirementSources] =
     useState<JobDescriptionEvidence[]>([]);
   const [proposalReady, setProposalReady] = useState(false);
@@ -107,7 +132,6 @@ export function JobDescriptionPage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [generationLoading, setGenerationLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [postingRefreshKey, setPostingRefreshKey] = useState(0);
   const [error, setError] = useState<string>();
@@ -126,6 +150,29 @@ export function JobDescriptionPage() {
       })
       .catch(() => {
         // The main workflow remains usable when the list cannot be loaded.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const savedSessionId = sessionStorage.getItem(supervisorSessionKey);
+    if (!savedSessionId) return;
+
+    let active = true;
+    setChatLoading(true);
+    apiRequest<SupervisorChatResponse>(
+      `/supervisor/sessions/${savedSessionId}`,
+    )
+      .then((response) => {
+        if (active) applySupervisorResponse(response);
+      })
+      .catch(() => {
+        sessionStorage.removeItem(supervisorSessionKey);
+      })
+      .finally(() => {
+        if (active) setChatLoading(false);
       });
     return () => {
       active = false;
@@ -183,15 +230,16 @@ export function JobDescriptionPage() {
     ]);
   }
 
-  async function refreshWorkflowContents() {
+  async function refreshWorkflowContents(selectedJobId?: number) {
     setPostingRefreshKey((current) => current + 1);
     try {
       const items = await apiRequest<JobDescriptionResponse[]>(
         "/job-descriptions",
       );
       setJobDescriptions(items);
-      if (jobDescription) {
-        const refreshed = items.find((item) => item.id === jobDescription.id);
+      const targetId = selectedJobId ?? jobDescription?.id;
+      if (targetId) {
+        const refreshed = items.find((item) => item.id === targetId);
         if (refreshed) {
           setJobDescription(refreshed);
           setDraftTitle(refreshed.title);
@@ -200,6 +248,50 @@ export function JobDescriptionPage() {
       }
     } catch (requestError) {
       setError(getErrorMessage(requestError));
+    }
+  }
+
+  function applySupervisorResponse(response: SupervisorChatResponse) {
+    setSessionId(response.session_id);
+    sessionStorage.setItem(supervisorSessionKey, response.session_id);
+    setSupervisorPhase(response.phase);
+    setMessages(
+      response.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        outcome:
+          message.outcome === "info" ? undefined : message.outcome,
+      })),
+    );
+
+    const requirement = response.requirement_state;
+    setProfile(requirement.profile);
+    setMissingFields(requirement.missing_fields);
+    setRequirementSources(requirement.source_references);
+    setProposalReady(requirement.proposal_ready);
+    setRequirementProfileId(response.requirement_profile_id ?? undefined);
+    setChatStatus(
+      response.phase === "requirement_confirmation"
+        ? "awaiting_confirmation"
+        : response.phase === "requirement_confirmed"
+          ? "confirmed"
+          : response.phase === "error"
+            ? "error"
+            : "active",
+    );
+
+    if (response.job_description) {
+      setJobDescription(response.job_description);
+      setDraftTitle(response.job_description.title);
+      setDraftContent(response.job_description.content);
+      upsertJobDescription(response.job_description);
+    } else {
+      setJobDescription(undefined);
+      setDraftTitle("");
+      setDraftContent("");
+    }
+    if (response.job_posting || response.refresh_required) {
+      setPostingRefreshKey((current) => current + 1);
     }
   }
 
@@ -223,84 +315,40 @@ export function JobDescriptionPage() {
     setInput("");
 
     try {
-      if (jobDescription?.status === "approved") {
-        const response = await apiRequest<DiscordPostingAssistantResponse>(
-          "/job-postings/discord/assistant",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              job_description_id: jobDescription.id,
-              message: trimmedMessage,
-            }),
-          },
-        );
-        setMessages((current) => [
-          ...current,
-          {
-            role: "assistant",
-            content:
-              response.status === "published"
-                ? `Success: ${response.assistant_message}`
-                : response.assistant_message,
-            outcome:
-              response.status === "published" ? "success" : undefined,
-          },
-        ]);
-        if (response.posting) {
-          await refreshWorkflowContents();
-        }
-        return;
-      }
-
-      const response = await apiRequest<RequirementChatResponse>(
-        "/requirements/chat",
+      const response = await apiRequest<SupervisorChatResponse>(
+        "/supervisor/chat",
         {
           method: "POST",
           body: JSON.stringify({
             session_id: sessionId,
             message: trimmedMessage,
+            selected_job_description_id: jobDescription?.id ?? null,
           }),
         },
       );
-
-      setSessionId(response.session_id);
-      setProfile(response.profile);
-      setMissingFields(response.missing_fields);
-      setChatStatus(response.status);
-      setKnowledgeStatus(response.knowledge_status);
-      setRequirementSources(response.source_references);
-      setProposalReady(response.proposal_ready);
-      if (response.requirement_profile_id) {
-        setRequirementProfileId(response.requirement_profile_id);
-      }
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", content: response.assistant_message },
-      ]);
-
-      if (response.error) {
-        setError(response.error);
+      applySupervisorResponse(response);
+      if (response.refresh_required) {
+        await refreshWorkflowContents(response.job_description?.id);
       }
     } catch (requestError) {
       const message = getErrorMessage(requestError);
       setError(message);
       addTaskMessage("failure", message);
-      if (jobDescription?.status === "approved") {
-        await refreshWorkflowContents();
-      }
+      await refreshWorkflowContents(jobDescription?.id);
     } finally {
       setChatLoading(false);
     }
   }
 
   function startNewSession() {
+    sessionStorage.removeItem(supervisorSessionKey);
     setMessages([{ role: "assistant", content: initialAssistantMessage }]);
     setInput("");
     setSessionId(undefined);
     setProfile(undefined);
     setMissingFields([]);
     setChatStatus("active");
-    setKnowledgeStatus("not_searched");
+    setSupervisorPhase("requirements");
     setRequirementSources([]);
     setProposalReady(false);
     setRequirementProfileId(undefined);
@@ -368,35 +416,8 @@ export function JobDescriptionPage() {
   }
 
   async function generateJobDescription() {
-    if (!requirementProfileId || generationLoading) return;
-
-    setError(undefined);
-    setGenerationLoading(true);
-    try {
-      const response = await apiRequest<JobDescriptionResponse>(
-        "/job-descriptions/generate",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            requirement_profile_id: requirementProfileId,
-          }),
-        },
-      );
-      setJobDescription(response);
-      setDraftTitle(response.title);
-      setDraftContent(response.content);
-      upsertJobDescription(response);
-      addTaskMessage(
-        "success",
-        `Job description “${response.title}” was generated.`,
-      );
-    } catch (requestError) {
-      const message = getErrorMessage(requestError);
-      setError(message);
-      addTaskMessage("failure", `Could not generate the job description. ${message}`);
-    } finally {
-      setGenerationLoading(false);
-    }
+    if (!requirementProfileId || chatLoading) return;
+    await sendMessage("Generate the job description.");
   }
 
   async function saveDraft() {
@@ -430,29 +451,8 @@ export function JobDescriptionPage() {
   }
 
   async function approveDraft() {
-    if (!jobDescription || saveLoading) return;
-
-    setError(undefined);
-    setSaveLoading(true);
-    try {
-      const response = await apiRequest<JobDescriptionResponse>(
-        `/job-descriptions/${jobDescription.id}/approve`,
-        { method: "POST" },
-      );
-      setJobDescription(response);
-      upsertJobDescription(response);
-      addTaskMessage(
-        "success",
-        "The job description was approved. You can now tell me to post this job.",
-      );
-      await refreshWorkflowContents();
-    } catch (requestError) {
-      const message = getErrorMessage(requestError);
-      setError(message);
-      addTaskMessage("failure", `Could not approve the job description. ${message}`);
-    } finally {
-      setSaveLoading(false);
-    }
+    if (!jobDescription || chatLoading) return;
+    await sendMessage("Approve the current job description.");
   }
 
   async function createEditableRevision(item: JobDescriptionResponse) {
@@ -744,19 +744,12 @@ export function JobDescriptionPage() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold text-slate-900">HireSense assistant</h2>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                {jobDescription?.status === "approved"
-                  ? "Job posting mode"
-                  : knowledgeStatus === "found"
-                  ? "Previous job descriptions found"
-                  : knowledgeStatus === "empty"
-                    ? "No matching data"
-                    : knowledgeStatus === "error"
-                      ? "Retrieval error"
-                      : "Ready to search"}
+                {phaseLabels[supervisorPhase]}
               </span>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              One central assistant handles requirements and approved-job posting.
+              The supervisor routes requirements, JD generation and editing,
+              approval, and job posting to specialist workflows.
             </p>
           </div>
 
@@ -786,14 +779,12 @@ export function JobDescriptionPage() {
 
             {chatLoading ? (
               <p className="text-sm text-slate-500" role="status">
-                {jobDescription?.status === "approved"
-                  ? "Processing the job-posting task…"
-                  : "Searching previous job descriptions and preparing a proposal…"}
+                The supervisor is selecting and running the appropriate workflow…
               </p>
             ) : null}
           </div>
 
-          {jobDescription?.status !== "approved" && requirementSources.length ? (
+          {supervisorPhase.startsWith("requirement") && requirementSources.length ? (
             <div className="border-t border-slate-200 bg-blue-50/60 px-5 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                 Sources used for this proposal
@@ -808,7 +799,7 @@ export function JobDescriptionPage() {
             </div>
           ) : null}
 
-          {jobDescription?.status !== "approved" && formattedMissingFields.length ? (
+          {supervisorPhase.startsWith("requirement") && formattedMissingFields.length ? (
             <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
               Still needed: {formattedMissingFields.join(", ")}.
             </p>
@@ -829,31 +820,15 @@ export function JobDescriptionPage() {
                 id="requirement-message"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder={
-                  jobDescription?.status === "approved"
-                    ? 'e.g. “Post this job”'
-                    : requirementProfileId
-                      ? "Generate and approve a job description to continue…"
-                      : "e.g. Python and FastAPI are required…"
-                }
-                disabled={
-                  chatLoading ||
-                  Boolean(
-                    requirementProfileId &&
-                    jobDescription?.status !== "approved",
-                  )
-                }
+                placeholder={phasePlaceholders[supervisorPhase]}
+                disabled={chatLoading}
                 className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               />
               <button
                 type="submit"
                 disabled={
                   chatLoading ||
-                  !input.trim() ||
-                  Boolean(
-                    requirementProfileId &&
-                    jobDescription?.status !== "approved",
-                  )
+                  !input.trim()
                 }
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -961,10 +936,10 @@ export function JobDescriptionPage() {
               <button
                 type="button"
                 onClick={() => void generateJobDescription()}
-                disabled={!requirementProfileId || generationLoading || Boolean(jobDescription)}
+                disabled={!requirementProfileId || chatLoading || Boolean(jobDescription)}
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {generationLoading ? "Generating…" : "Generate JD"}
+                {chatLoading ? "Working…" : "Generate JD"}
               </button>
             </div>
 
@@ -1016,7 +991,7 @@ export function JobDescriptionPage() {
                     <button
                       type="button"
                       onClick={() => void approveDraft()}
-                      disabled={saveLoading}
+                      disabled={saveLoading || chatLoading}
                       className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Approve JD
