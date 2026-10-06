@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+.interviewer-main {
+  transition: padding-right 300ms ease-out;
+}
+
+@media (min-width: 1024px) {
+  body.supervisor-panel-open .interviewer-main {
+    padding-right: 440px;
+  }
+
+  .supervisor-chat-panel {
+    top: var(--interviewer-navbar-height, 74px);
+  }
+}

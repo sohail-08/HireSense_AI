@@ -11,6 +11,7 @@ import {
 } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
+import { SupervisorChatPanel } from "../components/jobs/SupervisorChatPanel";
 import type {
   JobDescriptionDraft,
   JobDescriptionEvidence,
@@ -108,6 +109,9 @@ function DraftSection({
 }
 
 export function JobDescriptionPage() {
+  const [chatPanelOpen, setChatPanelOpen] = useState(() =>
+    window.matchMedia("(min-width: 1024px)").matches,
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: initialAssistantMessage },
   ]);
@@ -410,11 +414,6 @@ export function JobDescriptionPage() {
     }
   }
 
-  function handleChatSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void sendMessage(input);
-  }
-
   async function generateJobDescription() {
     if (!requirementProfileId || chatLoading) return;
     await sendMessage("Generate the job description.");
@@ -547,13 +546,28 @@ export function JobDescriptionPage() {
               {jobDescription.version}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={startNewSession}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Start new session
-          </button>
+          {!chatPanelOpen ? (
+            <button
+              type="button"
+              onClick={() => setChatPanelOpen(true)}
+              aria-controls="supervisor-chat-panel"
+              aria-expanded="false"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+                className="size-4"
+              >
+                <path d="M8 10h8M8 14h5" strokeLinecap="round" />
+                <path d="M6.5 19.5 3 21l1.1-3.8A8.5 8.5 0 1 1 6.5 19.5Z" strokeLinejoin="round" />
+              </svg>
+              Open assistant
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -738,119 +752,8 @@ export function JobDescriptionPage() {
         )}
       </section>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <section className="flex min-h-[640px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-900">HireSense assistant</h2>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                {phaseLabels[supervisorPhase]}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              The supervisor routes requirements, JD generation and editing,
-              approval, and job posting to specialist workflows.
-            </p>
-          </div>
-
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-            {messages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 ${
-                    message.role === "user"
-                      ? "rounded-br-sm bg-blue-600 text-white"
-                      : message.outcome === "success"
-                        ? "rounded-bl-sm border border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : message.outcome === "failure"
-                          ? "rounded-bl-sm border border-red-200 bg-red-50 text-red-800"
-                          : "rounded-bl-sm bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {message.content}
-                </div>
-              </div>
-            ))}
-
-            {chatLoading ? (
-              <p className="text-sm text-slate-500" role="status">
-                The supervisor is selecting and running the appropriate workflow…
-              </p>
-            ) : null}
-          </div>
-
-          {supervisorPhase.startsWith("requirement") && requirementSources.length ? (
-            <div className="border-t border-slate-200 bg-blue-50/60 px-5 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Sources used for this proposal
-              </p>
-              <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                {requirementSources.map((source) => (
-                  <li key={`${source.document_id}-${source.chunk_id}`}>
-                    {source.document_title} · relevance {source.score.toFixed(2)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {supervisorPhase.startsWith("requirement") && formattedMissingFields.length ? (
-            <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">
-              Still needed: {formattedMissingFields.join(", ")}.
-            </p>
-          ) : null}
-
-          <form
-            onSubmit={handleChatSubmit}
-            className="border-t border-slate-200 p-4"
-          >
-            <label
-              htmlFor="requirement-message"
-              className="sr-only"
-            >
-              Assistant message
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="requirement-message"
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder={phasePlaceholders[supervisorPhase]}
-                disabled={chatLoading}
-                className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              />
-              <button
-                type="submit"
-                disabled={
-                  chatLoading ||
-                  !input.trim()
-                }
-                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                Send
-              </button>
-            </div>
-
-            {canConfirm ? (
-              <button
-                type="button"
-                onClick={() => void sendMessage("use previous JD defaults")}
-                disabled={chatLoading}
-                className="mt-3 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Use previous JD defaults
-              </button>
-            ) : null}
-          </form>
-        </section>
-
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mt-8 grid items-start gap-6 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-semibold text-slate-900">Requirement profile</h2>
@@ -1079,8 +982,26 @@ export function JobDescriptionPage() {
               </p>
             )}
           </section>
-        </div>
       </div>
+
+      <SupervisorChatPanel
+        open={chatPanelOpen}
+        phaseLabel={phaseLabels[supervisorPhase]}
+        messages={messages}
+        loading={chatLoading}
+        input={input}
+        placeholder={phasePlaceholders[supervisorPhase]}
+        requirementContextVisible={supervisorPhase.startsWith("requirement")}
+        requirementSources={requirementSources}
+        missingFields={formattedMissingFields}
+        canConfirm={canConfirm}
+        onOpen={() => setChatPanelOpen(true)}
+        onClose={() => setChatPanelOpen(false)}
+        onInputChange={setInput}
+        onSend={() => void sendMessage(input)}
+        onConfirm={() => void sendMessage("use previous JD defaults")}
+        onNewSession={startNewSession}
+      />
     </section>
   );
 }
