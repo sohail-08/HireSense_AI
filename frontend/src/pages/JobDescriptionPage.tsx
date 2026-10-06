@@ -483,7 +483,8 @@ export function JobDescriptionPage() {
     if (
       deletingJobId ||
       !window.confirm(
-        `Delete “${item.title}” version ${item.version}? This cannot be undone.`,
+        `Delete “${item.title}” version ${item.version} from HireSense? ` +
+          "Any job post already published to Discord will remain there.",
       )
     ) {
       return;

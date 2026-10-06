@@ -5,10 +5,14 @@ from sqlalchemy.orm import Session
 from app.agents.job_description import render_job_description
 from app.database import Base
 from app.models import (
+    JobDescription,
     JobDescriptionStatus,
+    JobPosting,
+    JobPostingStatus,
     KnowledgeSourceType,
     RequirementProfile,
     RequirementProfileStatus,
+    SupervisorSession,
     User,
     UserRole,
 )
@@ -182,3 +186,77 @@ def test_unconfirmed_profile_cannot_generate_job_description(tmp_path):
                 requirement_profile_id=profile.id,
                 interviewer_user_id=interviewer.id,
             )
+
+
+def test_delete_archives_posted_job_and_clears_supervisor_state(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'posted-delete.db'}")
+    Base.metadata.create_all(engine)
+    service = JobDescriptionService(FakeJobDescriptionModel(_draft()))
+
+    with Session(engine) as session:
+        interviewer = User(
+            name="Interviewer",
+            email="posted-delete@example.com",
+            password_hash="hashed-password",
+            role=UserRole.INTERVIEWER,
+        )
+        session.add(interviewer)
+        session.flush()
+        profile = RequirementProfile(
+            title="Backend Engineer",
+            status=RequirementProfileStatus.CONFIRMED,
+            created_by_user_id=interviewer.id,
+        )
+        session.add(profile)
+        session.flush()
+        job = JobDescription(
+            requirement_profile_id=profile.id,
+            title="Backend Engineer",
+            content="Backend engineer job description",
+            structured_content=_draft().model_dump(mode="json"),
+            status=JobDescriptionStatus.APPROVED,
+            created_by_user_id=interviewer.id,
+        )
+        session.add(job)
+        session.flush()
+        posting = JobPosting(
+            job_description_id=job.id,
+            platform="discord",
+            status=JobPostingStatus.PUBLISHED,
+            external_post_id="discord-message-1",
+        )
+        session.add(posting)
+        session.flush()
+        supervisor = SupervisorSession(
+            interviewer_user_id=interviewer.id,
+            requirement_profile_id=profile.id,
+            job_description_id=job.id,
+            job_posting_id=posting.id,
+            phase="published",
+            state_json={"messages": []},
+        )
+        session.add(supervisor)
+        session.commit()
+        job_id = job.id
+        posting_id = posting.id
+        supervisor_id = supervisor.id
+
+        service.delete(
+            session,
+            job_description_id=job_id,
+            interviewer_user_id=interviewer.id,
+        )
+
+        archived = session.get(JobDescription, job_id)
+        assert archived is not None
+        assert archived.status is JobDescriptionStatus.ARCHIVED
+        assert session.get(JobPosting, posting_id) is not None
+        saved_supervisor = session.get(SupervisorSession, supervisor_id)
+        assert saved_supervisor is not None
+        assert saved_supervisor.job_description_id is None
+        assert saved_supervisor.job_posting_id is None
+        assert saved_supervisor.phase == "requirement_confirmed"
+        assert service.list_for_interviewer(
+            session,
+            interviewer_user_id=interviewer.id,
+        ) == []

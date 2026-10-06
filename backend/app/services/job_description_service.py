@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.agents.job_description import (
@@ -10,9 +10,11 @@ from app.agents.job_description import (
 from app.models.job import (
     JobDescription,
     JobDescriptionStatus,
+    JobPosting,
     RequirementProfile,
     RequirementProfileStatus,
 )
+from app.models.supervisor import SupervisorSession
 from app.rag.service import KnowledgeBaseService
 from app.schemas.job import JobDescriptionDraft, JobDescriptionUpdateRequest
 
@@ -106,8 +108,8 @@ class JobDescriptionService:
             db.scalars(
                 select(JobDescription)
                 .where(
-                    JobDescription.created_by_user_id
-                    == interviewer_user_id
+                    JobDescription.created_by_user_id == interviewer_user_id,
+                    JobDescription.status != JobDescriptionStatus.ARCHIVED,
                 )
                 .order_by(
                     JobDescription.updated_at.desc(),
@@ -216,11 +218,41 @@ class JobDescriptionService:
             job_description_id=job_description_id,
             interviewer_user_id=interviewer_user_id,
         )
-        if job_description.postings:
-            raise ValueError(
-                "A job description with job postings cannot be deleted"
+        posting_ids = list(
+            db.scalars(
+                select(JobPosting.id).where(
+                    JobPosting.job_description_id == job_description.id
+                )
             )
-        db.delete(job_description)
+        )
+        session_reference_filter = (
+            SupervisorSession.job_description_id == job_description.id
+        )
+        if posting_ids:
+            session_reference_filter = or_(
+                session_reference_filter,
+                SupervisorSession.job_posting_id.in_(posting_ids),
+            )
+        supervisor_sessions = list(
+            db.scalars(
+                select(SupervisorSession).where(session_reference_filter)
+            )
+        )
+        for supervisor in supervisor_sessions:
+            supervisor.job_description_id = None
+            supervisor.job_posting_id = None
+            supervisor.phase = (
+                "requirement_confirmed"
+                if supervisor.requirement_profile_id is not None
+                else "requirements"
+            )
+
+        if posting_ids:
+            # Preserve posting/application history and external Discord references.
+            # Archived JDs are excluded from the interviewer workspace.
+            job_description.status = JobDescriptionStatus.ARCHIVED
+        else:
+            db.delete(job_description)
         db.commit()
 
     @staticmethod
