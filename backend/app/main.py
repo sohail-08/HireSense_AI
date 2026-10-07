@@ -17,7 +17,11 @@ from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
-from app.storage import ensure_cv_storage_root, ensure_storage_root
+from app.storage import (
+    ensure_cv_storage_root,
+    ensure_knowledge_storage_root,
+    ensure_storage_root,
+)
 
 
 configure_logging()
@@ -28,6 +32,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     ensure_storage_root()
     ensure_cv_storage_root()
+    ensure_knowledge_storage_root()
 
     with SessionLocal() as db:
         seed_interviewer(db)

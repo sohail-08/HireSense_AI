@@ -37,6 +37,34 @@ def _values(enum_type: type[Enum]) -> list[str]:
     return [item.value for item in enum_type]
 
 
+class ApplicationImportExclusion(Base):
+    __tablename__ = "application_import_exclusions"
+    __table_args__ = (
+        Index(
+            "uq_application_import_exclusions_owner_source_reference",
+            "created_by_user_id",
+            "source",
+            "source_reference",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    source: Mapped[ApplicationSource] = mapped_column(
+        SqlEnum(
+            ApplicationSource,
+            native_enum=False,
+            create_constraint=True,
+            values_callable=_values,
+        )
+    )
+    source_reference: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
 class Candidate(Base):
     __tablename__ = "candidates"
     __table_args__ = (

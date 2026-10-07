@@ -1,4 +1,5 @@
 from app.models.candidate import (
+    ApplicationImportExclusion,
     ApplicationSource,
     ApplicationStatus,
     Candidate,
@@ -24,6 +25,7 @@ from app.models.user import User, UserRole
 
 __all__ = [
     "ApplicationSource",
+    "ApplicationImportExclusion",
     "ApplicationStatus",
     "Candidate",
     "CandidateApplication",

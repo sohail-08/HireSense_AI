@@ -7,6 +7,7 @@ from app.config import Settings
 from app.database import Base
 from app.integrations.google_workspace import GoogleDriveFile
 from app.models import (
+    ApplicationImportExclusion,
     ApplicationSource,
     Candidate,
     CandidateApplication,
@@ -22,6 +23,7 @@ from app.models import (
     UserRole,
 )
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
+from app.services.candidate_application_service import CandidateApplicationService
 
 
 class FakeGoogleReader:
@@ -191,6 +193,25 @@ def test_google_forms_sync_is_idempotent_and_stores_cv(tmp_path):
         assert document.status is CVProcessingStatus.VALIDATED
         stored = tmp_path / "storage" / document.storage_path
         assert stored.read_bytes() == b"synthetic cv pdf"
+
+        application_id = application.id
+        candidate_id = candidate.id
+        document_id = document.id
+        CandidateApplicationService(_settings(tmp_path / "storage")).delete(
+            db,
+            application_id=application_id,
+            interviewer_user_id=interviewer.id,
+        )
+
+        assert db.get(CandidateApplication, application_id) is None
+        assert db.get(CVDocument, document_id) is None
+        assert db.get(Candidate, candidate_id) is None
+        assert not stored.exists()
+        assert db.scalar(select(ApplicationImportExclusion)) is not None
+
+        third = service.sync(db, interviewer_user_id=interviewer.id)
+        assert third["imported_applications"] == 0
+        assert third["skipped_deleted"] == 1
 
 
 def test_job_resolution_never_guesses_between_postings(tmp_path):

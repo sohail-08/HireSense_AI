@@ -69,6 +69,7 @@ def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
         "candidates",
         "candidate_applications",
         "cv_documents",
+        "application_import_exclusions",
     }.issubset(inspector.get_table_names())
 
     assert {

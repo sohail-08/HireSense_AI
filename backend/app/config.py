@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
+    knowledge_pdf_max_file_size_mb: int = Field(default=15, ge=1, le=100)
+    knowledge_pdf_max_pages: int = Field(default=100, ge=1, le=500)
 
     google_service_account_file: str = "secrets/google-service-account.json"
     google_form_url: str | None = None

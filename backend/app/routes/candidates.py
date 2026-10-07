@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -15,6 +15,7 @@ from app.schemas.candidate import (
     GoogleFormsSyncResponse,
 )
 from app.security import require_interviewer
+from app.services.candidate_application_service import CandidateApplicationService
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 
 
@@ -79,6 +80,34 @@ def list_candidate_applications(
         interviewer_user_id=interviewer.id,
         job_posting_id=job_posting_id,
     )
+
+
+@router.delete(
+    "/applications/{application_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_candidate_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    try:
+        CandidateApplicationService(get_settings()).delete(
+            db,
+            application_id=application_id,
+            interviewer_user_id=interviewer.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from None
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

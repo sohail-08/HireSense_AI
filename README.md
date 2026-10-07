@@ -73,8 +73,11 @@ confidential company material through the unpaid tier.
 ## Job-description workflow
 
 1. Sign in as the Interviewer and open **Jobs**.
-2. Expand **Add previous job description** and add one or more approved
-   historical job descriptions.
+2. Expand **Add previous job description**, select an approved historical job
+   description PDF, and upload it. The PDF must contain selectable text; scanned
+   image-only documents need OCR before upload. The default limits are 15 MB and
+   100 pages and can be changed with `KNOWLEDGE_PDF_MAX_FILE_SIZE_MB` and
+   `KNOWLEDGE_PDF_MAX_PAGES`.
 3. Use the central supervisor chat and describe the role, for example: `I want to hire a
    backend engineer.`
 4. HireSense retrieves related previous job descriptions and proposes a complete
@@ -164,6 +167,12 @@ present instead of creating duplicates. The dataset contains six historical
 engineering job descriptions. It is development/demo data only and must not be
 represented as real company information.
 
+Uploaded source PDFs are private runtime data under
+`backend/storage/knowledge/` and are ignored by Git. HireSense extracts their
+text, stores searchable chunks in PostgreSQL, and records source metadata such
+as the original filename and page count. Removing an uploaded knowledge
+document deletes its database record, indexed chunks, and stored source PDF.
+
 The chatbot does not treat the LLM's own completeness claim as authoritative.
 The backend checks required skills, qualifications, experience and selection
 criteria before confirmation is enabled. Confirmed profiles retain source
@@ -215,6 +224,16 @@ The service account has read-only Sheets and Drive scopes. The API never serves
 the private CV directory as static content. Each accepted file is size-checked,
 restricted to PDF/DOCX, given a safe local filename, and recorded with a SHA-256
 digest for later parsing and ranking.
+
+Deleting a collected application removes its application and CV records from
+PostgreSQL, deletes its locally stored CV files, and removes the candidate when
+they have no other applications or documents. HireSense retains only a hashed
+import exclusion so the unchanged Google Sheet row is not imported again.
+
+Other web-app delete actions are also persistent: deleting a knowledge document
+removes its indexed chunks, while deleting a job description removes its local
+postings, applications and CV records. A Discord message already published to
+an external server remains on Discord.
 
 ## Tests
 

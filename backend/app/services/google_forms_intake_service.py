@@ -1,5 +1,4 @@
 import hashlib
-import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,12 +13,14 @@ from app.config import Settings
 from app.integrations.google_workspace import GoogleWorkspaceReader
 from app.models.candidate import (
     ApplicationSource,
+    ApplicationImportExclusion,
     Candidate,
     CandidateApplication,
     CVDocument,
     CVProcessingStatus,
 )
 from app.models.job import JobDescription, JobPosting
+from app.services.candidate_application_service import google_form_reference
 
 
 HEADER_ALIASES = {
@@ -100,6 +101,16 @@ class GoogleFormsIntakeService:
             spreadsheet_id=spreadsheet_id,
             sheet_name=self.settings.google_forms_sheet_name,
         )
+        deleted_references = set(
+            db.scalars(
+                select(ApplicationImportExclusion.source_reference).where(
+                    ApplicationImportExclusion.created_by_user_id
+                    == interviewer_user_id,
+                    ApplicationImportExclusion.source
+                    == ApplicationSource.GOOGLE_FORM,
+                )
+            )
+        )
         result = self._empty_result()
         downloaded_paths: list[Path] = []
 
@@ -129,11 +140,14 @@ class GoogleFormsIntakeService:
                     continue
                 posting, job = resolved
 
-                reference = self._source_reference(
+                reference = google_form_reference(
                     spreadsheet_id=spreadsheet_id,
                     sheet_name=self.settings.google_forms_sheet_name,
                     record=record,
                 )
+                if reference in deleted_references:
+                    result["skipped_deleted"] += 1
+                    continue
                 existing = existing_by_row.get(row_number)
                 if existing is None:
                     existing = db.scalar(
@@ -446,20 +460,6 @@ class GoogleFormsIntakeService:
     def _value(values: list[str], index: int | None) -> str:
         return values[index].strip() if index is not None and index < len(values) else ""
 
-    @staticmethod
-    def _source_reference(
-        *,
-        spreadsheet_id: str,
-        sheet_name: str,
-        record: dict[str, str],
-    ) -> str:
-        payload = json.dumps(
-            [spreadsheet_id, sheet_name, record],
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-        return "gform:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
     def _resolve_posting(
         self,
         value: str,
@@ -704,6 +704,7 @@ class GoogleFormsIntakeService:
             "imported_applications": 0,
             "reassigned_applications": 0,
             "skipped_existing": 0,
+            "skipped_deleted": 0,
             "unmatched_responses": 0,
             "downloaded_cvs": 0,
             "issues": [],

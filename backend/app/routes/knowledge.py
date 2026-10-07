@@ -1,4 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
+from app.config import get_settings
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,6 +21,7 @@ from app.schemas.knowledge import (
     KnowledgeDocumentResponse,
 )
 from app.security import require_interviewer
+from app.services.knowledge_pdf_service import KnowledgePDFService
 
 
 router = APIRouter(prefix="/api/knowledge", tags=["Knowledge Base"])
@@ -18,6 +29,10 @@ router = APIRouter(prefix="/api/knowledge", tags=["Knowledge Base"])
 
 def _service() -> KnowledgeBaseService:
     return KnowledgeBaseService(OllamaEmbeddingProvider())
+
+
+def _pdf_service() -> KnowledgePDFService:
+    return KnowledgePDFService(get_settings(), _service())
 
 
 @router.post(
@@ -51,6 +66,38 @@ def create_knowledge_document(
         ) from None
 
 
+@router.post(
+    "/documents/upload",
+    response_model=KnowledgeDocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_knowledge_document(
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None, max_length=255),
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    try:
+        return _pdf_service().upload(
+            db,
+            file=file,
+            title=title,
+            interviewer_user_id=interviewer.id,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except RuntimeError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This knowledge document has already been added",
+        ) from None
+
+
 @router.get("/documents", response_model=list[KnowledgeDocumentResponse])
 def list_knowledge_documents(
     db: Session = Depends(get_db),
@@ -69,7 +116,7 @@ def delete_knowledge_document(
     _interviewer: User = Depends(require_interviewer),
 ):
     try:
-        _service().delete_document(db, document_id)
+        _pdf_service().delete(db, document_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)

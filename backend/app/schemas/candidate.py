@@ -118,6 +118,7 @@ class GoogleFormsSyncResponse(BaseModel):
     imported_applications: int
     reassigned_applications: int
     skipped_existing: int
+    skipped_deleted: int
     unmatched_responses: int
     downloaded_cvs: int
     issues: list[GoogleFormsSyncIssue]

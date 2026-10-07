@@ -29,8 +29,10 @@ export function CandidatesPage() {
     useState<CandidateApplicationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [deletingApplicationId, setDeletingApplicationId] = useState<number>();
   const [syncResult, setSyncResult] = useState<GoogleFormsSyncResult>();
   const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -87,6 +89,34 @@ export function CandidatesPage() {
     }
   }
 
+  async function deleteApplication(application: CandidateApplicationSummary) {
+    const candidateName = application.candidate.name ?? "this candidate";
+    if (
+      deletingApplicationId ||
+      !window.confirm(
+        `Delete the application for ${candidateName}? ` +
+          "Its database record and locally stored CV files will be removed.",
+      )
+    ) {
+      return;
+    }
+
+    setDeletingApplicationId(application.id);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      await apiRequest<void>(`/candidates/applications/${application.id}`, {
+        method: "DELETE",
+      });
+      await refreshApplications();
+      setNotice(`Deleted the application for ${candidateName}.`);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setDeletingApplicationId(undefined);
+    }
+  }
+
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -115,6 +145,11 @@ export function CandidatesPage() {
       </div>
 
       <ErrorMessage message={error} />
+      {notice ? (
+        <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {notice}
+        </p>
+      ) : null}
 
       <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -180,6 +215,9 @@ export function CandidatesPage() {
             {syncResult.downloaded_cvs} CV(s). Reassigned {" "}
             {syncResult.reassigned_applications} existing application(s) and skipped {" "}
             {syncResult.skipped_existing} unchanged response(s)
+            {syncResult.skipped_deleted
+              ? ` and ${syncResult.skipped_deleted} previously deleted response(s)`
+              : ""}
             {syncResult.unmatched_responses
               ? ` and ${syncResult.unmatched_responses} response(s) with an unknown or missing job`
               : ""}
@@ -284,6 +322,16 @@ export function CandidatesPage() {
                     <p className="text-sm text-amber-700">CV not available</p>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void deleteApplication(application)}
+                  disabled={deletingApplicationId !== undefined}
+                  className="mt-4 text-sm font-semibold text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  {deletingApplicationId === application.id
+                    ? "Deleting…"
+                    : "Delete application"}
+                </button>
               </article>
             ))}
           </div>

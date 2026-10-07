@@ -290,6 +290,7 @@ export interface GoogleFormsSyncResult {
   imported_applications: number;
   reassigned_applications: number;
   skipped_existing: number;
+  skipped_deleted: number;
   unmatched_responses: number;
   downloaded_cvs: number;
   issues: { row_number: number; message: string }[];

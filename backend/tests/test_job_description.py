@@ -5,6 +5,11 @@ from sqlalchemy.orm import Session
 from app.agents.job_description import render_job_description
 from app.database import Base
 from app.models import (
+    ApplicationSource,
+    Candidate,
+    CandidateApplication,
+    CVDocument,
+    CVProcessingStatus,
     JobDescription,
     JobDescriptionStatus,
     JobPosting,
@@ -188,7 +193,7 @@ def test_unconfirmed_profile_cannot_generate_job_description(tmp_path):
             )
 
 
-def test_delete_archives_posted_job_and_clears_supervisor_state(tmp_path):
+def test_delete_removes_posted_job_and_clears_supervisor_state(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'posted-delete.db'}")
     Base.metadata.create_all(engine)
     service = JobDescriptionService(FakeJobDescriptionModel(_draft()))
@@ -227,6 +232,33 @@ def test_delete_archives_posted_job_and_clears_supervisor_state(tmp_path):
         )
         session.add(posting)
         session.flush()
+        candidate = Candidate(
+            name="Delete Candidate",
+            email="delete-candidate@example.com",
+        )
+        session.add(candidate)
+        session.flush()
+        application = CandidateApplication(
+            job_posting_id=posting.id,
+            candidate_id=candidate.id,
+            source=ApplicationSource.GOOGLE_FORM,
+            source_reference="gform:" + "a" * 64,
+        )
+        session.add(application)
+        session.flush()
+        document = CVDocument(
+            application_id=application.id,
+            candidate_id=candidate.id,
+            original_filename="candidate.pdf",
+            storage_path="cvs/delete-test/candidate.pdf",
+            mime_type="application/pdf",
+            file_size_bytes=1,
+            sha256="b" * 64,
+            source=ApplicationSource.GOOGLE_FORM,
+            status=CVProcessingStatus.VALIDATED,
+        )
+        session.add(document)
+        session.flush()
         supervisor = SupervisorSession(
             interviewer_user_id=interviewer.id,
             requirement_profile_id=profile.id,
@@ -239,6 +271,9 @@ def test_delete_archives_posted_job_and_clears_supervisor_state(tmp_path):
         session.commit()
         job_id = job.id
         posting_id = posting.id
+        candidate_id = candidate.id
+        application_id = application.id
+        document_id = document.id
         supervisor_id = supervisor.id
 
         service.delete(
@@ -247,10 +282,11 @@ def test_delete_archives_posted_job_and_clears_supervisor_state(tmp_path):
             interviewer_user_id=interviewer.id,
         )
 
-        archived = session.get(JobDescription, job_id)
-        assert archived is not None
-        assert archived.status is JobDescriptionStatus.ARCHIVED
-        assert session.get(JobPosting, posting_id) is not None
+        assert session.get(JobDescription, job_id) is None
+        assert session.get(JobPosting, posting_id) is None
+        assert session.get(CandidateApplication, application_id) is None
+        assert session.get(CVDocument, document_id) is None
+        assert session.get(Candidate, candidate_id) is None
         saved_supervisor = session.get(SupervisorSession, supervisor_id)
         assert saved_supervisor is not None
         assert saved_supervisor.job_description_id is None

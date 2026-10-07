@@ -7,6 +7,8 @@ from app.agents.job_description import (
     JobDescriptionModel,
     render_job_description,
 )
+from app.config import get_settings
+from app.models.candidate import CandidateApplication
 from app.models.job import (
     JobDescription,
     JobDescriptionStatus,
@@ -17,6 +19,7 @@ from app.models.job import (
 from app.models.supervisor import SupervisorSession
 from app.rag.service import KnowledgeBaseService
 from app.schemas.job import JobDescriptionDraft, JobDescriptionUpdateRequest
+from app.services.candidate_application_service import CandidateApplicationService
 
 
 class JobDescriptionService:
@@ -247,13 +250,42 @@ class JobDescriptionService:
                 else "requirements"
             )
 
+        application_service = CandidateApplicationService(get_settings())
+        stored_paths = []
+        candidate_ids: set[int] = set()
         if posting_ids:
-            # Preserve posting/application history and external Discord references.
-            # Archived JDs are excluded from the interviewer workspace.
-            job_description.status = JobDescriptionStatus.ARCHIVED
-        else:
-            db.delete(job_description)
+            applications = list(
+                db.scalars(
+                    select(CandidateApplication).where(
+                        CandidateApplication.job_posting_id.in_(posting_ids)
+                    )
+                )
+            )
+            for application in applications:
+                paths, candidate_id = application_service.delete_record(
+                    db,
+                    application=application,
+                    interviewer_user_id=interviewer_user_id,
+                    remember_import=False,
+                )
+                stored_paths.extend(paths)
+                if candidate_id is not None:
+                    candidate_ids.add(candidate_id)
+            db.flush()
+            for candidate_id in candidate_ids:
+                application_service.delete_orphan_candidate(db, candidate_id)
+            postings = list(
+                db.scalars(
+                    select(JobPosting).where(JobPosting.id.in_(posting_ids))
+                )
+            )
+            for posting in postings:
+                db.delete(posting)
+            db.flush()
+
+        db.delete(job_description)
         db.commit()
+        application_service.cleanup_cv_files(stored_paths)
 
     @staticmethod
     def _profile_payload(profile: RequirementProfile) -> dict[str, Any]:

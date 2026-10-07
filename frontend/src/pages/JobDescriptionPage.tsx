@@ -140,7 +140,8 @@ export function JobDescriptionPage() {
   const [postingRefreshKey, setPostingRefreshKey] = useState(0);
   const [error, setError] = useState<string>();
   const [knowledgeTitle, setKnowledgeTitle] = useState("");
-  const [knowledgeContent, setKnowledgeContent] = useState("");
+  const [knowledgeFile, setKnowledgeFile] = useState<File>();
+  const [knowledgeFileInputKey, setKnowledgeFileInputKey] = useState(0);
   const [knowledgeLoading, setKnowledgeLoading] = useState(false);
   const [knowledgeNotice, setKnowledgeNotice] = useState<string>();
   const [knowledgeDocuments, setKnowledgeDocuments] =
@@ -365,7 +366,7 @@ export function JobDescriptionPage() {
 
   async function addKnowledgeDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!knowledgeTitle.trim() || !knowledgeContent.trim() || knowledgeLoading) {
+    if (!knowledgeFile || knowledgeLoading) {
       return;
     }
 
@@ -373,19 +374,21 @@ export function JobDescriptionPage() {
     setKnowledgeNotice(undefined);
     setError(undefined);
     try {
+      const formData = new FormData();
+      formData.append("file", knowledgeFile);
+      if (knowledgeTitle.trim()) {
+        formData.append("title", knowledgeTitle.trim());
+      }
       const document = await apiRequest<KnowledgeDocumentResponse>(
-        "/knowledge/documents",
+        "/knowledge/documents/upload",
         {
           method: "POST",
-          body: JSON.stringify({
-            title: knowledgeTitle,
-            content: knowledgeContent,
-            metadata: {},
-          }),
+          body: formData,
         },
       );
       setKnowledgeTitle("");
-      setKnowledgeContent("");
+      setKnowledgeFile(undefined);
+      setKnowledgeFileInputKey((current) => current + 1);
       setKnowledgeNotice(
         `Added “${document.title}”. Start a new chat to use the updated knowledge base.`,
       );
@@ -401,6 +404,15 @@ export function JobDescriptionPage() {
   }
 
   async function deleteKnowledgeDocument(documentId: number) {
+    const document = knowledgeDocuments.find((item) => item.id === documentId);
+    if (
+      !window.confirm(
+        `Remove “${document?.title ?? "this document"}” from the knowledge base? ` +
+          "The document and its indexed chunks will be deleted from the database.",
+      )
+    ) {
+      return;
+    }
     setError(undefined);
     try {
       await apiRequest<void>(`/knowledge/documents/${documentId}`, {
@@ -408,6 +420,9 @@ export function JobDescriptionPage() {
       });
       setKnowledgeDocuments((current) =>
         current.filter((document) => document.id !== documentId),
+      );
+      setKnowledgeNotice(
+        `Removed “${document?.title ?? "knowledge document"}” from the database.`,
       );
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -587,7 +602,7 @@ export function JobDescriptionPage() {
         >
           <div>
             <label htmlFor="knowledge-title" className="text-sm font-medium text-slate-700">
-              Job description title
+              Job description title (optional)
             </label>
             <input
               id="knowledge-title"
@@ -598,29 +613,32 @@ export function JobDescriptionPage() {
             />
           </div>
           <div>
-            <label htmlFor="knowledge-content" className="text-sm font-medium text-slate-700">
-              Document content
+            <label htmlFor="knowledge-pdf" className="text-sm font-medium text-slate-700">
+              Previous job description PDF
             </label>
-            <textarea
-              id="knowledge-content"
-              value={knowledgeContent}
-              onChange={(event) => setKnowledgeContent(event.target.value)}
-              rows={7}
-              placeholder="Paste the approved previous job description here."
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            <input
+              key={knowledgeFileInputKey}
+              id="knowledge-pdf"
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => setKnowledgeFile(event.target.files?.[0])}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:font-semibold file:text-blue-700"
             />
+            <p className="mt-2 text-xs text-slate-500">
+              Selectable-text PDFs only, up to 15 MB and 100 pages. The filename
+              is used as the title when the optional title is empty.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 lg:col-span-2">
             <button
               type="submit"
               disabled={
                 knowledgeLoading ||
-                !knowledgeTitle.trim() ||
-                !knowledgeContent.trim()
+                !knowledgeFile
               }
               className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {knowledgeLoading ? "Embedding document…" : "Add to knowledge base"}
+              {knowledgeLoading ? "Extracting and embedding…" : "Upload and index PDF"}
             </button>
             {knowledgeNotice ? (
               <p className="text-sm text-emerald-700">{knowledgeNotice}</p>
@@ -641,7 +659,13 @@ export function JobDescriptionPage() {
                       <p className="truncate text-sm font-medium text-slate-800">
                         {document.title}
                       </p>
-                      <p className="text-xs text-slate-500">Previous job description</p>
+                      <p className="text-xs text-slate-500">
+                        {document.metadata_json.uploaded_pdf
+                          ? `PDF · ${document.metadata_json.page_count ?? "?"} page(s)`
+                          : document.metadata_json.synthetic
+                            ? "Synthetic previous job description"
+                            : "Previous job description"}
+                      </p>
                     </div>
                     <button
                       type="button"
