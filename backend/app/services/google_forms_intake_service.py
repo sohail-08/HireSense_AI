@@ -40,6 +40,15 @@ HEADER_ALIASES = {
         "curriculum vitae",
     ),
 }
+JOB_HEADER_ALIASES = (
+    "job posting",
+    "job posting id",
+    "job id",
+    "position applied for",
+    "applied position",
+    "job title",
+    "role applied for",
+)
 
 ALLOWED_CV_TYPES = {
     "application/pdf": ".pdf",
@@ -64,18 +73,12 @@ class GoogleFormsIntakeService:
         db: Session,
         *,
         interviewer_user_id: int,
-        job_posting_id: int,
     ) -> dict[str, Any]:
         spreadsheet_id = self.settings.google_forms_spreadsheet_id
         if not spreadsheet_id:
             raise ValueError(
                 "GOOGLE_FORMS_SPREADSHEET_ID is not configured"
             )
-        posting, job = self._owned_posting(
-            db,
-            interviewer_user_id=interviewer_user_id,
-            job_posting_id=job_posting_id,
-        )
         rows = self.reader.read_sheet(
             spreadsheet_id=spreadsheet_id,
             sheet_name=self.settings.google_forms_sheet_name,
@@ -85,6 +88,18 @@ class GoogleFormsIntakeService:
 
         headers = [str(value).strip() for value in rows[0]]
         mapping = self._column_mapping(headers)
+        postings = self._owned_postings(
+            db,
+            interviewer_user_id=interviewer_user_id,
+        )
+        if not postings:
+            raise LookupError("No job postings are available for candidate intake")
+        existing_by_row = self._existing_applications_by_row(
+            db,
+            postings=postings,
+            spreadsheet_id=spreadsheet_id,
+            sheet_name=self.settings.google_forms_sheet_name,
+        )
         result = self._empty_result()
         downloaded_paths: list[Path] = []
 
@@ -98,38 +113,53 @@ class GoogleFormsIntakeService:
                     for index, header in enumerate(headers)
                     if header
                 }
-                if not self._matches_job(
-                    values,
-                    mapping.get("job"),
-                    posting=posting,
-                    job=job,
-                ):
-                    result["skipped_other_jobs"] += 1
+                job_value = self._value(values, mapping.get("job"))
+                resolved, resolution_error = self._resolve_posting(
+                    job_value,
+                    postings,
+                )
+                if resolved is None:
+                    result["unmatched_responses"] += 1
+                    result["issues"].append(
+                        {
+                            "row_number": row_number,
+                            "message": resolution_error,
+                        }
+                    )
                     continue
+                posting, job = resolved
 
                 reference = self._source_reference(
                     spreadsheet_id=spreadsheet_id,
                     sheet_name=self.settings.google_forms_sheet_name,
-                    job_posting_id=posting.id,
                     record=record,
                 )
-                existing = db.scalar(
-                    select(CandidateApplication).where(
-                        CandidateApplication.job_posting_id == posting.id,
-                        CandidateApplication.source
-                        == ApplicationSource.GOOGLE_FORM,
-                        CandidateApplication.source_reference == reference,
+                existing = existing_by_row.get(row_number)
+                if existing is None:
+                    existing = db.scalar(
+                        select(CandidateApplication).where(
+                            CandidateApplication.job_posting_id.in_(
+                                [owned_posting.id for owned_posting, _ in postings]
+                            ),
+                            CandidateApplication.source
+                            == ApplicationSource.GOOGLE_FORM,
+                            CandidateApplication.source_reference == reference,
+                        )
                     )
-                )
                 if existing is not None:
-                    result["skipped_existing"] += 1
+                    if existing.job_posting_id != posting.id:
+                        existing.job_posting_id = posting.id
+                        result["reassigned_applications"] += 1
+                    else:
+                        result["skipped_existing"] += 1
+                    existing.source_reference = reference
+                    retry_warnings: list[str] = []
+                    file_ids = self._drive_file_ids(
+                        self._value(values, mapping.get("cv"))
+                    )
                     if not existing.cv_documents and existing.candidate_id:
                         candidate = db.get(Candidate, existing.candidate_id)
                         if candidate is not None:
-                            retry_warnings: list[str] = []
-                            file_ids = self._drive_file_ids(
-                                self._value(values, mapping.get("cv"))
-                            )
                             for file_id in file_ids:
                                 try:
                                     path = self._download_cv(
@@ -141,24 +171,24 @@ class GoogleFormsIntakeService:
                                     result["downloaded_cvs"] += 1
                                 except (RuntimeError, ValueError) as exc:
                                     retry_warnings.append(str(exc))
-                            existing.response_data = {
-                                **record,
-                                "_google_import": {
-                                    "sheet_name": (
-                                        self.settings.google_forms_sheet_name
-                                    ),
-                                    "row_number": row_number,
-                                    "drive_file_ids": file_ids,
-                                    "warnings": retry_warnings,
-                                },
-                            }
-                            result["issues"].extend(
-                                {
-                                    "row_number": row_number,
-                                    "message": warning,
-                                }
-                                for warning in retry_warnings
-                            )
+                    existing.response_data = {
+                        **record,
+                        "_google_import": {
+                            "spreadsheet_id": spreadsheet_id,
+                            "sheet_name": self.settings.google_forms_sheet_name,
+                            "row_number": row_number,
+                            "resolved_job_posting_id": posting.id,
+                            "drive_file_ids": file_ids,
+                            "warnings": retry_warnings,
+                        },
+                    }
+                    result["issues"].extend(
+                        {
+                            "row_number": row_number,
+                            "message": warning,
+                        }
+                        for warning in retry_warnings
+                    )
                     continue
 
                 row_warnings: list[str] = []
@@ -234,8 +264,10 @@ class GoogleFormsIntakeService:
                 application.response_data = {
                     **record,
                     "_google_import": {
+                        "spreadsheet_id": spreadsheet_id,
                         "sheet_name": self.settings.google_forms_sheet_name,
                         "row_number": row_number,
+                        "resolved_job_posting_id": posting.id,
                         "drive_file_ids": file_ids,
                         "warnings": row_warnings,
                     },
@@ -369,14 +401,17 @@ class GoogleFormsIntakeService:
                 f"Available headers: {', '.join(headers)}"
             )
         job_column = self.settings.google_forms_job_column
-        mapping["job"] = (
-            self._find_header(headers, job_column, (job_column,))
-            if job_column
-            else None
+        mapping["job"] = self._find_header(
+            headers,
+            job_column,
+            JOB_HEADER_ALIASES,
         )
-        if job_column and mapping["job"] is None:
+        if mapping["job"] is None:
             raise ValueError(
-                f"Configured job column '{job_column}' was not found"
+                f"Required job-routing column '{job_column}' was not found. "
+                "Add a required Google Form question such as 'Job Posting' "
+                "and use a posting ID or an exact HireSense job title as its value. "
+                f"Available headers: {', '.join(headers)}"
             )
         return mapping
 
@@ -416,31 +451,61 @@ class GoogleFormsIntakeService:
         *,
         spreadsheet_id: str,
         sheet_name: str,
-        job_posting_id: int,
         record: dict[str, str],
     ) -> str:
         payload = json.dumps(
-            [spreadsheet_id, sheet_name, job_posting_id, record],
+            [spreadsheet_id, sheet_name, record],
             ensure_ascii=False,
             sort_keys=True,
         )
         return "gform:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def _matches_job(
+    def _resolve_posting(
         self,
-        values: list[str],
-        job_index: int | None,
-        *,
-        posting: JobPosting,
-        job: JobDescription,
-    ) -> bool:
-        if job_index is None:
-            return True
-        selected = self._normalize(self._value(values, job_index))
-        return selected in {
-            self._normalize(str(posting.id)),
-            self._normalize(job.title),
-        }
+        value: str,
+        postings: list[tuple[JobPosting, JobDescription]],
+    ) -> tuple[tuple[JobPosting, JobDescription] | None, str]:
+        selected = value.strip()
+        if not selected:
+            return None, "Skipped response without a job posting value"
+
+        posting_id: int | None = None
+        if re.fullmatch(r"#?\d+", selected):
+            posting_id = int(selected.lstrip("#"))
+        else:
+            match = re.search(
+                r"(?:post(?:ing)?(?:\s+id)?|#)\s*#?\s*(\d+)",
+                selected,
+                flags=re.IGNORECASE,
+            )
+            if match:
+                posting_id = int(match.group(1))
+
+        if posting_id is not None:
+            for posting, job in postings:
+                if posting.id == posting_id:
+                    return (posting, job), ""
+            return None, (
+                f"Skipped response for unknown or inaccessible posting ID "
+                f"{posting_id}"
+            )
+
+        normalized_title = self._normalize(selected)
+        title_matches = [
+            (posting, job)
+            for posting, job in postings
+            if self._normalize(job.title) == normalized_title
+        ]
+        if len(title_matches) == 1:
+            return title_matches[0], ""
+        if len(title_matches) > 1:
+            return None, (
+                f"Skipped ambiguous job title '{selected}'; use a posting ID "
+                "instead"
+            )
+        return None, (
+            f"Skipped response for unknown job posting '{selected}'"
+        )
 
     @staticmethod
     def _candidate(
@@ -584,33 +649,62 @@ class GoogleFormsIntakeService:
         return datetime.now(timezone.utc)
 
     @staticmethod
-    def _owned_posting(
+    def _owned_postings(
         db: Session,
         *,
         interviewer_user_id: int,
-        job_posting_id: int,
-    ) -> tuple[JobPosting, JobDescription]:
-        row = db.execute(
+    ) -> list[tuple[JobPosting, JobDescription]]:
+        rows = db.execute(
             select(JobPosting, JobDescription)
             .join(
                 JobDescription,
                 JobDescription.id == JobPosting.job_description_id,
             )
             .where(
-                JobPosting.id == job_posting_id,
                 JobDescription.created_by_user_id == interviewer_user_id,
             )
-        ).one_or_none()
-        if row is None:
-            raise LookupError("Job posting not found")
-        return row[0], row[1]
+            .order_by(JobPosting.id)
+        ).all()
+        return [(posting, job) for posting, job in rows]
+
+    @staticmethod
+    def _existing_applications_by_row(
+        db: Session,
+        *,
+        postings: list[tuple[JobPosting, JobDescription]],
+        spreadsheet_id: str,
+        sheet_name: str,
+    ) -> dict[int, CandidateApplication]:
+        posting_ids = [posting.id for posting, _ in postings]
+        applications = db.scalars(
+            select(CandidateApplication).where(
+                CandidateApplication.job_posting_id.in_(posting_ids),
+                CandidateApplication.source == ApplicationSource.GOOGLE_FORM,
+            )
+        )
+        by_row: dict[int, CandidateApplication] = {}
+        for application in applications:
+            metadata = (application.response_data or {}).get(
+                "_google_import",
+                {},
+            )
+            if metadata.get("sheet_name") != sheet_name:
+                continue
+            stored_spreadsheet_id = metadata.get("spreadsheet_id")
+            if stored_spreadsheet_id and stored_spreadsheet_id != spreadsheet_id:
+                continue
+            row_number = metadata.get("row_number")
+            if isinstance(row_number, int):
+                by_row[row_number] = application
+        return by_row
 
     @staticmethod
     def _empty_result() -> dict[str, Any]:
         return {
             "imported_applications": 0,
+            "reassigned_applications": 0,
             "skipped_existing": 0,
-            "skipped_other_jobs": 0,
+            "unmatched_responses": 0,
             "downloaded_cvs": 0,
             "issues": [],
         }

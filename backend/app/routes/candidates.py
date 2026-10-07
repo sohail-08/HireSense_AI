@@ -46,6 +46,7 @@ def google_forms_configuration(
         "configured": not missing,
         "form_url": settings.google_form_url,
         "sheet_name": settings.google_forms_sheet_name,
+        "job_column": settings.google_forms_job_column,
         "missing_settings": missing,
     }
 
@@ -93,7 +94,6 @@ def sync_google_form_responses(
         return _service().sync(
             db,
             interviewer_user_id=interviewer.id,
-            job_posting_id=data.job_posting_id,
         )
     except LookupError as exc:
         raise HTTPException(

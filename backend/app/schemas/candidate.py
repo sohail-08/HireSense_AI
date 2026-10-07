@@ -101,13 +101,12 @@ class GoogleFormsConfigurationResponse(BaseModel):
     configured: bool
     form_url: str | None
     sheet_name: str
+    job_column: str
     missing_settings: list[str]
 
 
 class GoogleFormsSyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
-    job_posting_id: int = Field(gt=0)
 
 
 class GoogleFormsSyncIssue(BaseModel):
@@ -117,7 +116,8 @@ class GoogleFormsSyncIssue(BaseModel):
 
 class GoogleFormsSyncResponse(BaseModel):
     imported_applications: int
+    reassigned_applications: int
     skipped_existing: int
-    skipped_other_jobs: int
+    unmatched_responses: int
     downloaded_cvs: int
     issues: list[GoogleFormsSyncIssue]

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     google_forms_portfolio_column: str = "Portfolio"
     google_forms_location_column: str = "Location"
     google_forms_cv_column: str = "Upload CV"
-    google_forms_job_column: str | None = None
+    google_forms_job_column: str = "Job Posting"
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_embedding_model: str = "nomic-embed-text:latest"
@@ -79,7 +79,6 @@ class Settings(BaseSettings):
         "job_post_default_instructions",
         "google_form_url",
         "google_forms_spreadsheet_id",
-        "google_forms_job_column",
         mode="before",
     )
     @classmethod
@@ -87,6 +86,13 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("google_forms_job_column", mode="before")
+    @classmethod
+    def default_google_forms_job_column(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            return "Job Posting"
+        return value.strip()
 
     @field_validator("jwt_secret_key")
     @classmethod

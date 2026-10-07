@@ -282,13 +282,15 @@ export interface GoogleFormsConfiguration {
   configured: boolean;
   form_url: string | null;
   sheet_name: string;
+  job_column: string;
   missing_settings: string[];
 }
 
 export interface GoogleFormsSyncResult {
   imported_applications: number;
+  reassigned_applications: number;
   skipped_existing: number;
-  skipped_other_jobs: number;
+  unmatched_responses: number;
   downloaded_cvs: number;
   issues: { row_number: number; message: string }[];
 }

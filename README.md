@@ -196,18 +196,20 @@ Complete these one-time setup steps:
    GOOGLE_FORMS_SPREADSHEET_ID=your-spreadsheet-id
    ```
 
-4. If the response tab is not named `Form Responses 1`, set
+4. Add a required Google Form question named `Job Posting` (or configure its
+   exact name with `GOOGLE_FORMS_JOB_COLUMN`). Each answer must contain either
+   a HireSense posting ID, such as `Post #12`, or an exact job title. Posting
+   IDs are recommended because job titles can be repeated.
+5. If the response tab is not named `Form Responses 1`, set
    `GOOGLE_FORMS_SHEET_NAME`. Header names are detected from common Google Form
    labels. The exact labels can also be configured with the
    `GOOGLE_FORMS_*_COLUMN` variables shown in `.env.example`.
-5. Restart the backend, open **Candidates**, select the job posting that owns
-   these responses, and choose **Sync Google Form responses**.
+6. Restart the backend, open **Candidates**, and choose **Sync responses**.
 
 The sync is idempotent: importing the same Sheet row into the same job posting
-again does not create a duplicate application. If one response sheet collects
-applications for several jobs, configure `GOOGLE_FORMS_JOB_COLUMN`; its values
-must match either the HireSense posting ID or job title. Without that setting,
-all rows are assigned to the posting selected during synchronization.
+again does not create a duplicate application. Every row is routed independently
+using its job value. Missing, unknown, inaccessible, or ambiguous job values are
+reported and are never assigned to another posting.
 
 The service account has read-only Sheets and Drive scopes. The API never serves
 the private CV directory as static content. Each accepted file is size-checked,

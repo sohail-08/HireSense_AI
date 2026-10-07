@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
@@ -27,7 +27,6 @@ export function CandidatesPage() {
   const [postings, setPostings] = useState<CandidateJobPostingOption[]>([]);
   const [applications, setApplications] =
     useState<CandidateApplicationSummary[]>([]);
-  const [selectedPostingId, setSelectedPostingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<GoogleFormsSyncResult>();
@@ -47,10 +46,6 @@ export function CandidatesPage() {
         setConfiguration(config);
         setPostings(postingItems);
         setApplications(applicationItems);
-        const preferred =
-          postingItems.find((item) => item.status === "published") ??
-          postingItems[0];
-        if (preferred) setSelectedPostingId(String(preferred.id));
       })
       .catch((requestError) => {
         if (active) setError(errorMessage(requestError));
@@ -63,11 +58,6 @@ export function CandidatesPage() {
     };
   }, []);
 
-  const selectedPosting = useMemo(
-    () => postings.find((item) => String(item.id) === selectedPostingId),
-    [postings, selectedPostingId],
-  );
-
   async function refreshApplications() {
     const items = await apiRequest<CandidateApplicationSummary[]>(
       "/candidates/applications",
@@ -76,7 +66,7 @@ export function CandidatesPage() {
   }
 
   async function syncResponses() {
-    if (!selectedPostingId || syncing) return;
+    if (syncing) return;
     setSyncing(true);
     setError(undefined);
     setSyncResult(undefined);
@@ -85,9 +75,7 @@ export function CandidatesPage() {
         "/candidates/google-forms/sync",
         {
           method: "POST",
-          body: JSON.stringify({
-            job_posting_id: Number(selectedPostingId),
-          }),
+          body: JSON.stringify({}),
         },
       );
       setSyncResult(result);
@@ -140,30 +128,15 @@ export function CandidatesPage() {
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
-            <label className="min-w-64 text-sm font-medium text-slate-700">
-              Import responses for
-              <select
-                value={selectedPostingId}
-                onChange={(event) => setSelectedPostingId(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
-              >
-                <option value="">Select a job posting</option>
-                {postings.map((posting) => (
-                  <option key={posting.id} value={posting.id}>
-                    {posting.title} · Post #{posting.id} · {posting.status}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               type="button"
               onClick={() => void syncResponses()}
               disabled={
                 syncing ||
-                !selectedPostingId ||
+                postings.length === 0 ||
                 !configuration?.configured
               }
-              className="self-end rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {syncing ? "Syncing responses…" : "Sync responses"}
             </button>
@@ -178,19 +151,37 @@ export function CandidatesPage() {
           </div>
         ) : null}
 
-        {selectedPosting ? (
-          <p className="mt-4 text-xs text-slate-500">
-            Responses will be attached to “{selectedPosting.title}” posting #{selectedPosting.id}.
-          </p>
+        {configuration ? (
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+            <p>
+              Every response must contain the required Form field “
+              {configuration.job_column}”. Use one of these posting values:
+            </p>
+            {postings.length ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {postings.map((posting) => (
+                  <li key={posting.id}>
+                    <span className="font-semibold">Post #{posting.id}</span>
+                    {" — "}{posting.title}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 font-medium">
+                Create a job posting before importing candidates.
+              </p>
+            )}
+          </div>
         ) : null}
 
         {syncResult ? (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             Imported {syncResult.imported_applications} application(s) and {" "}
-            {syncResult.downloaded_cvs} CV(s). Skipped {syncResult.skipped_existing} {" "}
-            existing response(s)
-            {syncResult.skipped_other_jobs
-              ? ` and ${syncResult.skipped_other_jobs} response(s) for other jobs`
+            {syncResult.downloaded_cvs} CV(s). Reassigned {" "}
+            {syncResult.reassigned_applications} existing application(s) and skipped {" "}
+            {syncResult.skipped_existing} unchanged response(s)
+            {syncResult.unmatched_responses
+              ? ` and ${syncResult.unmatched_responses} response(s) with an unknown or missing job`
               : ""}
             .
             {syncResult.issues.length ? (
