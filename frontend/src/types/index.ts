@@ -209,3 +209,86 @@ export interface SupervisorChatResponse {
   job_posting: DiscordJobPost | null;
   refresh_required: boolean;
 }
+
+export type ApplicationSource = "direct_upload" | "google_form" | "import";
+export type ApplicationStatus =
+  | "received"
+  | "screening"
+  | "reviewed"
+  | "shortlisted"
+  | "rejected"
+  | "withdrawn";
+
+export interface CandidateProfile {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  location: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CandidateCVDocument {
+  id: number;
+  application_id: number | null;
+  candidate_id: number | null;
+  original_filename: string;
+  storage_path: string;
+  mime_type: string;
+  file_size_bytes: number;
+  sha256: string;
+  source: ApplicationSource;
+  status:
+    | "received"
+    | "validated"
+    | "processing"
+    | "processed"
+    | "rejected"
+    | "failed";
+  extracted_text: string | null;
+  extraction_data: Record<string, unknown> | null;
+  extraction_warnings: string[];
+  error_message: string | null;
+  processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CandidateApplicationSummary {
+  id: number;
+  job_posting_id: number;
+  job_title: string;
+  source: ApplicationSource;
+  source_reference: string | null;
+  status: ApplicationStatus;
+  submitted_at: string;
+  response_data: Record<string, unknown>;
+  candidate: CandidateProfile;
+  cv_documents: CandidateCVDocument[];
+}
+
+export interface CandidateJobPostingOption {
+  id: number;
+  job_description_id: number;
+  title: string;
+  status: JobPostingStatus;
+  published_at: string | null;
+}
+
+export interface GoogleFormsConfiguration {
+  configured: boolean;
+  form_url: string | null;
+  sheet_name: string;
+  missing_settings: string[];
+}
+
+export interface GoogleFormsSyncResult {
+  imported_applications: number;
+  skipped_existing: number;
+  skipped_other_jobs: number;
+  downloaded_cvs: number;
+  issues: { row_number: number; message: string }[];
+}

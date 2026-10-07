@@ -174,6 +174,46 @@ The first migration creates the existing authentication schema on a clean
 database and adopts the existing `users` table when upgrading a database that
 was created by the original development milestone.
 
+## Google Forms candidate and CV intake
+
+HireSense can import candidate responses from the Google Sheet linked to the
+application form and download uploaded PDF/DOCX CVs from Google Drive. Candidate
+records and application metadata are stored in PostgreSQL. CV files are stored
+under `backend/storage/cvs/`; both that directory and `backend/secrets/` are
+excluded from Git.
+
+Complete these one-time setup steps:
+
+1. Open `backend/secrets/google-service-account.json` and copy its
+   `client_email` value. Share the response spreadsheet and the Google Forms
+   upload folder with that address as a viewer. Enabling the APIs alone does not
+   grant the service account access to those files.
+2. Copy the spreadsheet ID from the response Sheet URL. It is the value between
+   `/d/` and `/edit`.
+3. Add the ID to the project `.env` file:
+
+   ```dotenv
+   GOOGLE_FORMS_SPREADSHEET_ID=your-spreadsheet-id
+   ```
+
+4. If the response tab is not named `Form Responses 1`, set
+   `GOOGLE_FORMS_SHEET_NAME`. Header names are detected from common Google Form
+   labels. The exact labels can also be configured with the
+   `GOOGLE_FORMS_*_COLUMN` variables shown in `.env.example`.
+5. Restart the backend, open **Candidates**, select the job posting that owns
+   these responses, and choose **Sync Google Form responses**.
+
+The sync is idempotent: importing the same Sheet row into the same job posting
+again does not create a duplicate application. If one response sheet collects
+applications for several jobs, configure `GOOGLE_FORMS_JOB_COLUMN`; its values
+must match either the HireSense posting ID or job title. Without that setting,
+all rows are assigned to the posting selected during synchronization.
+
+The service account has read-only Sheets and Drive scopes. The API never serves
+the private CV directory as static content. Each accepted file is size-checked,
+restricted to PDF/DOCX, given a safe local filename, and recorded with a SHA-256
+digest for later parsing and ranking.
+
 ## Tests
 
 ```powershell
@@ -201,9 +241,9 @@ Do not use `docker compose down -v` unless you intend to delete the database.
 - Database changes must be introduced through Alembic migrations.
 - Offline tests use deterministic embeddings; the running application uses
   `nomic-embed-text` through Ollama for semantic retrieval.
-- Candidate documents will be stored under the private `private_storage`
-  Docker volume. Do not place CVs, credentials or exported candidate data in
-  the repository.
+- Candidate documents are stored under the host-mounted private
+  `backend/storage/cvs/` directory. Do not place CVs, credentials or exported
+  candidate data in the repository.
 - JWTs use sessionStorage for this local milestone.
 - Logout removes the browser session but does not revoke a previously
   issued token. Tokens expire after their configured lifetime.

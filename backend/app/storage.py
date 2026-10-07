@@ -20,6 +20,12 @@ def ensure_storage_root() -> Path:
     return storage_root()
 
 
+def ensure_cv_storage_root() -> Path:
+    directory = private_storage_path("cvs")
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def private_storage_path(relative_path: str) -> Path:
     root = storage_root()
     candidate = (root / relative_path).resolve()

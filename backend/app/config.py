@@ -21,6 +21,20 @@ class Settings(BaseSettings):
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
 
+    google_service_account_file: str = "secrets/google-service-account.json"
+    google_form_url: str | None = None
+    google_forms_spreadsheet_id: str | None = None
+    google_forms_sheet_name: str = "Form Responses 1"
+    google_forms_timestamp_column: str = "Timestamp"
+    google_forms_name_column: str = "Name"
+    google_forms_email_column: str = "Email Address"
+    google_forms_phone_column: str = "Phone"
+    google_forms_linkedin_column: str = "LinkedIn"
+    google_forms_portfolio_column: str = "Portfolio"
+    google_forms_location_column: str = "Location"
+    google_forms_cv_column: str = "Upload CV"
+    google_forms_job_column: str | None = None
+
     ollama_base_url: str = "http://localhost:11434"
     ollama_embedding_model: str = "nomic-embed-text:latest"
     ollama_timeout_seconds: float = Field(default=60, ge=1, le=600)
@@ -63,6 +77,9 @@ class Settings(BaseSettings):
         "job_post_default_location",
         "job_post_default_application_deadline",
         "job_post_default_instructions",
+        "google_form_url",
+        "google_forms_spreadsheet_id",
+        "google_forms_job_column",
         mode="before",
     )
     @classmethod

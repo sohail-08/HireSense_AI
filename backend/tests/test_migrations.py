@@ -91,6 +91,14 @@ def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
     }.issubset(
         {column["name"] for column in inspector.get_columns("cv_documents")}
     )
+    assert "response_data" in {
+        column["name"]
+        for column in inspector.get_columns("candidate_applications")
+    }
+    assert "uq_candidate_applications_source_reference" in {
+        index["name"]
+        for index in inspector.get_indexes("candidate_applications")
+    }
     assert {
         "heading",
         "reviewed_content",

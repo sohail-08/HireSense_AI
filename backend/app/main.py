@@ -10,13 +10,14 @@ from app.config import get_settings
 from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
+from app.routes.candidates import router as candidates_router
 from app.routes.job_descriptions import router as job_descriptions_router
 from app.routes.job_postings import router as job_postings_router
 from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
-from app.storage import ensure_storage_root
+from app.storage import ensure_cv_storage_root, ensure_storage_root
 
 
 configure_logging()
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_storage_root()
+    ensure_cv_storage_root()
 
     with SessionLocal() as db:
         seed_interviewer(db)
@@ -53,6 +55,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(candidates_router)
 app.include_router(job_descriptions_router)
 app.include_router(job_postings_router)
 app.include_router(knowledge_router)

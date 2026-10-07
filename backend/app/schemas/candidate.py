@@ -36,6 +36,7 @@ class CandidateApplicationCreate(BaseModel):
     candidate_id: int | None = Field(default=None, gt=0)
     source: ApplicationSource = ApplicationSource.DIRECT_UPLOAD
     source_reference: str | None = Field(default=None, max_length=255)
+    response_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class CandidateApplicationResponse(CandidateApplicationCreate):
@@ -73,3 +74,50 @@ class CVDocumentResponse(CVDocumentCreate):
     processed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class CandidateJobPostingOption(BaseModel):
+    id: int
+    job_description_id: int
+    title: str
+    status: str
+    published_at: datetime | None
+
+
+class CandidateApplicationSummary(BaseModel):
+    id: int
+    job_posting_id: int
+    job_title: str
+    source: ApplicationSource
+    source_reference: str | None
+    status: ApplicationStatus
+    submitted_at: datetime
+    response_data: dict[str, Any]
+    candidate: CandidateResponse
+    cv_documents: list[CVDocumentResponse]
+
+
+class GoogleFormsConfigurationResponse(BaseModel):
+    configured: bool
+    form_url: str | None
+    sheet_name: str
+    missing_settings: list[str]
+
+
+class GoogleFormsSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_posting_id: int = Field(gt=0)
+
+
+class GoogleFormsSyncIssue(BaseModel):
+    row_number: int
+    message: str
+
+
+class GoogleFormsSyncResponse(BaseModel):
+    imported_applications: int
+    skipped_existing: int
+    skipped_other_jobs: int
+    downloaded_cvs: int
+    issues: list[GoogleFormsSyncIssue]

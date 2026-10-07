@@ -77,6 +77,13 @@ class CandidateApplication(Base):
     __table_args__ = (
         Index("ix_candidate_applications_job_posting_id", "job_posting_id"),
         Index("ix_candidate_applications_status", "status"),
+        Index(
+            "uq_candidate_applications_source_reference",
+            "job_posting_id",
+            "source",
+            "source_reference",
+            unique=True,
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -98,6 +105,7 @@ class CandidateApplication(Base):
     source_reference: Mapped[str | None] = mapped_column(
         String(255), nullable=True
     )
+    response_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[ApplicationStatus] = mapped_column(
         SqlEnum(
             ApplicationStatus,
