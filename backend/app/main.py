@@ -15,8 +15,10 @@ from app.routes.job_descriptions import router as job_descriptions_router
 from app.routes.job_postings import router as job_postings_router
 from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
+from app.routes.screening import router as screening_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
+from app.services.screening_service import ScreeningService
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -36,6 +38,7 @@ async def lifespan(app: FastAPI):
 
     with SessionLocal() as db:
         seed_interviewer(db)
+        ScreeningService.recover_interrupted(db)
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -65,6 +68,7 @@ app.include_router(job_descriptions_router)
 app.include_router(job_postings_router)
 app.include_router(knowledge_router)
 app.include_router(requirements_router)
+app.include_router(screening_router)
 app.include_router(supervisor_router)
 
 

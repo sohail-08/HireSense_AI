@@ -15,6 +15,7 @@
 - Persisted LangGraph supervisor with LLM intent routing and shared workflow state
 - Interviewer UI for previous-JD knowledge, requirement review and JD approval
 - Reviewed Discord job-post previews with persistent publication status
+- Job-scoped PDF/DOCX CV parsing, requirement screening and semantic ranking
 
 ## Requirements
 
@@ -149,9 +150,8 @@ embed titles to 256, embed descriptions to 4,096, individual field values to
 [webhook](https://docs.discord.com/developers/resources/webhook) and
 [message](https://docs.discord.com/developers/resources/message) documentation.
 
-Known limitations: this increment targets one standard text-channel webhook.
-It does not create Google Forms, collect responses or CVs, parse documents, or
-rank candidates. A network timeout after sending is recorded as `uncertain`;
+Known limitations: Discord publishing targets one standard text-channel webhook.
+A network timeout after sending is recorded as `uncertain`;
 check Discord before explicitly preparing another publication. A Discord link
 is shown only when Discord returns server, channel, and message identifiers.
 
@@ -234,6 +234,48 @@ Other web-app delete actions are also persistent: deleting a knowledge document
 removes its indexed chunks, while deleting a job description removes its local
 postings, applications and CV records. A Discord message already published to
 an external server remains on Discord.
+
+## CV screening and semantic ranking
+
+1. Import applications and CVs with **Candidates → Sync responses**.
+2. Open **Assessments** and select the published job posting to assess. HireSense
+   uses only applications routed to that posting and requires its confirmed
+   requirement profile and approved job description.
+3. Select individual pending candidates or choose **Screen all pending**. The
+   work runs as a persisted background batch, so the page can poll progress and
+   display per-CV failures without discarding successful results.
+4. Review the ranked candidates, deterministic requirement-coverage score,
+   strengths, gaps and items to verify. Open a candidate to inspect the extracted
+   profile and every Met, Partially Met, Unmet or Unable to Determine decision
+   with its source quote and PDF page or DOCX block location.
+
+PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
+directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported
+formats and documents outside the configured size/page/text limits are moved to
+the review list rather than silently ranked. The screening prompt treats CV text
+as untrusted data, validates cited quotes against parsed source blocks, and runs
+a separate model check before positive evidence is accepted.
+
+Ranking uses an auditable weighted coverage calculation: Met = 1, Partially Met
+= 0.5, and Unmet or Unable to Determine = 0. Requirement weights configured on
+the profile are used; otherwise each item receives the explicit default weight
+of 1. Ties share the same rank and are ordered stably by application ID. Results
+persist with the CV hash, requirement snapshot, model, prompt version and
+calculation version. Unchanged compatible results are reused; changed CVs or job
+requirements are screened again.
+
+The limits can be configured in the root `.env` file:
+
+```dotenv
+CV_MAX_PAGES=40
+CV_MAX_CHARACTERS=150000
+CV_MIN_EXTRACT_CHARACTERS=80
+SCREENING_BATCH_MAX_APPLICATIONS=50
+```
+
+Gemini receives CV content during screening. Use only data that your privacy and
+data-processing policy permits sending to the configured model provider. Real
+candidate data should not be sent through an unpaid/demo API tier.
 
 ## Tests
 

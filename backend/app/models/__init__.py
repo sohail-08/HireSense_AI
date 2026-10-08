@@ -20,6 +20,18 @@ from app.models.requirement_session import (
     RequirementDiscoverySession,
     RequirementDiscoveryStatus,
 )
+from app.models.screening import (
+    RankingDisposition,
+    RankingEntry,
+    RankingSnapshot,
+    RequirementMatch,
+    RequirementMatchStatus,
+    ScreeningBatch,
+    ScreeningBatchItem,
+    ScreeningBatchStatus,
+    ScreeningRun,
+    ScreeningRunStatus,
+)
 from app.models.supervisor import SupervisorSession
 from app.models.user import User, UserRole
 
@@ -42,6 +54,16 @@ __all__ = [
     "RequirementDiscoveryStatus",
     "RequirementProfile",
     "RequirementProfileStatus",
+    "RequirementMatch",
+    "RequirementMatchStatus",
+    "RankingDisposition",
+    "RankingEntry",
+    "RankingSnapshot",
+    "ScreeningBatch",
+    "ScreeningBatchItem",
+    "ScreeningBatchStatus",
+    "ScreeningRun",
+    "ScreeningRunStatus",
     "SupervisorSession",
     "User",
     "UserRole",

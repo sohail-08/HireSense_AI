@@ -21,6 +21,7 @@ import { InterviewerDashboard } from "./pages/InterviewerDashboard";
 import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ScreeningPage } from "./pages/ScreeningPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
@@ -97,9 +98,7 @@ export default function App() {
 
           <Route
             path="assessments"
-            element={
-              <PlaceholderPage title="Assessments" />
-            }
+            element={<ScreeningPage />}
           />
         </Route>
       </Route>

@@ -114,6 +114,46 @@ def test_domain_migration_creates_f1_f2_f3_tables(tmp_path):
     )
 
 
+def test_screening_migration_creates_batches_matches_and_rankings(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'screening-migration.db'}"
+
+    run_upgrade(database_url)
+
+    inspector = inspect(create_engine(database_url))
+    assert {
+        "screening_batches",
+        "screening_batch_items",
+        "screening_runs",
+        "requirement_matches",
+        "ranking_snapshots",
+        "ranking_entries",
+    }.issubset(inspector.get_table_names())
+    assert {
+        "application_id",
+        "cv_sha256",
+        "requirement_snapshot_hash",
+        "extracted_profile",
+        "requirement_coverage",
+        "review_flags",
+        "prompt_version",
+        "calculation_version",
+    }.issubset(
+        {column["name"] for column in inspector.get_columns("screening_runs")}
+    )
+    assert {
+        "requirement_key",
+        "status",
+        "evidence",
+        "evidence_gaps",
+        "review_flags",
+    }.issubset(
+        {
+            column["name"]
+            for column in inspector.get_columns("requirement_matches")
+        }
+    )
+
+
 def test_knowledge_base_migration_creates_document_and_chunk_tables(tmp_path):
     database_url = f"sqlite:///{tmp_path / 'knowledge.db'}"
 
