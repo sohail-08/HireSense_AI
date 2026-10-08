@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.agents.job_posting import PostingCommandExtraction
 from app.agents.supervisor import SupervisorDecision
 from app.database import Base
-from app.integrations.discord import DiscordPublishResult
+from app.integrations.discord_mcp import DiscordPublishResult
 from app.models import JobPostingStatus, SupervisorSession, User, UserRole
 from app.schemas.job import JobDescriptionDraft
 from app.schemas.requirements import (

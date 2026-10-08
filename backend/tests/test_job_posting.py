@@ -1,4 +1,4 @@
-import json
+import asyncio
 from datetime import date, timedelta
 
 import httpx
@@ -14,13 +14,20 @@ from app.agents.job_posting import (
     JobPostingAssistantGraph,
     PostingCommandExtraction,
 )
-from app.integrations.discord import (
+from app.integrations.discord_mcp import (
     DiscordConfigurationError,
     DiscordDeliveryUncertainError,
+    DiscordMCPPublisher,
     DiscordPublishError,
     DiscordPublishResult,
-    DiscordWebhookPublisher,
 )
+from app.job_posting_mcp.server import (
+    DiscordBotPublisher,
+    DiscordBotSettings,
+    DiscordEmbedField,
+    mcp as job_posting_mcp,
+)
+from mcp import Client
 from app.models import (
     JobDescription,
     JobDescriptionStatus,
@@ -53,6 +60,9 @@ class StubPublisher:
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return self.outcome
+
+    def is_configured(self):
+        return True
 
 
 class StubPostingCommandModel:
@@ -358,15 +368,15 @@ def test_stale_job_description_is_not_published():
     [
         (
             DiscordConfigurationError(
-                "discord_webhook_not_configured",
+                "discord_bot_not_configured",
                 "Discord publishing is not configured.",
             ),
             JobPostingStatus.FAILED,
         ),
         (
             DiscordPublishError(
-                "discord_webhook_invalid",
-                "Discord rejected the webhook.",
+                "discord_bot_unauthorized",
+                "Discord rejected the bot credentials.",
             ),
             JobPostingStatus.FAILED,
         ),
@@ -404,82 +414,143 @@ def test_publication_failures_are_persisted(error, expected_status):
     engine.dispose()
 
 
-def test_publisher_uses_wait_confirmation_and_bounded_rate_limit_retry():
+def test_mcp_server_exposes_only_status_and_job_publication_tools():
+    async def list_names():
+        async with Client(job_posting_mcp) as client:
+            result = await client.list_tools()
+            return {tool.name for tool in result.tools}
+
+    assert asyncio.run(list_names()) == {
+        "get_discord_posting_status",
+        "publish_job_post",
+    }
+
+
+def test_mcp_bot_publisher_posts_to_fixed_channel_with_bot_authentication():
     requests = []
-    sleeps = []
 
     def handler(request: httpx.Request):
         requests.append(request)
-        if len(requests) == 1:
-            return httpx.Response(429, json={"retry_after": 0.25})
         return httpx.Response(
             200,
-            json={"id": "333", "channel_id": "222", "guild_id": "111"},
+            json={"id": "333", "channel_id": "222222222222222222", "guild_id": "111"},
         )
 
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    publisher = DiscordWebhookPublisher(
-        webhook_url="https://discord.com/api/webhooks/123/token",
-        client=client,
-        max_rate_limit_wait_seconds=1,
-        sleeper=sleeps.append,
-    )
-    payload = {"content": "Hiring", "allowed_mentions": {"parse": []}}
+    async def publish():
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler)
+        ) as client:
+            publisher = DiscordBotPublisher(
+                DiscordBotSettings(
+                    discord_bot_token="secret-bot-token",
+                    discord_channel_id="222222222222222222",
+                    discord_api_base_url="https://discord.test/api/v10",
+                ),
+                client=client,
+            )
+            return await publisher.publish(
+                content="Hiring",
+                title="Backend Engineer",
+                description="Build reliable APIs.",
+                fields=[DiscordEmbedField(name="Apply", value="https://example.com")],
+            )
 
-    result = publisher.publish(payload)
+    result = asyncio.run(publish())
 
+    assert result.ok is True
     assert result.message_id == "333"
-    assert len(requests) == 2
-    assert requests[0].url.params["wait"] == "true"
-    assert json.loads(requests[0].content) == payload
-    assert sleeps == [0.25]
-    client.close()
+    assert len(requests) == 1
+    assert str(requests[0].url) == (
+        "https://discord.test/api/v10/channels/222222222222222222/messages"
+    )
+    assert requests[0].headers["authorization"] == "Bot secret-bot-token"
+    sent = requests[0].read().decode()
+    assert "secret-bot-token" not in sent
+    assert '"allowed_mentions":{"parse":[]}' in sent
 
 
-def test_publisher_handles_deleted_webhook_and_uncertain_timeout():
-    invalid_client = httpx.Client(
-        transport=httpx.MockTransport(
-            lambda _request: httpx.Response(404, json={"message": "Unknown Webhook"})
+def test_mcp_bot_publisher_reports_configuration_and_uncertain_delivery():
+    missing = DiscordBotPublisher(DiscordBotSettings())
+    missing_result = asyncio.run(
+        missing.publish(
+            content="Hiring",
+            title="Backend Engineer",
+            description="Build APIs.",
+            fields=[],
         )
     )
-    invalid_publisher = DiscordWebhookPublisher(
-        webhook_url="https://discord.com/api/webhooks/123/secret-token",
-        client=invalid_client,
-    )
-    with pytest.raises(DiscordPublishError) as invalid_error:
-        invalid_publisher.publish({"content": "Hiring"})
-    assert invalid_error.value.code == "discord_webhook_invalid"
-    assert "secret-token" not in invalid_error.value.safe_message
-    invalid_client.close()
+    assert missing_result.ok is False
+    assert missing_result.error_code == "discord_bot_not_configured"
 
     def timeout(request: httpx.Request):
         raise httpx.ReadTimeout("timed out", request=request)
 
-    timeout_client = httpx.Client(transport=httpx.MockTransport(timeout))
-    uncertain_publisher = DiscordWebhookPublisher(
-        webhook_url="https://discord.com/api/webhooks/123/secret-token",
-        client=timeout_client,
+    async def publish_timeout():
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(timeout)
+        ) as client:
+            publisher = DiscordBotPublisher(
+                DiscordBotSettings(
+                    discord_bot_token="secret-bot-token",
+                    discord_channel_id="222222222222222222",
+                ),
+                client=client,
+            )
+            return await publisher.publish(
+                content="Hiring",
+                title="Backend Engineer",
+                description="Build APIs.",
+                fields=[],
+            )
+
+    timeout_result = asyncio.run(publish_timeout())
+    assert timeout_result.delivery_uncertain is True
+    assert timeout_result.error_code == "discord_delivery_uncertain"
+
+
+def test_backend_publisher_uses_mcp_tool_contract(monkeypatch):
+    publisher = DiscordMCPPublisher(
+        mcp_url="http://job-posting-mcp:8001/mcp",
+        timeout_seconds=5,
     )
-    with pytest.raises(DiscordDeliveryUncertainError):
-        uncertain_publisher.publish({"content": "Hiring"})
-    timeout_client.close()
+    calls = []
 
+    def call_tool(name, arguments):
+        calls.append((name, arguments))
+        return {
+            "ok": True,
+            "message_id": "333",
+            "channel_id": "222",
+            "guild_id": "111",
+        }
 
-def test_publisher_reports_missing_configuration_without_sending():
-    client = httpx.Client(
-        transport=httpx.MockTransport(
-            lambda _request: pytest.fail("No Discord request should be sent")
+    monkeypatch.setattr(publisher, "_call_tool", call_tool)
+    result = publisher.publish(
+        {
+            "content": "Hiring",
+            "embeds": [
+                {
+                    "title": "Backend Engineer",
+                    "description": "Build APIs.",
+                    "fields": [],
+                }
+            ],
+            "allowed_mentions": {"parse": []},
+        }
+    )
+
+    assert result == DiscordPublishResult("333", "222", "111")
+    assert calls == [
+        (
+            "publish_job_post",
+            {
+                "content": "Hiring",
+                "title": "Backend Engineer",
+                "description": "Build APIs.",
+                "fields": [],
+            },
         )
-    )
-    publisher = DiscordWebhookPublisher(webhook_url=None, client=client)
-    publisher.webhook_url = None
-
-    with pytest.raises(DiscordConfigurationError) as error:
-        publisher.publish({"content": "Hiring"})
-
-    assert error.value.code == "discord_webhook_not_configured"
-    assert "DISCORD_WEBHOOK_URL" in error.value.safe_message
-    client.close()
+    ]
 
 
 def test_job_posting_routes_require_interviewer_and_return_saved_status(monkeypatch):

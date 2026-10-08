@@ -9,12 +9,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.integrations.discord import (
+from app.integrations.discord_mcp import (
     DiscordConfigurationError,
     DiscordDeliveryUncertainError,
     DiscordPublishError,
     DiscordPublishResult,
-    DiscordWebhookPublisher,
+    DiscordMCPPublisher,
 )
 from app.models.job import (
     JobDescription,
@@ -189,10 +189,10 @@ class DiscordJobPostComposer:
 class DiscordJobPostingService:
     def __init__(
         self,
-        publisher: DiscordWebhookPublisher | None = None,
+        publisher: DiscordMCPPublisher | None = None,
         composer: DiscordJobPostComposer | None = None,
     ):
-        self.publisher = publisher or DiscordWebhookPublisher()
+        self.publisher = publisher or DiscordMCPPublisher()
         self.composer = composer or DiscordJobPostComposer()
 
     def preview(

@@ -71,7 +71,7 @@ export function DiscordJobPostPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PostForm>(emptyForm);
-  const [webhookConfigured, setWebhookConfigured] = useState(false);
+  const [mcpConfigured, setMcpConfigured] = useState(false);
   const [publications, setPublications] = useState<DiscordJobPost[]>([]);
   const [savedPreview, setSavedPreview] = useState<DiscordJobPost>();
   const [previewCurrent, setPreviewCurrent] = useState(false);
@@ -92,7 +92,7 @@ export function DiscordJobPostPanel({
     ])
       .then(([defaults, posts]) => {
         if (!active) return;
-        setWebhookConfigured(defaults.webhook_configured);
+        setMcpConfigured(defaults.mcp_configured);
         setPublications(posts);
         const editablePreview = posts.find((post) => post.status === "draft");
         if (editablePreview) {
@@ -395,9 +395,9 @@ export function DiscordJobPostPanel({
               </div>
             </div>
 
-            {!webhookConfigured ? (
+            {!mcpConfigured ? (
               <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                Add DISCORD_WEBHOOK_URL to the backend environment before publishing.
+                Configure the Discord bot token and channel ID on the job-posting MCP server before publishing.
               </p>
             ) : null}
             {!previewCurrent ? (
@@ -420,7 +420,7 @@ export function DiscordJobPostPanel({
                 onClick={() => void publish()}
                 disabled={
                   publishing ||
-                  !webhookConfigured ||
+                  !mcpConfigured ||
                   !previewCurrent ||
                   savedPreview?.status !== "draft"
                 }

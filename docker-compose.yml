@@ -61,9 +61,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.5-flash-lite}
       GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-60}
-      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
-      DISCORD_TIMEOUT_SECONDS: ${DISCORD_TIMEOUT_SECONDS:-15}
-      DISCORD_RATE_LIMIT_MAX_WAIT_SECONDS: ${DISCORD_RATE_LIMIT_MAX_WAIT_SECONDS:-5}
+      JOB_POSTING_MCP_URL: http://job-posting-mcp:8001/mcp
+      JOB_POSTING_MCP_TIMEOUT_SECONDS: ${JOB_POSTING_MCP_TIMEOUT_SECONDS:-30}
       DISCORD_DEFAULT_HEADING: ${DISCORD_DEFAULT_HEADING:-BJIT is Hiring!}
       JOB_POST_DEFAULT_APPLICATION_URL: ${JOB_POST_DEFAULT_APPLICATION_URL:-}
       JOB_POST_DEFAULT_CONTACT_EMAIL: ${JOB_POST_DEFAULT_CONTACT_EMAIL:-}
@@ -81,6 +80,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      job-posting-mcp:
+        condition: service_healthy
 
     healthcheck:
       test:
@@ -92,6 +93,36 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+    restart: unless-stopped
+
+  job-posting-mcp:
+    build: ./backend
+
+    command:
+      - python
+      - -m
+      - app.job_posting_mcp.server
+
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
+      DISCORD_API_BASE_URL: ${DISCORD_API_BASE_URL:-https://discord.com/api/v10}
+      DISCORD_BOT_TIMEOUT_SECONDS: ${DISCORD_BOT_TIMEOUT_SECONDS:-15}
+
+    expose:
+      - "8001"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; connection = socket.create_connection(('localhost', 8001), 3); connection.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
     restart: unless-stopped
 

@@ -99,11 +99,22 @@ the same workflow.
 
 ## Discord job posting
 
-Create an incoming webhook for the standard Discord text channel that should
-receive job posts. Put the URL only in the root `.env` file:
+HireSense publishes through a dedicated MCP server and the Discord Bot API.
+The application backend is an MCP client; it no longer sends Discord requests
+directly. The MCP server exposes only a configuration check and a
+`publish_job_post` tool locked to one configured channel.
+
+Create an application and bot in the Discord Developer Portal, install the bot
+in the target server, and grant it **View Channel**, **Send Messages**, and
+**Embed Links** permissions for the target channel. Enable Discord developer
+mode and copy the channel ID. Put the bot token and channel ID only in the root
+`.env` file:
 
 ```dotenv
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-id/your-token
+DISCORD_BOT_TOKEN=your-private-bot-token
+DISCORD_CHANNEL_ID=your-numeric-channel-id
+JOB_POSTING_MCP_URL=http://localhost:8001/mcp
+JOB_POSTING_MCP_TIMEOUT_SECONDS=30
 DISCORD_DEFAULT_HEADING=BJIT is Hiring!
 JOB_POST_DEFAULT_APPLICATION_URL=
 JOB_POST_DEFAULT_CONTACT_EMAIL=
@@ -112,12 +123,13 @@ JOB_POST_DEFAULT_APPLICATION_DEADLINE=
 JOB_POST_DEFAULT_INSTRUCTIONS=
 ```
 
-The webhook is a backend secret. Do not place it in `frontend/.env`, a
-`VITE_*` variable, source code, screenshots, or logs. Recreate the backend
-after changing it:
+The bot token is supplied only to the `job-posting-mcp` container. The main
+backend receives only the MCP URL. Do not place the token in `frontend/.env`, a
+`VITE_*` variable, source code, screenshots, or logs. Recreate the MCP server
+and backend after changing the configuration:
 
 ```powershell
-docker compose up -d --build --force-recreate backend
+docker compose up -d --build --force-recreate job-posting-mcp backend
 ```
 
 To publish:
@@ -141,17 +153,18 @@ The existing **Prepare job post** editor remains available for manual preview
 creation. It can edit all configured footer values and uses the same protected
 preview and publication services as the assistant.
 
-HireSense publishes one message using Discord content plus one embed, sends
-`allowed_mentions.parse` as an empty list, and requests confirmation with
-`wait=true`. It rejects oversized posts rather than truncating the approved job
-description. Discord currently limits message content to 2,000 characters,
+After explicit interviewer approval, the backend calls the MCP
+`publish_job_post` tool over Streamable HTTP. The MCP server publishes one
+message using Discord content plus one embed and forces
+`allowed_mentions.parse` to an empty list. It rejects oversized posts rather
+than truncating the approved job description. Discord currently limits message content to 2,000 characters,
 embed titles to 256, embed descriptions to 4,096, individual field values to
 1,024, and combined embed text to 6,000 characters. See Discord's official
-[webhook](https://docs.discord.com/developers/resources/webhook) and
-[message](https://docs.discord.com/developers/resources/message) documentation.
+[authentication](https://docs.discord.com/developers/reference#authentication)
+and [message](https://docs.discord.com/developers/resources/message) documentation.
 
-Known limitations: Discord publishing targets one standard text-channel webhook.
-A network timeout after sending is recorded as `uncertain`;
+Known limitations: the MCP server targets one configured Discord channel and
+exposes job publication only. A network timeout after sending is recorded as `uncertain`;
 check Discord before explicitly preparing another publication. A Discord link
 is shown only when Discord returns server, channel, and message identifiers.
 

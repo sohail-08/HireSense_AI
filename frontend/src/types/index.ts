@@ -129,7 +129,7 @@ export interface DiscordPostDefaults {
   location: string | null;
   application_deadline: string | null;
   additional_instructions: string | null;
-  webhook_configured: boolean;
+  mcp_configured: boolean;
 }
 
 export interface DiscordJobPost {

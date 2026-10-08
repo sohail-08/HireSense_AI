@@ -75,7 +75,7 @@ class DiscordPostDefaultsResponse(BaseModel):
     location: str | None
     application_deadline: date | None
     additional_instructions: str | None
-    webhook_configured: bool
+    mcp_configured: bool
 
 
 class DiscordJobPostResponse(BaseModel):

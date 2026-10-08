@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.agents.job_posting import GeminiPostingCommandModel
 from app.config import get_settings
 from app.database import get_db
-from app.integrations.discord import (
+from app.integrations.discord_mcp import (
     DiscordConfigurationError,
     DiscordDeliveryUncertainError,
     DiscordPublishError,
@@ -85,6 +85,7 @@ def get_discord_post_defaults(
     _interviewer: User = Depends(require_interviewer),
 ):
     settings = get_settings()
+    service = _service()
     return DiscordPostDefaultsResponse(
         heading=settings.discord_default_heading,
         application_url=settings.job_post_default_application_url,
@@ -92,7 +93,7 @@ def get_discord_post_defaults(
         location=settings.job_post_default_location,
         application_deadline=settings.job_post_default_application_deadline,
         additional_instructions=settings.job_post_default_instructions,
-        webhook_configured=settings.discord_webhook_url is not None,
+        mcp_configured=service.publisher.is_configured(),
     )
 
 

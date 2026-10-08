@@ -52,13 +52,8 @@ class Settings(BaseSettings):
     gemini_chat_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
 
-    discord_webhook_url: SecretStr | None = None
-    discord_timeout_seconds: float = Field(default=15, ge=1, le=60)
-    discord_rate_limit_max_wait_seconds: float = Field(
-        default=5,
-        ge=0,
-        le=30,
-    )
+    job_posting_mcp_url: str = "http://localhost:8001/mcp"
+    job_posting_mcp_timeout_seconds: float = Field(default=30, ge=1, le=120)
     discord_default_heading: str = Field(
         default="BJIT is Hiring!",
         min_length=1,
@@ -77,7 +72,6 @@ class Settings(BaseSettings):
     )
 
     @field_validator(
-        "discord_webhook_url",
         "job_post_default_application_url",
         "job_post_default_contact_email",
         "job_post_default_location",
