@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.agents.job_posting import PostingCommandExtraction
-from app.agents.supervisor import SupervisorDecision
+from supervisor_fakes import QueueToolModel
 from app.database import Base
 from app.integrations.discord_mcp import DiscordPublishResult
 from app.models import JobPostingStatus, SupervisorSession, User, UserRole
@@ -21,17 +21,6 @@ from app.services.job_posting_assistant_service import JobPostingAssistantServic
 from app.services.job_posting_service import DiscordJobPostingService
 from app.services.requirement_discovery_service import RequirementDiscoveryService
 from app.services.supervisor_service import SupervisorService
-
-
-class QueueRouter:
-    def __init__(self, actions):
-        self.actions = list(actions)
-
-    def route(self, **_kwargs):
-        return SupervisorDecision(
-            action=self.actions.pop(0),
-            reason="Test route",
-        )
 
 
 class QueueRequirementModel:
@@ -110,7 +99,7 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
     Base.metadata.create_all(engine)
     deadline = date.today() + timedelta(days=14)
     publisher = StubPublisher()
-    router = QueueRouter(
+    model = QueueToolModel(
         [
             "requirements",
             "requirements",
@@ -147,7 +136,7 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
         DiscordJobPostingService(publisher=publisher),
     )
     service = SupervisorService(
-        router=router,
+        model=model,
         requirement_service=requirement_service,
         job_description_service=job_service,
         job_edit_model=StaticJobEditModel(
@@ -179,7 +168,7 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
             db,
             interviewer_user_id=interviewer.id,
             session_id=session_id,
-            message="Confirm the requirements",
+            message="Use it.",
         )
         assert confirmed["phase"] == "requirement_confirmed", confirmed[
             "assistant_message"
@@ -251,6 +240,10 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
         assert saved.job_description_id == edited["job_description"].id
         assert saved.job_posting_id == validated.job_posting.id
         assert len(saved.state_json["messages"]) == 16
+        assert saved.state_json["last_tool_call"]["name"] == "job_posting"
+        assert saved.state_json["last_tool_call"]["args"]["message"] == "Approve the post"
+        assert len(model.tool_messages) == 8
+        assert {binding["tool_choice"] for binding in model.bindings} == {"any", "none"}
 
         restored = service.get_session(
             db,

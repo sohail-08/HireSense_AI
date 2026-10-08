@@ -23,12 +23,10 @@ type SupervisorChatPanelProps = {
   requirementContextVisible: boolean;
   requirementSources: JobDescriptionEvidence[];
   missingFields: string[];
-  canConfirm: boolean;
   onOpen: () => void;
   onClose: () => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
-  onConfirm: () => void;
   onNewSession: () => void;
 };
 
@@ -42,12 +40,10 @@ export function SupervisorChatPanel({
   requirementContextVisible,
   requirementSources,
   missingFields,
-  canConfirm,
   onOpen,
   onClose,
   onInputChange,
   onSend,
-  onConfirm,
   onNewSession,
 }: SupervisorChatPanelProps) {
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -99,6 +95,13 @@ export function SupervisorChatPanel({
       behavior: "smooth",
     });
   }, [loading, messages, open]);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 112)}px`;
+  }, [input, open]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -152,12 +155,12 @@ export function SupervisorChatPanel({
         aria-label="HireSense supervisor"
         aria-hidden={!open}
         inert={!open}
-        className={`supervisor-chat-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out ${
+        className={`supervisor-chat-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-[440px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "pointer-events-none translate-x-full"
         }`}
       >
-        <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
-          <div className="flex items-start gap-3">
+        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
+          <div className="flex items-center gap-2.5">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
               <svg
                 viewBox="0 0 24 24"
@@ -184,6 +187,14 @@ export function SupervisorChatPanel({
             </div>
             <button
               type="button"
+              onClick={onNewSession}
+              disabled={loading}
+              className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50"
+            >
+              New workflow
+            </button>
+            <button
+              type="button"
               onClick={onClose}
               className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-blue-600"
               aria-label="Close assistant"
@@ -200,25 +211,11 @@ export function SupervisorChatPanel({
               </svg>
             </button>
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
-            <p className="text-xs leading-5 text-slate-600">
-              One assistant for JDs, posting, application sync, and screening.
-            </p>
-            <button
-              type="button"
-              onClick={onNewSession}
-              disabled={loading}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-            >
-              New workflow
-            </button>
-          </div>
         </header>
 
         <div
           ref={messageListRef}
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50/70 px-4 py-5 sm:px-5"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/70 px-4 py-4"
           aria-live="polite"
         >
           {messages.map((message, index) => (
@@ -229,17 +226,17 @@ export function SupervisorChatPanel({
               }`}
             >
               <div
-                className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                   message.role === "user"
-                    ? "rounded-br-md bg-blue-600 text-white"
+                    ? "max-w-[88%] rounded-br-md bg-blue-600 text-white"
                     : message.outcome === "success"
-                      ? "rounded-bl-md border border-emerald-200 bg-emerald-50 text-emerald-900"
+                      ? "max-w-full rounded-bl-md border border-emerald-200 bg-emerald-50 text-emerald-900"
                       : message.outcome === "failure"
-                        ? "rounded-bl-md border border-red-200 bg-red-50 text-red-900"
-                        : "rounded-bl-md border border-slate-200 bg-white text-slate-700"
+                        ? "max-w-full rounded-bl-md border border-red-200 bg-red-50 text-red-900"
+                        : "max-w-full rounded-bl-md border border-slate-200 bg-white text-slate-700"
                 }`}
               >
-                {message.content}
+                <p>{message.content}</p>
               </div>
             </div>
           ))}
@@ -254,42 +251,30 @@ export function SupervisorChatPanel({
               </div>
             </div>
           ) : null}
-        </div>
-
-        {requirementContextVisible && requirementSources.length ? (
-          <details className="border-t border-slate-200 bg-blue-50/70 px-4 py-2.5 text-xs sm:px-5">
-            <summary className="cursor-pointer font-semibold text-blue-700">
-              {requirementSources.length} previous JD source
-              {requirementSources.length === 1 ? "" : "s"} used
-            </summary>
-            <ul className="mt-2 space-y-1.5 text-slate-600">
-              {requirementSources.map((source) => (
-                <li key={`${source.document_id}-${source.chunk_id}`}>
-                  {source.document_title} · relevance {source.score.toFixed(2)}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-
-        {requirementContextVisible && missingFields.length ? (
-          <p className="border-t border-slate-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 sm:px-5">
-            Still needed: {missingFields.join(", ")}.
-          </p>
-        ) : null}
-
-        <form onSubmit={submit} className="border-t border-slate-200 bg-white p-4 sm:p-5">
-          {canConfirm ? (
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={loading}
-              className="mb-3 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Use previous JD defaults
-            </button>
+          {requirementContextVisible && requirementSources.length ? (
+            <details className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-xs">
+              <summary className="cursor-pointer font-semibold text-blue-700">
+                {requirementSources.length} previous JD source
+                {requirementSources.length === 1 ? "" : "s"} used
+              </summary>
+              <ul className="mt-2 space-y-1.5 text-slate-600">
+                {requirementSources.map((source) => (
+                  <li key={`${source.document_id}-${source.chunk_id}`}>
+                    {source.document_title} · relevance {source.score.toFixed(2)}
+                  </li>
+                ))}
+              </ul>
+            </details>
           ) : null}
 
+          {requirementContextVisible && missingFields.length ? (
+            <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              Still needed: {missingFields.join(", ")}.
+            </p>
+          ) : null}
+        </div>
+
+        <form onSubmit={submit} className="shrink-0 border-t border-slate-200 bg-white p-3">
           <label htmlFor="supervisor-message" className="sr-only">
             Message HireSense assistant
           </label>
@@ -302,8 +287,8 @@ export function SupervisorChatPanel({
               onKeyDown={handleInputKeyDown}
               placeholder={placeholder}
               disabled={loading}
-              rows={2}
-              className="max-h-32 min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-slate-400 disabled:text-slate-400"
+              rows={1}
+              className="max-h-28 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-slate-400 disabled:text-slate-400"
             />
             <button
               type="submit"
@@ -323,7 +308,7 @@ export function SupervisorChatPanel({
               </svg>
             </button>
           </div>
-          <p className="mt-2 text-center text-[11px] text-slate-400">
+          <p className="supervisor-input-hint mt-1.5 text-center text-[11px] text-slate-400">
             Enter to send · Shift + Enter for a new line
           </p>
         </form>

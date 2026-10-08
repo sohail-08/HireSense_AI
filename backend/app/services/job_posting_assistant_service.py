@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents.job_posting import JobPostingAssistantGraph, PostingCommandModel
+from app.agents.approval import is_explicit_approval
 from app.models.job import JobDescription, JobPosting, JobPostingStatus
 from app.schemas.job_posting import DiscordPostPreviewRequest
 from app.services.job_posting_service import DiscordJobPostingService
@@ -51,6 +52,8 @@ class JobPostingAssistantService:
             raise RuntimeError(state["error"])
 
         action = state.get("action", "other")
+        if action == "approve" and not is_explicit_approval(message):
+            raise ValueError("Please explicitly approve the job post before publishing")
         missing = list(state.get("missing_fields", []))
         supplied_details = (
             state.get("application_url")

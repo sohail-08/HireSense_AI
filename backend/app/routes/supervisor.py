@@ -7,7 +7,7 @@ from app.agents.job_description import (
 )
 from app.agents.job_posting import GeminiPostingCommandModel
 from app.agents.requirement_discovery import GeminiRequirementModel
-from app.agents.supervisor import GeminiSupervisorRouter
+from app.agents.supervisor import GeminiSupervisorModel
 from app.database import get_db
 from app.config import get_settings
 from app.integrations.google_workspace import GoogleServiceAccountReader
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/supervisor", tags=["Supervisor"])
 def _service() -> SupervisorService:
     settings = get_settings()
     return SupervisorService(
-        router=GeminiSupervisorRouter(),
+        model=GeminiSupervisorModel(),
         requirement_service=RequirementDiscoveryService(
             GeminiRequirementModel(),
             KnowledgeBaseService(OllamaEmbeddingProvider()),

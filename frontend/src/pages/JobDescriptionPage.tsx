@@ -673,6 +673,21 @@ export function JobDescriptionPage() {
                     ? "Not specified"
                     : `${profile.min_years_experience}+ years`}
                 </p>
+                {supervisorResponse?.phase === "requirement_confirmation"
+                  && supervisorResponse.requirement_state.proposal_ready
+                  && !requirementProfileId ? (
+                  <div className="flex justify-start border-t border-slate-200 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => void sendMessage("Use it.")}
+                      disabled={chatLoading}
+                      aria-label="Use this requirement profile"
+                      className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chatLoading ? "Working…" : "Use it"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="mt-5 rounded-xl bg-slate-50 px-4 py-5 text-sm text-slate-500">

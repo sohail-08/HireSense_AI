@@ -92,6 +92,7 @@ def _is_confirmation(message: str) -> bool:
         "use previous data",
         "use the previous data",
         "use these requirements",
+        "use it",
     }
 
 
@@ -389,7 +390,7 @@ class RequirementDiscoveryGraph:
             if is_revision:
                 message = (
                     revision_prefix
-                    + "Review the updated profile, then choose 'Use previous JD defaults' "
+                    + "Review the updated profile, then choose 'Use it' "
                     "or tell me another change."
                 )
             else:
@@ -397,7 +398,7 @@ class RequirementDiscoveryGraph:
                 message = (
                     f"I found {source_count} relevant previous job description"
                     f"{'s' if source_count != 1 else ''} and prepared a requirement proposal. "
-                    "Choose 'Use previous JD defaults' or tell me what you want to change."
+                    "Choose 'Use it' or tell me what you want to change."
                 )
             status = "awaiting_confirmation"
 

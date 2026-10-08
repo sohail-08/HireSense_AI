@@ -13,7 +13,7 @@
 - Semantic company-knowledge ingestion using Ollama embeddings
 - pgvector storage and database-side cosine similarity search with an HNSW index
 - Gemini-powered, RAG-backed requirement discovery and JD generation
-- Persisted LangGraph supervisor with LLM intent routing and shared workflow state
+- Persisted LangGraph supervisor with native Gemini tool calling and shared workflow state
 - Interviewer UI for previous-JD knowledge, requirement review and JD approval
 - Reviewed Discord job-post previews with persistent publication status
 - Job-scoped PDF/DOCX CV parsing, requirement screening and semantic ranking
@@ -114,7 +114,8 @@ confidential company material through the unpaid tier.
 3. Use the central supervisor chat and describe the role, for example: `I want to hire a
    backend engineer.`
 4. HireSense retrieves related previous job descriptions and proposes a complete
-   requirement profile. Choose **Use previous JD defaults** or describe changes.
+   requirement profile. Choose **Use it** at the bottom-left of the requirement profile or
+   describe changes.
 5. Tell the supervisor to **generate the job description**. Request edits in
    natural language, such as `Remove Kubernetes from preferred skills`, then
    explicitly tell it to **approve the job description**.
@@ -122,12 +123,34 @@ confidential company material through the unpaid tier.
    Drafts can be edited directly; editing an approved JD creates a new draft
    version so the approved version remains unchanged.
 
-The supervisor uses Gemini to route every chat message to the requirement,
-JD-generation, JD-editing, JD-approval, or Discord-posting workflow. Its
+The supervisor uses Gemini's native tool calling via `ChatGoogleGenerativeAI`.
+`bind_tools()` exposes eight `@tool` definitions: requirements, JD generation,
+JD editing, JD approval, Discord posting, response syncing, candidate screening,
+and help. LangGraph's built-in `ToolNode` executes the selected tool and returns
+a `ToolMessage` to the supervisor before it produces its final answer.
+
+The graph is `START -> supervisor_agent -> tools -> capture_tool_result ->
+supervisor_agent -> END`, with conditional branches for tool execution,
+completion, and errors. Exactly one business tool can execute per chat request.
+The final response model disables further tool calls; a response-generation
+failure falls back to the completed tool's result without losing refresh or
+background-screening signals. Business services receive the actual interviewer
+message, and approval checks reject fabricated or absent approval instructions.
+See the [official Gemini integration documentation](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai#tool-calling).
+
+The existing `GEMINI_API_KEY` and `GEMINI_CHAT_MODEL` settings are reused. Its
 persistent session stores the requirement session, confirmed profile, active
 JD, active posting, current phase, and conversation history. The browser keeps
 the supervisor session ID in session storage so refreshing the page restores
 the same workflow.
+
+The supervisor also stores the last native tool-call name and arguments in its
+existing session state. Tools reuse the current services, including pgvector
+knowledge retrieval, job-specific Google Forms intake, background CV screening,
+and Discord publishing through the MCP server.
+
+Editable diagrams for all four actual graphs are available in
+[`docs/langgraphs/hiresense-all-langgraphs.drawio`](docs/langgraphs/hiresense-all-langgraphs.drawio).
 
 ## Discord job posting
 

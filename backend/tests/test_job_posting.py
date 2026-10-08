@@ -224,6 +224,7 @@ def test_posting_assistant_asks_then_previews_and_publishes_after_approval():
                 application_deadline=deadline,
             ),
             PostingCommandExtraction(action="approve"),
+            PostingCommandExtraction(action="approve"),
         ]
     )
     service = JobPostingAssistantService(
@@ -259,6 +260,18 @@ def test_posting_assistant_asks_then_previews_and_publishes_after_approval():
         assert posting.status is JobPostingStatus.DRAFT
         assert posting.application_url == "https://forms.example.com/apply"
         assert posting.application_deadline == deadline
+        assert publisher.calls == []
+
+        # A misclassified command cannot publish without the user's approval.
+        with pytest.raises(ValueError, match="explicitly approve"):
+            service.chat(
+                db,
+                job_description_id=job.id,
+                interviewer_user_id=interviewer.id,
+                posting_id=posting.id,
+                message="Do not publish this post",
+            )
+        assert posting.status is JobPostingStatus.DRAFT
         assert publisher.calls == []
 
         published = service.chat(

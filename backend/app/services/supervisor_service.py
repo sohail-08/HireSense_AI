@@ -5,11 +5,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents.job_description import JobDescriptionEditModel
+from app.agents.approval import is_explicit_approval
 from app.agents.supervisor import (
     HireSenseSupervisorGraph,
-    SupervisorRouterModel,
-    SupervisorTools,
-    SupervisorDecision,
+    SupervisorChatModel,
+)
+from app.agents.supervisor_tools import (
+    ScreeningToolRequest,
+    SupervisorToolCallbacks,
+    build_supervisor_tools,
 )
 from app.models.job import (
     JobDescription,
@@ -36,7 +40,7 @@ class SupervisorService:
     def __init__(
         self,
         *,
-        router: SupervisorRouterModel,
+        model: SupervisorChatModel,
         requirement_service: RequirementDiscoveryService,
         job_description_service: JobDescriptionService,
         job_edit_model: JobDescriptionEditModel,
@@ -45,7 +49,7 @@ class SupervisorService:
         candidate_intake_factory: Callable[[], GoogleFormsIntakeService] | None = None,
         screening_service: ScreeningService | None = None,
     ):
-        self.router = router
+        self.model = model
         self.requirement_service = requirement_service
         self.job_description_service = job_description_service
         self.job_edit_model = job_edit_model
@@ -89,7 +93,7 @@ class SupervisorService:
             {"role": "user", "content": message.strip(), "outcome": "info"}
         )
 
-        tools = SupervisorTools(
+        callbacks = SupervisorToolCallbacks(
             requirements=self._safe_tool(
                 supervisor,
                 lambda text: self._requirements_tool(
@@ -152,7 +156,8 @@ class SupervisorService:
                 preserve_phase=True,
             )(text),
         )
-        graph_state = HireSenseSupervisorGraph(self.router, tools).invoke(
+        tools = build_supervisor_tools(callbacks, user_message=message.strip())
+        graph_state = HireSenseSupervisorGraph(self.model, tools).invoke(
             message=message,
             context=self._routing_context(db, supervisor, messages),
         )
@@ -162,18 +167,20 @@ class SupervisorService:
             "assistant_message": "The supervisor produced no result.",
             "refresh_required": False,
         }
+        assistant_message = graph_state.get("final_response") or result["assistant_message"]
 
         supervisor.phase = result.get("phase", supervisor.phase)
         state_json = dict(supervisor.state_json or {})
         requirement_state = result.get("requirement_state")
         if requirement_state is not None:
             state_json["requirement_state"] = requirement_state
-        state_json["last_route"] = graph_state.get("action", "route_error")
-        state_json["last_route_reason"] = graph_state.get("route_reason")
+        state_json["last_route"] = graph_state.get("tool_name", "route_error")
+        state_json["last_route_reason"] = "Gemini native tool calling with ToolNode execution"
+        state_json["last_tool_call"] = graph_state.get("tool_call")
         messages.append(
             {
                 "role": "assistant",
-                "content": result["assistant_message"],
+                "content": assistant_message,
                 "outcome": result.get("outcome", "info"),
             }
         )
@@ -186,7 +193,7 @@ class SupervisorService:
             db,
             supervisor=supervisor,
             route=state_json["last_route"],
-            assistant_message=result["assistant_message"],
+            assistant_message=assistant_message,
             outcome=result.get("outcome", "info"),
             refresh_required=result.get("refresh_required", False),
         )
@@ -416,8 +423,18 @@ class SupervisorService:
         db: Session,
         supervisor: SupervisorSession,
         interviewer_user_id: int,
-        _message: str,
+        message: str,
     ) -> dict[str, Any]:
+        if not is_explicit_approval(message):
+            return self._failure(
+                supervisor,
+                "Please explicitly approve the job description before I approve it.",
+            )
+        if supervisor.phase in {"posting_details", "posting_approval", "published"}:
+            return self._failure(
+                supervisor,
+                "The current confirmation belongs to job posting, not JD approval.",
+            )
         job = self._current_job(db, supervisor, interviewer_user_id)
         if job is None:
             return self._failure(
@@ -565,7 +582,7 @@ class SupervisorService:
 
     def _screening_tool(
         self, db: Session, supervisor: SupervisorSession,
-        interviewer_user_id: int, decision: SupervisorDecision,
+        interviewer_user_id: int, decision: ScreeningToolRequest,
     ) -> dict[str, Any]:
         if self.screening_service is None:
             raise RuntimeError("Candidate screening is unavailable")

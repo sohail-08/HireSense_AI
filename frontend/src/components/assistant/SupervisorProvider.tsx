@@ -181,16 +181,14 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
         loading={loading}
         input={input}
         placeholder={page === "candidates" ? "e.g. Sync responses…"
-          : page === "assessments" ? "e.g. Screen candidates for the selected job…" : "Ask about requirements, JDs, posting, sync, or screening…"}
+          : page === "assessments" ? "Screen candidates for a job…" : "Message HireSense assistant…"}
         requirementContextVisible={phase.startsWith("requirement")}
         requirementSources={requirement?.source_references ?? []}
         missingFields={requirement?.missing_fields ?? []}
-        canConfirm={phase === "requirement_confirmation" && Boolean(requirement?.proposal_ready)}
         onOpen={() => setOpen(true)}
         onClose={close}
         onInputChange={setInput}
         onSend={() => void sendMessage(input)}
-        onConfirm={() => void sendMessage("use previous JD defaults")}
         onNewSession={newSession}
       />
     </Context.Provider>
