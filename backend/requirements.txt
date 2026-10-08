@@ -3,6 +3,7 @@ uvicorn[standard]>=0.30,<1
 SQLAlchemy>=2.0,<2.1
 alembic>=1.14,<2
 psycopg[binary]>=3.2,<4
+pgvector>=0.4,<0.5
 pydantic-settings>=2.6,<3
 email-validator>=2.2,<3
 PyJWT>=2.10,<3

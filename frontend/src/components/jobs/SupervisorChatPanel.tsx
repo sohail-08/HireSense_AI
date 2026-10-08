@@ -203,11 +203,12 @@ export function SupervisorChatPanel({
 
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
             <p className="text-xs leading-5 text-slate-600">
-              One assistant for requirements, JDs, approvals, and posting.
+              One assistant for JDs, posting, application sync, and screening.
             </p>
             <button
               type="button"
               onClick={onNewSession}
+              disabled={loading}
               className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
             >
               New workflow

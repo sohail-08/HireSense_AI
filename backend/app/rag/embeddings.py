@@ -80,4 +80,7 @@ class OllamaEmbeddingProvider:
 def cosine_similarity(left: list[float], right: list[float]) -> float:
     if len(left) != len(right):
         raise ValueError("Embedding vectors must have the same dimension")
-    return sum(a * b for a, b in zip(left, right, strict=True))
+    denominator = math.sqrt(sum(a * a for a in left)) * math.sqrt(sum(b * b for b in right))
+    if denominator == 0:
+        return 0.0
+    return sum(a * b for a, b in zip(left, right, strict=True)) / denominator

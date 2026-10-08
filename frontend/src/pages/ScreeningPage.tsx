@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
+import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import type {
   RankingItem,
   RequirementMatchResult,
@@ -97,6 +98,10 @@ function RankingCard({
 }
 
 export function ScreeningPage() {
+  const {
+    setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion,
+    batch: assistantBatch,
+  } = useSupervisor();
   const [jobs, setJobs] = useState<ScreeningJobOption[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<number>();
   const [dashboard, setDashboard] = useState<ScreeningDashboard>();
@@ -106,15 +111,18 @@ export function ScreeningPage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string>();
+  const selectedJobRef = useRef(selectedJobId);
+  selectedJobRef.current = selectedJobId;
 
   async function loadJobs() {
     const items = await apiRequest<ScreeningJobOption[]>("/screening/jobs");
     setJobs(items);
-    setSelectedJobId((current) => current ?? items[0]?.id);
+    setSelectedJobId((current) => items.some((item) => item.id === current) ? current : items[0]?.id);
   }
 
   async function loadDashboard(jobId: number) {
     const value = await apiRequest<ScreeningDashboard>(`/screening/jobs/${jobId}`);
+    if (selectedJobRef.current !== jobId) return;
     setDashboard(value);
     setSelectedApplications((current) =>
       current.filter((id) => value.applications.some((item) => item.id === id)),
@@ -139,7 +147,35 @@ export function ScreeningPage() {
   }, [selectedJobId]);
 
   useEffect(() => {
-    if (!batch || !["queued", "processing"].includes(batch.status)) return;
+    setSelectedJobPostingId(selectedJobId);
+    setSelectedApplicationIds(selectedApplications);
+  }, [selectedJobId, selectedApplications, setSelectedJobPostingId, setSelectedApplicationIds]);
+
+  useEffect(() => () => {
+    setSelectedJobPostingId(undefined);
+    setSelectedApplicationIds([]);
+  }, [setSelectedJobPostingId, setSelectedApplicationIds]);
+
+  useEffect(() => {
+    if (!assistantBatch) return;
+    setBatch(assistantBatch);
+    setSelectedJobId(assistantBatch.job_posting_id);
+    setSelectedApplications([]);
+  }, [assistantBatch?.id]);
+
+  useEffect(() => {
+    if (assistantBatch) setBatch((current) => current?.id === assistantBatch.id ? assistantBatch : current);
+  }, [assistantBatch]);
+
+  useEffect(() => {
+    if (!refreshVersion) return;
+    void loadJobs().catch((requestError) => setError(messageFor(requestError)));
+    if (selectedJobId) void loadDashboard(selectedJobId)
+      .catch((requestError) => setError(messageFor(requestError)));
+  }, [refreshVersion]);
+
+  useEffect(() => {
+    if (!batch || batch.id === assistantBatch?.id || !["queued", "processing"].includes(batch.status)) return;
     const timer = window.setInterval(() => {
       void apiRequest<ScreeningBatch>(`/screening/batches/${batch.id}`)
         .then(async (next) => {
@@ -155,7 +191,7 @@ export function ScreeningPage() {
         .catch((requestError) => setError(messageFor(requestError)));
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [batch?.id, batch?.status]);
+  }, [batch?.id, batch?.status, assistantBatch?.id]);
 
   const pendingIds = useMemo(
     () =>

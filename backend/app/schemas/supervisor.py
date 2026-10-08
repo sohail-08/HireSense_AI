@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.job import JobDescriptionResponse
 from app.schemas.job_posting import DiscordJobPostResponse
 from app.schemas.requirements import RequirementProfileDraft
+from app.schemas.candidate import GoogleFormsSyncResponse
+from app.schemas.screening import ScreeningBatchResponse
 
 
 SupervisorPhase = Literal[
@@ -46,6 +48,9 @@ class SupervisorChatRequest(BaseModel):
     session_id: str | None = Field(default=None, min_length=1, max_length=36)
     message: str = Field(min_length=1, max_length=10_000)
     selected_job_description_id: int | None = Field(default=None, gt=0)
+    page_context: Literal["jobs", "candidates", "assessments", "other"] = "jobs"
+    selected_job_posting_id: int | None = Field(default=None, gt=0)
+    selected_application_ids: list[int] = Field(default_factory=list, max_length=50)
 
     @field_validator("message", mode="before")
     @classmethod
@@ -65,3 +70,5 @@ class SupervisorChatResponse(BaseModel):
     job_description: JobDescriptionResponse | None = None
     job_posting: DiscordJobPostResponse | None = None
     refresh_required: bool = False
+    sync_result: GoogleFormsSyncResponse | None = None
+    screening_batch: ScreeningBatchResponse | None = None

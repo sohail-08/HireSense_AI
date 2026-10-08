@@ -208,6 +208,8 @@ export interface SupervisorChatResponse {
   job_description: JobDescriptionResponse | null;
   job_posting: DiscordJobPost | null;
   refresh_required: boolean;
+  sync_result: GoogleFormsSyncResult | null;
+  screening_batch: ScreeningBatch | null;
 }
 
 export type ApplicationSource = "direct_upload" | "google_form" | "import";

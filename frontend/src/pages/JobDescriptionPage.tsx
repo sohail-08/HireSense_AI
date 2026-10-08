@@ -1,7 +1,6 @@
 import {
   FormEvent,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
@@ -11,59 +10,14 @@ import {
 } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
-import { SupervisorChatPanel } from "../components/jobs/SupervisorChatPanel";
+import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import type {
   JobDescriptionDraft,
-  JobDescriptionEvidence,
   JobDescriptionResponse,
   KnowledgeDocumentResponse,
-  RequirementChatStatus,
   RequirementProfileDraft,
   SupervisorChatResponse,
-  SupervisorPhase,
 } from "../types";
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  outcome?: "success" | "failure";
-};
-
-const initialAssistantMessage =
-  "Tell me the role you want to hire for. I’ll search previous job descriptions, then propose requirements for you to accept or change.";
-const supervisorSessionKey = "hiresense_supervisor_session_id";
-
-const fieldLabels: Record<string, string> = {
-  title: "role/title",
-  required_skills: "required skills",
-  qualifications: "qualifications",
-  experience: "experience requirement",
-  selection_criteria: "selection criteria",
-};
-
-const phaseLabels: Record<SupervisorPhase, string> = {
-  requirements: "Requirement discovery",
-  requirement_confirmation: "Confirm requirements",
-  requirement_confirmed: "Ready to generate JD",
-  job_description_draft: "JD review",
-  job_description_approved: "Ready to post",
-  posting_details: "Posting details",
-  posting_approval: "Confirm publication",
-  published: "Published",
-  error: "Needs attention",
-};
-
-const phasePlaceholders: Record<SupervisorPhase, string> = {
-  requirements: "e.g. I want to hire a backend engineer…",
-  requirement_confirmation: "Confirm the requirements or request a change…",
-  requirement_confirmed: "e.g. Generate the job description…",
-  job_description_draft: "Edit or approve the current job description…",
-  job_description_approved: "e.g. Post this job to Discord…",
-  posting_details: "Provide the application link and deadline…",
-  posting_approval: "Approve the post or request a change…",
-  published: "Ask about the completed workflow…",
-  error: "Retry the task or ask what to do next…",
-};
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -109,23 +63,12 @@ function DraftSection({
 }
 
 export function JobDescriptionPage() {
-  const [chatPanelOpen, setChatPanelOpen] = useState(() =>
-    window.matchMedia("(min-width: 1024px)").matches,
-  );
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: initialAssistantMessage },
-  ]);
-  const [input, setInput] = useState("");
-  const [sessionId, setSessionId] = useState<string>();
+  const {
+    response: supervisorResponse, loading: chatLoading,
+    open: chatPanelOpen, setOpen: setChatPanelOpen, sendMessage,
+    addTaskMessage, setSelectedJobDescriptionId, refreshVersion,
+  } = useSupervisor();
   const [profile, setProfile] = useState<RequirementProfileDraft>();
-  const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [chatStatus, setChatStatus] =
-    useState<RequirementChatStatus>("active");
-  const [supervisorPhase, setSupervisorPhase] =
-    useState<SupervisorPhase>("requirements");
-  const [requirementSources, setRequirementSources] =
-    useState<JobDescriptionEvidence[]>([]);
-  const [proposalReady, setProposalReady] = useState(false);
   const [requirementProfileId, setRequirementProfileId] = useState<number>();
   const [jobDescription, setJobDescription] =
     useState<JobDescriptionResponse>();
@@ -135,7 +78,6 @@ export function JobDescriptionPage() {
   const [deletingJobId, setDeletingJobId] = useState<number>();
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [postingRefreshKey, setPostingRefreshKey] = useState(0);
   const [error, setError] = useState<string>();
@@ -162,27 +104,23 @@ export function JobDescriptionPage() {
   }, []);
 
   useEffect(() => {
-    const savedSessionId = sessionStorage.getItem(supervisorSessionKey);
-    if (!savedSessionId) return;
+    if (supervisorResponse) applySupervisorResponse(supervisorResponse);
+    else {
+      setProfile(undefined);
+      setRequirementProfileId(undefined);
+      setJobDescription(undefined);
+      setDraftTitle("");
+      setDraftContent("");
+    }
+  }, [supervisorResponse]);
 
-    let active = true;
-    setChatLoading(true);
-    apiRequest<SupervisorChatResponse>(
-      `/supervisor/sessions/${savedSessionId}`,
-    )
-      .then((response) => {
-        if (active) applySupervisorResponse(response);
-      })
-      .catch(() => {
-        sessionStorage.removeItem(supervisorSessionKey);
-      })
-      .finally(() => {
-        if (active) setChatLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  useEffect(() => {
+    setSelectedJobDescriptionId(jobDescription?.id);
+  }, [jobDescription?.id, setSelectedJobDescriptionId]);
+
+  useEffect(() => {
+    if (refreshVersion) void refreshWorkflowContents(supervisorResponse?.job_description?.id);
+  }, [refreshVersion]);
 
   useEffect(() => {
     let active = true;
@@ -201,37 +139,10 @@ export function JobDescriptionPage() {
     };
   }, []);
 
-  const canConfirm = Boolean(
-    sessionId &&
-      profile &&
-      proposalReady &&
-      chatStatus === "awaiting_confirmation" &&
-      !requirementProfileId,
-  );
-
-  const formattedMissingFields = useMemo(
-    () => missingFields.map((field) => fieldLabels[field] ?? field),
-    [missingFields],
-  );
-
   function upsertJobDescription(item: JobDescriptionResponse) {
     setJobDescriptions((current) => [
       item,
       ...current.filter((existing) => existing.id !== item.id),
-    ]);
-  }
-
-  function addTaskMessage(
-    outcome: "success" | "failure",
-    content: string,
-  ) {
-    setMessages((current) => [
-      ...current,
-      {
-        role: "assistant",
-        outcome,
-        content: `${outcome === "success" ? "Success" : "Failed"}: ${content}`,
-      },
     ]);
   }
 
@@ -257,33 +168,9 @@ export function JobDescriptionPage() {
   }
 
   function applySupervisorResponse(response: SupervisorChatResponse) {
-    setSessionId(response.session_id);
-    sessionStorage.setItem(supervisorSessionKey, response.session_id);
-    setSupervisorPhase(response.phase);
-    setMessages(
-      response.messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        outcome:
-          message.outcome === "info" ? undefined : message.outcome,
-      })),
-    );
-
     const requirement = response.requirement_state;
     setProfile(requirement.profile);
-    setMissingFields(requirement.missing_fields);
-    setRequirementSources(requirement.source_references);
-    setProposalReady(requirement.proposal_ready);
     setRequirementProfileId(response.requirement_profile_id ?? undefined);
-    setChatStatus(
-      response.phase === "requirement_confirmation"
-        ? "awaiting_confirmation"
-        : response.phase === "requirement_confirmed"
-          ? "confirmed"
-          : response.phase === "error"
-            ? "error"
-            : "active",
-    );
 
     if (response.job_description) {
       setJobDescription(response.job_description);
@@ -304,63 +191,6 @@ export function JobDescriptionPage() {
     setJobDescription(item);
     setDraftTitle(item.title);
     setDraftContent(item.content);
-    setError(undefined);
-  }
-
-  async function sendMessage(message: string) {
-    const trimmedMessage = message.trim();
-    if (!trimmedMessage || chatLoading) return;
-
-    setError(undefined);
-    setChatLoading(true);
-    setMessages((current) => [
-      ...current,
-      { role: "user", content: trimmedMessage },
-    ]);
-    setInput("");
-
-    try {
-      const response = await apiRequest<SupervisorChatResponse>(
-        "/supervisor/chat",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            session_id: sessionId,
-            message: trimmedMessage,
-            selected_job_description_id: jobDescription?.id ?? null,
-          }),
-        },
-      );
-      applySupervisorResponse(response);
-      if (response.refresh_required) {
-        await refreshWorkflowContents(response.job_description?.id);
-      }
-    } catch (requestError) {
-      const message = getErrorMessage(requestError);
-      setError(message);
-      addTaskMessage("failure", message);
-      await refreshWorkflowContents(jobDescription?.id);
-    } finally {
-      setChatLoading(false);
-    }
-  }
-
-  function startNewSession() {
-    sessionStorage.removeItem(supervisorSessionKey);
-    setMessages([{ role: "assistant", content: initialAssistantMessage }]);
-    setInput("");
-    setSessionId(undefined);
-    setProfile(undefined);
-    setMissingFields([]);
-    setChatStatus("active");
-    setSupervisorPhase("requirements");
-    setRequirementSources([]);
-    setProposalReady(false);
-    setRequirementProfileId(undefined);
-    setJobDescription(undefined);
-    setPostingRefreshKey((current) => current + 1);
-    setDraftTitle("");
-    setDraftContent("");
     setError(undefined);
   }
 
@@ -1009,24 +839,6 @@ export function JobDescriptionPage() {
           </section>
       </div>
 
-      <SupervisorChatPanel
-        open={chatPanelOpen}
-        phaseLabel={phaseLabels[supervisorPhase]}
-        messages={messages}
-        loading={chatLoading}
-        input={input}
-        placeholder={phasePlaceholders[supervisorPhase]}
-        requirementContextVisible={supervisorPhase.startsWith("requirement")}
-        requirementSources={requirementSources}
-        missingFields={formattedMissingFields}
-        canConfirm={canConfirm}
-        onOpen={() => setChatPanelOpen(true)}
-        onClose={() => setChatPanelOpen(false)}
-        onInputChange={setInput}
-        onSend={() => void sendMessage(input)}
-        onConfirm={() => void sendMessage("use previous JD defaults")}
-        onNewSession={startNewSession}
-      />
     </section>
   );
 }

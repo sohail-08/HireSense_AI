@@ -9,6 +9,7 @@ from app.agents.supervisor import (
     HireSenseSupervisorGraph,
     SupervisorRouterModel,
     SupervisorTools,
+    SupervisorDecision,
 )
 from app.models.job import (
     JobDescription,
@@ -18,11 +19,14 @@ from app.models.job import (
     RequirementProfile,
 )
 from app.models.supervisor import SupervisorSession
+from app.models.screening import ScreeningBatch, ScreeningBatchStatus
 from app.schemas.job import JobDescriptionUpdateRequest
 from app.schemas.requirements import RequirementProfileDraft
 from app.services.job_description_service import JobDescriptionService
 from app.services.job_posting_assistant_service import JobPostingAssistantService
 from app.services.requirement_discovery_service import RequirementDiscoveryService
+from app.services.google_forms_intake_service import GoogleFormsIntakeService
+from app.services.screening_service import ScreeningService
 
 
 ToolMethod = Callable[[str], dict[str, Any]]
@@ -37,12 +41,18 @@ class SupervisorService:
         job_description_service: JobDescriptionService,
         job_edit_model: JobDescriptionEditModel,
         job_posting_service: JobPostingAssistantService,
+        candidate_intake_service: GoogleFormsIntakeService | None = None,
+        candidate_intake_factory: Callable[[], GoogleFormsIntakeService] | None = None,
+        screening_service: ScreeningService | None = None,
     ):
         self.router = router
         self.requirement_service = requirement_service
         self.job_description_service = job_description_service
         self.job_edit_model = job_edit_model
         self.job_posting_service = job_posting_service
+        self.candidate_intake_service = candidate_intake_service
+        self.candidate_intake_factory = candidate_intake_factory
+        self.screening_service = screening_service
 
     def chat(
         self,
@@ -52,6 +62,9 @@ class SupervisorService:
         message: str,
         session_id: str | None = None,
         selected_job_description_id: int | None = None,
+        page_context: str = "jobs",
+        selected_job_posting_id: int | None = None,
+        selected_application_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         supervisor = self._get_or_create_session(
             db,
@@ -67,6 +80,10 @@ class SupervisorService:
             )
 
         state_json = dict(supervisor.state_json or {})
+        state_json["page_context"] = page_context
+        state_json["selected_screening_job_posting_id"] = selected_job_posting_id
+        state_json["selected_application_ids"] = selected_application_ids or []
+        supervisor.state_json = state_json
         messages = list(state_json.get("messages", []))
         messages.append(
             {"role": "user", "content": message.strip(), "outcome": "info"}
@@ -122,6 +139,18 @@ class SupervisorService:
                 supervisor,
                 lambda text: self._help_tool(supervisor, text),
             ),
+            sync_responses=self._safe_tool(
+                supervisor,
+                lambda text: self._sync_tool(db, supervisor, interviewer_user_id),
+                preserve_phase=True,
+            ),
+            screen_candidates=lambda text, decision: self._safe_tool(
+                supervisor,
+                lambda _: self._screening_tool(
+                    db, supervisor, interviewer_user_id, decision,
+                ),
+                preserve_phase=True,
+            )(text),
         )
         graph_state = HireSenseSupervisorGraph(self.router, tools).invoke(
             message=message,
@@ -135,6 +164,7 @@ class SupervisorService:
         }
 
         supervisor.phase = result.get("phase", supervisor.phase)
+        state_json = dict(supervisor.state_json or {})
         requirement_state = result.get("requirement_state")
         if requirement_state is not None:
             state_json["requirement_state"] = requirement_state
@@ -152,7 +182,7 @@ class SupervisorService:
         db.commit()
         db.refresh(supervisor)
 
-        return self._response(
+        response = self._response(
             db,
             supervisor=supervisor,
             route=state_json["last_route"],
@@ -160,6 +190,11 @@ class SupervisorService:
             outcome=result.get("outcome", "info"),
             refresh_required=result.get("refresh_required", False),
         )
+        response["sync_result"] = result.get("sync_result")
+        response["screening_batch"] = result.get("screening_batch") or response.get("screening_batch")
+        # Internal signal: the HTTP route queues work only for a newly created batch.
+        response["screening_started"] = result.get("screening_started", False)
+        return response
 
     def get_session(
         self,
@@ -493,21 +528,116 @@ class SupervisorService:
             "assistant_message": guidance.get(
                 supervisor.phase,
                 "Tell me what hiring task you want to perform.",
-            ),
+            ) + " You can also ask me to sync responses or screen candidates for a job posting.",
             "refresh_required": False,
+        }
+
+    def _sync_tool(
+        self, db: Session, supervisor: SupervisorSession, interviewer_user_id: int,
+    ) -> dict[str, Any]:
+        service = self.candidate_intake_service
+        if service is None and self.candidate_intake_factory:
+            service = self.candidate_intake_factory()
+        if service is None:
+            raise RuntimeError("Candidate response sync is unavailable")
+        result = service.sync(
+            db, interviewer_user_id=interviewer_user_id,
+        )
+        warnings = result["issues"]
+        message = (
+            f"Synced responses: imported {result['imported_applications']} application(s), "
+            f"downloaded {result['downloaded_cvs']} CV(s), reassigned "
+            f"{result['reassigned_applications']} application(s), and skipped "
+            f"{result['skipped_existing']} unchanged and {result['skipped_deleted']} "
+            "previously deleted response(s)."
+        )
+        if warnings:
+            message += f" {len(warnings)} warning(s): " + "; ".join(
+                f"Row {item['row_number']}: {item['message']}" for item in warnings[:5]
+            )
+        return {
+            "phase": supervisor.phase,
+            "outcome": "failure" if warnings and not result["imported_applications"] else "success",
+            "assistant_message": message,
+            "refresh_required": True,
+            "sync_result": result,
+        }
+
+    def _screening_tool(
+        self, db: Session, supervisor: SupervisorSession,
+        interviewer_user_id: int, decision: SupervisorDecision,
+    ) -> dict[str, Any]:
+        if self.screening_service is None:
+            raise RuntimeError("Candidate screening is unavailable")
+        jobs = self.screening_service.list_jobs(db, interviewer_user_id=interviewer_user_id)
+        state = dict(supervisor.state_json or {})
+        posting_id = decision.job_posting_id or state.get("selected_screening_job_posting_id")
+        if posting_id is None and len(jobs) == 1 and not decision.needs_job_selection:
+            posting_id = jobs[0]["id"]
+        job = next((item for item in jobs if item["id"] == posting_id), None)
+        if decision.needs_job_selection or job is None:
+            state["pending_screening_selection"] = True
+            supervisor.state_json = state
+            choices = "; ".join(f"{item['title']} (Post #{item['id']})" for item in jobs)
+            return {
+                "phase": supervisor.phase,
+                "outcome": "info",
+                "assistant_message": (
+                    "Which job posting should I screen? " + choices
+                    if jobs else "Create a job posting and collect applications before screening."
+                ),
+                "refresh_required": False,
+            }
+        application_ids = None
+        if decision.screening_scope == "selected":
+            # Checked applications only belong to the job currently shown in the UI.
+            if state.get("selected_screening_job_posting_id") != posting_id:
+                raise ValueError("Select that job on Assessments and check the applications to screen")
+            application_ids = state.get("selected_application_ids", [])
+            if not application_ids:
+                raise ValueError("Check at least one application on Assessments, or ask to screen all pending candidates")
+        active = db.scalar(select(ScreeningBatch).where(
+            ScreeningBatch.job_posting_id == posting_id,
+            ScreeningBatch.created_by_user_id == interviewer_user_id,
+            ScreeningBatch.status.in_([ScreeningBatchStatus.QUEUED, ScreeningBatchStatus.PROCESSING]),
+        ))
+        if active:
+            raise ValueError(f"Screening batch #{active.id} is already running for this job")
+        batch = self.screening_service.create_batch(
+            db, interviewer_user_id=interviewer_user_id,
+            job_posting_id=posting_id, application_ids=application_ids,
+        )
+        state["pending_screening_selection"] = False
+        state["last_screening_batch_id"] = batch.id
+        supervisor.state_json = state
+        return {
+            "phase": supervisor.phase,
+            "outcome": "success",
+            "assistant_message": (
+                f"Started screening batch #{batch.id} for {batch.total_applications} "
+                f"application(s) under “{job['title']}” (Post #{posting_id}). "
+                "I’ll refresh the requirement matches and ranking when processing finishes."
+            ),
+            "refresh_required": True,
+            "screening_started": True,
+            "screening_batch": self.screening_service.get_batch(
+                db, interviewer_user_id=interviewer_user_id, batch_id=batch.id,
+            ),
         }
 
     @staticmethod
     def _safe_tool(
         supervisor: SupervisorSession,
         callback: ToolMethod,
+        *,
+        preserve_phase: bool = False,
     ) -> ToolMethod:
         def invoke(message: str) -> dict[str, Any]:
             try:
                 return callback(message)
             except (LookupError, PermissionError, RuntimeError, ValueError) as exc:
                 return {
-                    "phase": "error",
+                    "phase": supervisor.phase if preserve_phase else "error",
                     "outcome": "failure",
                     "assistant_message": f"The task failed: {exc}",
                     "refresh_required": True,
@@ -533,6 +663,13 @@ class SupervisorService:
         )
         return {
             "phase": supervisor.phase,
+            "page_context": (supervisor.state_json or {}).get("page_context", "jobs"),
+            "selected_screening_job_posting_id": (supervisor.state_json or {}).get("selected_screening_job_posting_id"),
+            "selected_application_ids": (supervisor.state_json or {}).get("selected_application_ids", []),
+            "pending_screening_selection": (supervisor.state_json or {}).get("pending_screening_selection", False),
+            "available_screening_jobs": self.screening_service.list_jobs(
+                db, interviewer_user_id=supervisor.interviewer_user_id,
+            ) if self.screening_service else [],
             "requirement_profile_confirmed": (
                 supervisor.requirement_profile_id is not None
             ),
@@ -576,6 +713,15 @@ class SupervisorService:
         refresh_required: bool,
     ) -> dict[str, Any]:
         state_json = supervisor.state_json or {}
+        screening_batch = None
+        if self.screening_service and state_json.get("last_screening_batch_id"):
+            try:
+                screening_batch = self.screening_service.get_batch(
+                    db, interviewer_user_id=supervisor.interviewer_user_id,
+                    batch_id=state_json["last_screening_batch_id"],
+                )
+            except LookupError:
+                pass
         return {
             "session_id": supervisor.id,
             "phase": supervisor.phase,
@@ -592,6 +738,7 @@ class SupervisorService:
             ),
             "job_posting": self._current_posting(db, supervisor),
             "refresh_required": refresh_required,
+            "screening_batch": screening_batch,
         }
 
     def _requirement_state(

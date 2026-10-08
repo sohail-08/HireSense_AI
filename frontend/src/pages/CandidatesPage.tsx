@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
+import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import type {
   CandidateApplicationSummary,
   CandidateJobPostingOption,
@@ -22,6 +23,7 @@ function fileSize(bytes: number): string {
 }
 
 export function CandidatesPage() {
+  const { refreshVersion, response } = useSupervisor();
   const [configuration, setConfiguration] =
     useState<GoogleFormsConfiguration>();
   const [postings, setPostings] = useState<CandidateJobPostingOption[]>([]);
@@ -59,6 +61,19 @@ export function CandidatesPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!refreshVersion) return;
+    let active = true;
+    void apiRequest<CandidateApplicationSummary[]>("/candidates/applications")
+      .then((items) => { if (active) setApplications(items); })
+      .catch((requestError) => { if (active) setError(errorMessage(requestError)); });
+    return () => { active = false; };
+  }, [refreshVersion]);
+
+  useEffect(() => {
+    if (response?.sync_result) setSyncResult(response.sync_result);
+  }, [response]);
 
   async function refreshApplications() {
     const items = await apiRequest<CandidateApplicationSummary[]>(

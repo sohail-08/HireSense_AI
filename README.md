@@ -11,6 +11,7 @@
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents
 - Semantic company-knowledge ingestion using Ollama embeddings
+- pgvector storage and database-side cosine similarity search with an HNSW index
 - Gemini-powered, RAG-backed requirement discovery and JD generation
 - Persisted LangGraph supervisor with LLM intent routing and shared workflow state
 - Interviewer UI for previous-JD knowledge, requirement review and JD approval
@@ -66,6 +67,37 @@ ollama pull nomic-embed-text
 When the backend runs in Docker, `OLLAMA_DOCKER_BASE_URL` must point to the
 host service. The default is `http://host.docker.internal:11434`; local
 non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
+
+## Knowledge embeddings with pgvector
+
+PostgreSQL stores previous-JD chunk embeddings in
+`knowledge_chunks.embedding` as `vector(768)`. Ollama continues to generate
+the embeddings using `nomic-embed-text:latest`; pgvector handles storage and
+similarity search. Queries use cosine distance (`<=>`), model metadata filtering,
+and a database `ORDER BY ... LIMIT` rather than loading every vector into Python.
+The HNSW index uses `vector_cosine_ops`; small datasets may use a sequential scan
+because PostgreSQL chooses the lowest-cost plan. HNSW is an approximate index.
+See the [pgvector documentation](https://github.com/pgvector/pgvector#hnsw).
+
+The PostgreSQL image is built from `postgres/Dockerfile`, retaining PostgreSQL 16
+and Alpine while installing pgvector 0.8.2. For an existing checkout, run:
+
+```powershell
+docker compose up -d --build
+```
+
+Migration `0014_pgvector_knowledge` enables the extension, converts the existing
+JSON embeddings in place, and creates the index. The existing `postgres_data`
+volume is reused. Migration stops without deleting records if an existing vector
+does not have 768 dimensions. No new API key or separate vector database is needed.
+When running PostgreSQL outside Docker, install pgvector on that server before
+running Alembic, and use a migration account able to create the extension.
+
+The database requires 768-dimensional embeddings. Switching to a different model
+requires compatible dimensions and re-embedding existing knowledge; vectors from
+different models are excluded from each other's searches. SQLite remains a JSON
+fallback for offline tests only. CV screening and ranking continue to use the
+existing requirement assessment workflow; this migration affects previous-JD RAG.
 
 The Gemini unpaid tier should be used only with synthetic or non-sensitive
 demo content. Do not submit real CVs, candidate personal information, or
@@ -250,6 +282,23 @@ an external server remains on Discord.
 
 ## CV screening and semantic ranking
 
+The shared assistant stays available across **Jobs**, **Candidates**, and
+**Assessments**, keeping the same conversation as you navigate. You can ask:
+
+- “Sync responses” to import the configured Google Sheet and download CVs. Each
+  response is routed using the existing Job Posting answer; sync is not restricted
+  to the job selected on Assessments.
+- “Screen candidates for Frontend Engineer” or “Screen Post #12” to start a
+  background batch for that posting's pending applications.
+- “Screen candidates for the selected job” to use the Assessments job selector.
+- “Screen selected candidates” to process the applications checked on Assessments.
+
+The assistant asks for a posting when the target is missing or ambiguous, rejects
+applications from another job, and prevents a second conversational batch while
+one is already running for that job. It reports import warnings and task failures,
+shows screening progress, and refreshes applications and ranking after completion.
+An active conversational batch can be restored after reloading the page.
+
 1. Import applications and CVs with **Candidates → Sync responses**.
 2. Open **Assessments** and select the published job posting to assess. HireSense
    uses only applications routed to that posting and requires its confirmed
@@ -298,7 +347,12 @@ docker compose exec backend python -m pytest -q
 
 The migration and storage tests also run against isolated SQLite databases.
 
-Tests use isolated SQLite databases and do not modify PostgreSQL.
+The default suite uses isolated SQLite databases; real pgvector integration tests
+are skipped unless `PGVECTOR_TEST_SERVER_URL` is supplied. To run those tests,
+point that variable at a disposable PostgreSQL server with pgvector installed.
+The test account needs permission to create databases. Each integration test
+creates and removes its own randomly named database; it never migrates the
+database named in the supplied connection URL.
 
 ## Stop
 

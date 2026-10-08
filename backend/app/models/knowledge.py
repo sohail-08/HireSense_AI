@@ -5,8 +5,14 @@ from typing import Any
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from app.database import Base
+
+
+# nomic-embed-text's full-size embeddings. Changing this requires a migration
+# and regeneration of the knowledge embeddings using the new model.
+KNOWLEDGE_EMBEDDING_DIMENSIONS = 768
 
 
 class KnowledgeSourceType(str, Enum):
@@ -74,6 +80,13 @@ class KnowledgeChunk(Base):
             "chunk_index",
             unique=True,
         ),
+        Index(
+            "ix_knowledge_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ).ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -82,7 +95,10 @@ class KnowledgeChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(JSON)
+    # SQLite is retained only for deterministic offline tests.
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(KNOWLEDGE_EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"),
+    )
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         JSON, default=dict
     )

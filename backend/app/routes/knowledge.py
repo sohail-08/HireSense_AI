@@ -55,6 +55,9 @@ def create_knowledge_document(
             metadata=data.metadata,
             created_by_user_id=interviewer.id,
         )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from None
     except RuntimeError as exc:
         db.rollback()
         raise HTTPException(status_code=503, detail=str(exc)) from None
