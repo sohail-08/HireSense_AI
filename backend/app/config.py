@@ -19,6 +19,18 @@ class Settings(BaseSettings):
     interviewer_password: SecretStr
 
     frontend_url: str = "http://localhost:5173"
+    interview_mcp_url: str = "http://localhost:8002/mcp"
+    interview_mcp_timeout_seconds: float = Field(default=120, ge=1, le=600)
+    interview_company_name: str = "BJIT"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=1025, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from_email: str = "interviews@hiresense.test"
+    smtp_from_name: str = "HireSense"
+    smtp_use_tls: bool = False
+    smtp_timeout_seconds: float = Field(default=15, ge=1, le=120)
+    interview_reply_to_email: str = "interviews@hiresense.test"
 
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)

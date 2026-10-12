@@ -15,7 +15,7 @@ COPY --chown=appuser:appuser alembic.ini ./alembic.ini
 COPY --chown=appuser:appuser alembic ./alembic
 COPY entrypoint.sh ./entrypoint.sh
 
-RUN chmod +x ./entrypoint.sh
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
 
 USER appuser
 

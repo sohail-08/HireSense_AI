@@ -114,6 +114,29 @@ class CandidateApplicationService:
 
         # Remove whole immutable calculation snapshots containing this application,
         # rather than retaining deleted CV evidence or rewriting historical scores.
+        from copy import deepcopy
+        from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery
+        schedule_ids = list(db.scalars(select(InterviewSchedule.id).where(InterviewSchedule.application_id == application.id)))
+        db.execute(delete(InterviewDelivery).where(InterviewDelivery.application_id == application.id))
+        db.execute(delete(InterviewSchedule).where(InterviewSchedule.application_id == application.id))
+        for batch in db.scalars(select(InterviewBatch)):
+            if not any(item.get("application_id") == application.id for item in batch.snapshot.get("recipients", [])):
+                continue
+            snapshot = deepcopy(batch.snapshot)
+            snapshot["recipients"] = [item for item in snapshot["recipients"] if item.get("application_id") != application.id]
+            snapshot.pop("selection_token", None)
+            for key in ("selected", "excluded"):
+                if "selection" in snapshot:
+                    snapshot["selection"][key] = [item for item in snapshot["selection"].get(key, []) if item.get("application_id") != application.id]
+            if "selection" in snapshot:
+                snapshot["selection"]["recipient_count"] = len(snapshot["selection"]["selected"])
+            if "schedule_ids" in snapshot.get("schedule", {}):
+                snapshot["schedule"]["schedule_ids"] = [item for item in snapshot["schedule"]["schedule_ids"] if item not in schedule_ids]
+            batch.snapshot = snapshot
+            if batch.status == "draft":
+                batch.status = "invalidated"
+            if not snapshot["recipients"]:
+                db.delete(batch)
         score_run_ids = list(db.scalars(select(CandidateScore.scoring_run_id).where(CandidateScore.application_id == application.id)))
         if score_run_ids:
             db.execute(delete(ScoringRequestKey).where(ScoringRequestKey.scoring_run_id.in_(score_run_ids)))

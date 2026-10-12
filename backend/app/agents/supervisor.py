@@ -49,6 +49,11 @@ Tools:
   posting. Set screening_scope=selected only when the user requests checked
   applications; otherwise use pending.
 - help: explain valid next actions when no business tool applies.
+- interviews: select candidates from persisted rankings, collect schedule details,
+  preview/confirm email invitations, or reschedule existing interviews through MCP.
+  Use this for scheduling requests and their follow-ups while interview_workflow
+  is active. A plain 'confirm' in interview_approval belongs to interviews.
+  Never approve invitations unless the latest human message explicitly confirms.
 
 Use the current phase and resources to choose a tool. Generic confirmation
 belongs to the pending confirmation step. Never select an approval tool without
