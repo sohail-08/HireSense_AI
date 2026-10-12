@@ -26,7 +26,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="interviewer-navbar sticky top-0 z-30 border-b border-slate-200 bg-white">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
         <NavLink
           to={`${prefix}/dashboard`}

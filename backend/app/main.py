@@ -7,10 +7,24 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import Base, SessionLocal, engine, get_db
+from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
+from app.routes.candidates import router as candidates_router
+from app.routes.job_descriptions import router as job_descriptions_router
+from app.routes.job_postings import router as job_postings_router
+from app.routes.knowledge import router as knowledge_router
+from app.routes.requirements import router as requirements_router
+from app.routes.screening import router as screening_router
+from app.routes.scoring import router as scoring_router
+from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
+from app.services.screening_service import ScreeningService
+from app.storage import (
+    ensure_cv_storage_root,
+    ensure_knowledge_storage_root,
+    ensure_storage_root,
+)
 
 
 configure_logging()
@@ -19,10 +33,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    ensure_storage_root()
+    ensure_cv_storage_root()
+    ensure_knowledge_storage_root()
 
     with SessionLocal() as db:
         seed_interviewer(db)
+        ScreeningService.recover_interrupted(db)
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -42,11 +59,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_url],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth_router)
+app.include_router(candidates_router)
+app.include_router(job_descriptions_router)
+app.include_router(job_postings_router)
+app.include_router(knowledge_router)
+app.include_router(requirements_router)
+app.include_router(screening_router)
+app.include_router(scoring_router)
+app.include_router(supervisor_router)
 
 
 @app.get("/api/health", tags=["Health"])

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    build: ./postgres
 
     ports:
       - "127.0.0.1:5432:5432"
@@ -34,12 +34,53 @@ services:
       INTERVIEWER_EMAIL: ${INTERVIEWER_EMAIL:?Set INTERVIEWER_EMAIL in .env}
       INTERVIEWER_PASSWORD: ${INTERVIEWER_PASSWORD:?Set INTERVIEWER_PASSWORD in .env}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/app/storage}
+      CV_MAX_FILE_SIZE_MB: ${CV_MAX_FILE_SIZE_MB:-10}
+      CV_MAX_PAGES: ${CV_MAX_PAGES:-40}
+      CV_MAX_CHARACTERS: ${CV_MAX_CHARACTERS:-150000}
+      CV_MIN_EXTRACT_CHARACTERS: ${CV_MIN_EXTRACT_CHARACTERS:-80}
+      SCREENING_BATCH_MAX_APPLICATIONS: ${SCREENING_BATCH_MAX_APPLICATIONS:-50}
+      KNOWLEDGE_PDF_MAX_FILE_SIZE_MB: ${KNOWLEDGE_PDF_MAX_FILE_SIZE_MB:-15}
+      KNOWLEDGE_PDF_MAX_PAGES: ${KNOWLEDGE_PDF_MAX_PAGES:-100}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_DOCKER_SERVICE_ACCOUNT_FILE:-/app/secrets/google-service-account.json}
+      GOOGLE_FORM_URL: ${GOOGLE_FORM_URL:-https://docs.google.com/forms/d/e/1FAIpQLSfMduzyxs15tGH8LpoVSV6Nqs_0S3udgPQ83n6mQZmY4w_OIg/viewform}
+      GOOGLE_FORMS_SPREADSHEET_ID: ${GOOGLE_FORMS_SPREADSHEET_ID:-}
+      GOOGLE_FORMS_SHEET_NAME: ${GOOGLE_FORMS_SHEET_NAME:-Form Responses 1}
+      GOOGLE_FORMS_TIMESTAMP_COLUMN: ${GOOGLE_FORMS_TIMESTAMP_COLUMN:-Timestamp}
+      GOOGLE_FORMS_NAME_COLUMN: ${GOOGLE_FORMS_NAME_COLUMN:-Name}
+      GOOGLE_FORMS_EMAIL_COLUMN: ${GOOGLE_FORMS_EMAIL_COLUMN:-Email Address}
+      GOOGLE_FORMS_PHONE_COLUMN: ${GOOGLE_FORMS_PHONE_COLUMN:-Phone}
+      GOOGLE_FORMS_LINKEDIN_COLUMN: ${GOOGLE_FORMS_LINKEDIN_COLUMN:-LinkedIn}
+      GOOGLE_FORMS_PORTFOLIO_COLUMN: ${GOOGLE_FORMS_PORTFOLIO_COLUMN:-Portfolio}
+      GOOGLE_FORMS_LOCATION_COLUMN: ${GOOGLE_FORMS_LOCATION_COLUMN:-Location}
+      GOOGLE_FORMS_CV_COLUMN: ${GOOGLE_FORMS_CV_COLUMN:-Upload CV}
+      GOOGLE_FORMS_JOB_COLUMN: ${GOOGLE_FORMS_JOB_COLUMN:-Job Posting}
+      OLLAMA_BASE_URL: ${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text:latest}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-60}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-60}
+      JOB_POSTING_MCP_URL: http://job-posting-mcp:8001/mcp
+      JOB_POSTING_MCP_TIMEOUT_SECONDS: ${JOB_POSTING_MCP_TIMEOUT_SECONDS:-30}
+      DISCORD_DEFAULT_HEADING: ${DISCORD_DEFAULT_HEADING:-BJIT is Hiring!}
+      JOB_POST_DEFAULT_APPLICATION_URL: ${JOB_POST_DEFAULT_APPLICATION_URL:-}
+      JOB_POST_DEFAULT_CONTACT_EMAIL: ${JOB_POST_DEFAULT_CONTACT_EMAIL:-}
+      JOB_POST_DEFAULT_LOCATION: ${JOB_POST_DEFAULT_LOCATION:-}
+      JOB_POST_DEFAULT_APPLICATION_DEADLINE: ${JOB_POST_DEFAULT_APPLICATION_DEADLINE:-}
+      JOB_POST_DEFAULT_INSTRUCTIONS: ${JOB_POST_DEFAULT_INSTRUCTIONS:-}
 
     ports:
       - "127.0.0.1:8000:8000"
 
+    volumes:
+      - ./backend/storage:/app/storage
+      - ./backend/secrets:/app/secrets:ro
+
     depends_on:
       postgres:
+        condition: service_healthy
+      job-posting-mcp:
         condition: service_healthy
 
     healthcheck:
@@ -52,6 +93,36 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+    restart: unless-stopped
+
+  job-posting-mcp:
+    build: ./backend
+
+    command:
+      - python
+      - -m
+      - app.job_posting_mcp.server
+
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
+      DISCORD_API_BASE_URL: ${DISCORD_API_BASE_URL:-https://discord.com/api/v10}
+      DISCORD_BOT_TIMEOUT_SECONDS: ${DISCORD_BOT_TIMEOUT_SECONDS:-15}
+
+    expose:
+      - "8001"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; connection = socket.create_connection(('localhost', 8001), 3); connection.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
     restart: unless-stopped
 

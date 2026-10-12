@@ -16,9 +16,12 @@ import { CandidateLayout } from "./layouts/CandidateLayout";
 import { InterviewerLayout } from "./layouts/InterviewerLayout";
 
 import { CandidateDashboard } from "./pages/CandidateDashboard";
+import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewerDashboard } from "./pages/InterviewerDashboard";
+import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ScreeningPage } from "./pages/ScreeningPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
@@ -78,16 +81,12 @@ export default function App() {
 
           <Route
             path="jobs"
-            element={
-              <PlaceholderPage title="Jobs" />
-            }
+            element={<JobDescriptionPage />}
           />
 
           <Route
             path="candidates"
-            element={
-              <PlaceholderPage title="Candidates" />
-            }
+            element={<CandidatesPage />}
           />
 
           <Route
@@ -99,9 +98,7 @@ export default function App() {
 
           <Route
             path="assessments"
-            element={
-              <PlaceholderPage title="Assessments" />
-            }
+            element={<ScreeningPage />}
           />
         </Route>
       </Route>

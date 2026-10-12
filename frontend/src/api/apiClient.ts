@@ -23,7 +23,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
 
-  if (options.body) {
+  if (options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 

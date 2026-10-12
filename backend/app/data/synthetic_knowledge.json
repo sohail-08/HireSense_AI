@@ -1,0 +1,80 @@
+[
+  {
+    "title": "Backend Engineer - Payments Platform - 2025",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/backend-engineer-payments-2025",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Engineering",
+      "location": "Dhaka (Hybrid)",
+      "approved_year": 2025
+    },
+    "content": "Role: Backend Engineer, Payments Platform. Summary: Northstar Digital is seeking a backend engineer to build secure, observable services for payment processing and merchant operations. Responsibilities: design and maintain REST APIs; implement asynchronous workflows; review code; improve test coverage; investigate production issues; document service contracts; and collaborate with product, QA, security, and frontend engineers. Required skills: Python, FastAPI, PostgreSQL, REST API design, SQL, Git, automated testing with Pytest, and practical Docker experience. Preferred skills: Redis, RabbitMQ or Kafka, AWS, CI/CD pipelines, OpenTelemetry, and experience with payment systems. Qualifications: bachelor's degree in Computer Science, Software Engineering, or a related discipline, or equivalent professional experience. Experience: minimum 3 years of professional backend software development. Selection criteria: evidence of maintainable Python code, API and database design ability, secure coding awareness, debugging approach, written communication, and collaboration. Interview process: recruiter screen, 60-minute Python coding exercise, 60-minute system-design interview, and behavioral interview. The coding exercise must be relevant to normal backend work and may not request production company data."
+  },
+  {
+    "title": "Senior Backend Engineer - Core Services - 2024",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/senior-backend-core-services-2024",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Engineering",
+      "location": "Remote within Bangladesh",
+      "approved_year": 2024
+    },
+    "content": "Role: Senior Backend Engineer, Core Services. Summary: Lead the design and delivery of reliable services used by Northstar Digital products. Responsibilities: own service architecture; turn product requirements into technical plans; mentor engineers; lead reviews; define observability and reliability standards; plan safe migrations; and participate in an on-call rotation. Required skills: at least 5 years of backend development, advanced Python, FastAPI or Django, PostgreSQL, distributed-systems fundamentals, API security, Docker, CI/CD, and production troubleshooting. Preferred skills: Kubernetes, AWS, Terraform, event-driven architecture, Kafka, Redis, and technical leadership. Qualifications: bachelor's degree in a computing discipline or equivalent demonstrable engineering experience. Selection criteria: architecture judgment, ability to explain trade-offs, operational ownership, code quality, mentoring ability, and inclusive collaboration. Interview process: experience review, practical code-review exercise, distributed-system design interview, leadership interview, and values interview."
+  },
+  {
+    "title": "Frontend Engineer - Customer Experience - 2025",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/frontend-engineer-customer-experience-2025",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Engineering",
+      "location": "Dhaka (Hybrid)",
+      "approved_year": 2025
+    },
+    "content": "Role: Frontend Engineer, Customer Experience. Summary: Build accessible and responsive web experiences for customer and operations teams. Responsibilities: deliver React features; translate designs into reusable components; integrate REST APIs; write automated tests; monitor frontend performance; and work closely with design, backend, and QA. Required skills: TypeScript, React, semantic HTML, modern CSS, state management, API integration, Git, and frontend testing. Preferred skills: Vite, Tailwind CSS, Playwright, design systems, web performance, and accessibility auditing. Qualifications: bachelor's degree in Computer Science or a related field, a relevant diploma, or equivalent portfolio and professional experience. Experience: minimum 2 years building production web applications. Selection criteria: component design, accessibility, testing discipline, problem solving, user empathy, and communication. Interview process: portfolio discussion, practical React exercise, frontend architecture interview, and behavioral interview."
+  },
+  {
+    "title": "Machine Learning Engineer - Talent Intelligence - 2025",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/ml-engineer-talent-intelligence-2025",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Applied AI",
+      "location": "Dhaka (Hybrid)",
+      "approved_year": 2025
+    },
+    "content": "Role: Machine Learning Engineer, Talent Intelligence. Summary: Develop and evaluate responsible NLP and retrieval systems for recruitment workflows. Responsibilities: prepare governed datasets; train and evaluate models; implement retrieval pipelines; expose models through APIs; monitor quality and drift; document experiments; and partner with product, engineering, and compliance. Required skills: Python, machine learning fundamentals, NLP, information retrieval, data validation, SQL, experiment tracking, and API development. Preferred skills: PyTorch, Hugging Face, vector databases, RAG evaluation, FastAPI, Docker, and cloud deployment. Qualifications: bachelor's or master's degree in Computer Science, Data Science, Statistics, or a related discipline, or equivalent applied experience. Experience: minimum 3 years in software or machine-learning engineering, including at least 1 year deploying ML systems. Selection criteria: experimental rigor, evaluation design, production engineering, responsible-AI awareness, communication, and collaboration. Interview process: project deep dive, Python and data exercise, ML-system design interview, responsible-AI scenario, and behavioral interview."
+  },
+  {
+    "title": "DevOps Engineer - Cloud Platform - 2024",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/devops-engineer-cloud-platform-2024",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Platform Engineering",
+      "location": "Remote within Bangladesh",
+      "approved_year": 2024
+    },
+    "content": "Role: DevOps Engineer, Cloud Platform. Summary: Improve the reliability, security, and delivery speed of Northstar Digital cloud services. Responsibilities: maintain CI/CD pipelines; manage infrastructure as code; improve monitoring and alerting; support incident response; automate environment provisioning; review production readiness; and partner with development teams on deployment practices. Required skills: Linux, AWS, Docker, Terraform, CI/CD, Git, networking fundamentals, and production troubleshooting. Preferred skills: Kubernetes, Helm, Python or Bash scripting, Prometheus, Grafana, OpenTelemetry, and PostgreSQL operations. Qualifications: bachelor's degree in Computer Science, Engineering, or a related discipline, or equivalent professional experience. Experience: minimum 3 years in DevOps, site reliability, cloud infrastructure, or a similar role. Selection criteria: infrastructure design, automation quality, security awareness, incident reasoning, communication, and operational ownership. Interview process: experience review, practical infrastructure exercise, cloud-system design discussion, and behavioral interview."
+  },
+  {
+    "title": "QA Automation Engineer - Web Platform - 2025",
+    "source_type": "previous_job_description",
+    "source_uri": "synthetic://previous-jd/qa-automation-engineer-web-platform-2025",
+    "metadata": {
+      "synthetic": true,
+      "fictional_company": "Northstar Digital",
+      "department": "Quality Engineering",
+      "location": "Dhaka (Hybrid)",
+      "approved_year": 2025
+    },
+    "content": "Role: QA Automation Engineer, Web Platform. Summary: Build reliable automated quality checks for Northstar Digital web applications and APIs. Responsibilities: design test strategies; create and maintain browser and API automation; investigate failures; improve test data and environments; contribute to release readiness; track quality risks; and collaborate with engineers and product managers. Required skills: automated testing, Playwright or Cypress, API testing, JavaScript or TypeScript, SQL, Git, defect analysis, and CI pipeline integration. Preferred skills: Python, performance testing, accessibility testing, Docker, contract testing, and cloud-based test environments. Qualifications: bachelor's degree in a computing discipline, a relevant diploma, or equivalent professional experience. Experience: minimum 2 years in software quality engineering or test automation. Selection criteria: test design, debugging ability, automation maintainability, risk assessment, attention to detail, and cross-team communication. Interview process: testing portfolio review, practical automation exercise, quality-strategy interview, and behavioral interview."
+  }
+]

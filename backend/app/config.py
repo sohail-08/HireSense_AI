@@ -1,11 +1,14 @@
+from datetime import date
 from functools import lru_cache
 
 from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.environment import ROOT_ENV_FILE
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     database_url: str
     jwt_secret_key: SecretStr
@@ -16,6 +19,82 @@ class Settings(BaseSettings):
     interviewer_password: SecretStr
 
     frontend_url: str = "http://localhost:5173"
+
+    storage_root: str = "storage"
+    cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
+    cv_max_pages: int = Field(default=40, ge=1, le=500)
+    cv_max_characters: int = Field(default=150_000, ge=1_000, le=2_000_000)
+    cv_min_extract_characters: int = Field(default=80, ge=1, le=10_000)
+    screening_batch_max_applications: int = Field(default=50, ge=1, le=500)
+    knowledge_pdf_max_file_size_mb: int = Field(default=15, ge=1, le=100)
+    knowledge_pdf_max_pages: int = Field(default=100, ge=1, le=500)
+
+    google_service_account_file: str = "secrets/google-service-account.json"
+    google_form_url: str | None = None
+    google_forms_spreadsheet_id: str | None = None
+    google_forms_sheet_name: str = "Form Responses 1"
+    google_forms_timestamp_column: str = "Timestamp"
+    google_forms_name_column: str = "Name"
+    google_forms_email_column: str = "Email Address"
+    google_forms_phone_column: str = "Phone"
+    google_forms_linkedin_column: str = "LinkedIn"
+    google_forms_portfolio_column: str = "Portfolio"
+    google_forms_location_column: str = "Location"
+    google_forms_cv_column: str = "Upload CV"
+    google_forms_job_column: str = "Job Posting"
+
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_embedding_model: str = "nomic-embed-text:latest"
+    ollama_timeout_seconds: float = Field(default=60, ge=1, le=600)
+
+    gemini_api_key: SecretStr | None = None
+    gemini_api_base_url: str = (
+        "https://generativelanguage.googleapis.com/v1beta"
+    )
+    gemini_chat_model: str = "gemini-3.5-flash-lite"
+    gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
+
+    job_posting_mcp_url: str = "http://localhost:8001/mcp"
+    job_posting_mcp_timeout_seconds: float = Field(default=30, ge=1, le=120)
+    discord_default_heading: str = Field(
+        default="BJIT is Hiring!",
+        min_length=1,
+        max_length=2000,
+    )
+    job_post_default_application_url: str | None = None
+    job_post_default_contact_email: EmailStr | None = None
+    job_post_default_location: str | None = Field(
+        default=None,
+        max_length=500,
+    )
+    job_post_default_application_deadline: date | None = None
+    job_post_default_instructions: str | None = Field(
+        default=None,
+        max_length=1024,
+    )
+
+    @field_validator(
+        "job_post_default_application_url",
+        "job_post_default_contact_email",
+        "job_post_default_location",
+        "job_post_default_application_deadline",
+        "job_post_default_instructions",
+        "google_form_url",
+        "google_forms_spreadsheet_id",
+        mode="before",
+    )
+    @classmethod
+    def empty_optional_value(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("google_forms_job_column", mode="before")
+    @classmethod
+    def default_google_forms_job_column(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            return "Job Posting"
+        return value.strip()
 
     @field_validator("jwt_secret_key")
     @classmethod
