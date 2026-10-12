@@ -20,6 +20,11 @@
 
 ## Requirements
 
+Deterministic technical/experience/qualification scoring is available on Assessments.
+Select a job, set three category weights, and choose **Save weights & rank candidates**.
+Pending CVs are processed automatically; evidence is available only when requested.
+See [scoring formulas, immutable snapshots and reviewer steps](docs/deterministic-candidate-scoring.md).
+
 Docker Desktop running with Linux containers.
 
 ## Startup
@@ -39,6 +44,15 @@ Health check: http://localhost:8000/api/health
 
 The backend runs migrations and seeds the Interviewer automatically.
 All public registrations create Candidates.
+
+The repository-root `.env` is the only active environment file. `.env.example`
+is a tracked template, not a second configuration file. Do not create
+`backend/.env` or `frontend/.env`. Local backend and Discord MCP processes load
+the root file regardless of their working directory; process environment
+variables take precedence. Docker Compose reads the same root file and passes
+only each service's settings into its container, without copying secrets into
+images or exposing them to the frontend. `DATABASE_URL` is the local connection;
+Compose supplies the backend's internal PostgreSQL URL separately.
 
 Requirement extraction and job-description generation use the Gemini API.
 Create a key in Google AI Studio and place it only in the root `.env` file:
@@ -314,7 +328,6 @@ The shared assistant stays available across **Jobs**, **Candidates**, and
 - “Screen candidates for Frontend Engineer” or “Screen Post #12” to start a
   background batch for that posting's pending applications.
 - “Screen candidates for the selected job” to use the Assessments job selector.
-- “Screen selected candidates” to process the applications checked on Assessments.
 
 The assistant asks for a posting when the target is missing or ambiguous, rejects
 applications from another job, and prevents a second conversational batch while
@@ -322,29 +335,38 @@ one is already running for that job. It reports import warnings and task failure
 shows screening progress, and refreshes applications and ranking after completion.
 An active conversational batch can be restored after reloading the page.
 
-1. Import applications and CVs with **Candidates → Sync responses**.
+1. Import applications and CVs with **Candidates → Sync responses** or the shared
+   assistant. Syncing routes responses across all jobs using their Job Posting answers.
+   Assessments focuses on weights and ranking, without sync or application-list controls.
 2. Open **Assessments** and select the published job posting to assess. HireSense
    uses only applications routed to that posting and requires its confirmed
    requirement profile and approved job description.
-3. Select individual pending candidates or choose **Screen all pending**. The
-   work runs as a persisted background batch, so the page can poll progress and
-   display per-CV failures without discarding successful results.
-4. Review the ranked candidates, deterministic requirement-coverage score,
-   strengths, gaps and items to verify. Open a candidate to inspect the extracted
-   profile and every Met, Partially Met, Unmet or Unable to Determine decision
-   with its source quote and PDF page or DOCX block location.
+3. Set the **Technical skills**, **Experience**, and **Qualifications** percentages
+   (total 100%). Choose **Save weights & rank candidates** to explicitly approve
+   them. Pending CVs are prepared in the background and scored after screening;
+   existing screening results are reused when current.
+4. Read the single ranking table. Choose **Inspect evidence** only if you want
+   category scores, requirement outcomes, source quotations and PDF page/DOCX
+   block locations. All candidates receive a rank; processing/evidence issues are
+   disclosed inside the optional evidence view. Earlier results are tucked under
+   **Previous rankings**.
 
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported
-formats and documents outside the configured size/page/text limits are moved to
-the review list rather than silently ranked. The screening prompt treats CV text
+formats and documents outside the configured size/page/text limits are recorded as
+processing failures. They receive zero evidence coverage and stay in the ranking,
+with the processing issue disclosed when evidence is inspected. The screening prompt treats CV text
 as untrusted data, validates cited quotes against parsed source blocks, and runs
 a separate model check before positive evidence is accepted.
 
-Ranking uses an auditable weighted coverage calculation: Met = 1, Partially Met
-= 0.5, and Unmet or Unable to Determine = 0. Requirement weights configured on
-the profile are used; otherwise each item receives the explicit default weight
-of 1. Ties share the same rank and are ordered stably by application ID. Results
+Ranking uses auditable category-weighted coverage: Met = 1, Partially Met = 0.5,
+and Unmet = 0. New scores normalize ambiguous or missing requirement matches to
+Unmet, without requiring manual confirmation. No candidates are held for review;
+failed processing has zero coverage, not a judgment of candidate capability.
+Within-category coverage uses approved
+requirement weights, then the three category percentages produce the final score.
+Unmapped selection criteria stay evidence-only. Ties share the same rank and are
+ordered stably by application ID. Results
 persist with the CV hash, requirement snapshot, model, prompt version and
 calculation version. Unchanged compatible results are reused; changed CVs or job
 requirements are screened again.

@@ -33,9 +33,14 @@ from app.models.screening import (
     ScreeningRunStatus,
 )
 from app.models.supervisor import SupervisorSession
+from app.models.scoring import CandidateScore, ScoringConfiguration, ScoringRequestKey, ScoringRun
 from app.models.user import User, UserRole
 
 __all__ = [
+    "CandidateScore",
+    "ScoringConfiguration",
+    "ScoringRequestKey",
+    "ScoringRun",
     "ApplicationSource",
     "ApplicationImportExclusion",
     "ApplicationStatus",

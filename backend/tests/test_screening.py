@@ -282,13 +282,13 @@ def test_batch_parses_existing_docx_ranks_ties_and_isolates_missing_cv(tmp_path)
         db.refresh(batch)
         assert batch.status is ScreeningBatchStatus.COMPLETED_WITH_ERRORS
         assert batch.successful_applications == 2
-        assert batch.review_applications == 1
-        assert batch.failed_applications == 0
+        assert batch.review_applications == 0
+        assert batch.failed_applications == 1
 
         runs = list(db.scalars(select(ScreeningRun).order_by(ScreeningRun.id)))
         assert [run.status for run in runs].count(ScreeningRunStatus.COMPLETED) == 2
         assert [run.status for run in runs].count(
-            ScreeningRunStatus.REVIEW_REQUIRED
+            ScreeningRunStatus.FAILED
         ) == 1
         completed = next(run for run in runs if run.application_id == first.id)
         assert completed.requirement_coverage == pytest.approx(66.67)
@@ -322,9 +322,9 @@ def test_batch_parses_existing_docx_ranks_ties_and_isolates_missing_cv(tmp_path)
         )
         ranked = [entry for entry in entries if entry.disposition.value == "ranked"]
         review = [entry for entry in entries if entry.disposition.value == "review"]
-        assert [entry.rank for entry in ranked] == [1, 1]
-        assert len(review) == 1
-        assert review[0].rank is None
+        assert [entry.rank for entry in ranked] == [1, 1, 3]
+        assert len(review) == 0
+        assert ranked[-1].requirement_coverage == 0
 
         retry_batch = service.create_batch(
             db,
@@ -334,6 +334,11 @@ def test_batch_parses_existing_docx_ranks_ties_and_isolates_missing_cv(tmp_path)
         )
         assert retry_batch.application_ids == [missing.id]
     engine.dispose()
+
+
+def test_screening_schema_exposes_only_three_outcomes_and_normalizes_legacy_status():
+    assert set(RequirementAssessment.model_json_schema()["properties"]["status"]["enum"]) == {"met", "partially_met", "unmet"}
+    assert RequirementAssessment(requirement_key="skill:0", status="unable_to_determine", explanation="No sufficient evidence").status == "unmet"
 
 
 def test_unverifiable_positive_evidence_is_downgraded():
@@ -385,13 +390,13 @@ def test_unverifiable_positive_evidence_is_downgraded():
         },
     )
 
-    assert result["matches"][0]["status"] == "unable_to_determine"
+    assert result["matches"][0]["status"] == "unmet"
     assert result["requirement_coverage"] == 0
     assert result["suitability_summary"] == ""
     assert "invalid_or_unverifiable_quote" in result["matches"][0]["review_flags"]
 
 
-def test_weighted_coverage_handles_all_four_match_outcomes():
+def test_weighted_coverage_normalizes_legacy_matches_to_three_outcomes():
     requirements = [
         {
             "key": "required_skill:0",
@@ -511,13 +516,12 @@ def test_weighted_coverage_handles_all_four_match_outcomes():
         "met",
         "partially_met",
         "unmet",
-        "unable_to_determine",
+        "unmet",
     ]
     assert result["counts"] == {
         "met": 1,
         "partially_met": 1,
-        "unmet": 1,
-        "unable_to_determine": 1,
+        "unmet": 2,
     }
     assert result["requirement_coverage"] == 50.0
 

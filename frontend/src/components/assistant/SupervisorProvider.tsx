@@ -115,7 +115,7 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
             window.clearInterval(timer);
             setRefreshVersion((current) => current + 1);
             addTaskMessage(next.status === "completed" ? "success" : "failure",
-              `Screening batch #${next.id} ${next.status.replaceAll("_", " ")}: ${next.successful_applications} completed, ${next.review_applications} need review, ${next.failed_applications} failed. ${next.error_message ?? "Results and ranking have been refreshed."}`);
+              `Screening batch #${next.id} ${next.status.replaceAll("_", " ")}: ${next.successful_applications} completed, ${next.failed_applications} failed. ${next.error_message ?? "Results and ranking have been refreshed. Requirements without accepted evidence receive zero credit."}`);
           }
         })
         .catch((error) => {

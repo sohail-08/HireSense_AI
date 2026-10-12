@@ -1,11 +1,11 @@
 # HireSense LangGraph diagrams
 
-These editable draw.io diagrams match the four compiled graphs in the current
+These editable draw.io diagrams match the five compiled graphs in the current
 backend. Node identifiers and directed edges were checked against
 `workflow._compiled.get_graph()`; START and END display LangGraph's
 `__start__` and `__end__` sentinels.
 
-Open **hiresense-all-langgraphs.drawio** in diagrams.net for all four graphs as
+Open **hiresense-all-langgraphs.drawio** in diagrams.net for all five graphs as
 separate pages, or open one of the individual files.
 
 | File | Graph | Source | Registered nodes | Edges |
@@ -14,6 +14,7 @@ separate pages, or open one of the individual files.
 | 02-requirement-discovery.drawio | RequirementDiscoveryGraph | `backend/app/agents/requirement_discovery.py` | 6 | 8 |
 | 03-job-posting.drawio | JobPostingAssistantGraph | `backend/app/agents/job_posting.py` | 2 | 3 |
 | 04-cv-screening.drawio | ScreeningWorkflow | `backend/app/screening/workflow.py` | 5 | 6 |
+| 05-candidate-scoring.drawio | CandidateScoringWorkflow | `backend/app/scoring/workflow.py` | 5 | 6 |
 
 Node counts exclude START and END. Solid arrows are unconditional edges.
 Dashed arrows are conditional edges. Conditional edge labels use the exact
@@ -54,4 +55,9 @@ LangGraph nodes.
   outside this graph.
 
 Service operations and calls between graphs are not added as graph edges.
-`../hiresense-langgraph-workflow.drawio` contains the same complete four-page set.
+`../hiresense-langgraph-workflow.drawio` contains the same complete five-page set.
+
+Candidate scoring consumes saved evidence after screening. Its actual nodes are
+`category_scoring`, `weighted_scoring`, `written_justification`, `rank_candidates`,
+and `persist_scores`. It does not invoke an LLM. An approved configuration is
+required for the service to invoke it automatically after a screening batch.

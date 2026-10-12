@@ -34,7 +34,7 @@ class GoogleWorkspaceReader(Protocol):
     def get_file(self, file_id: str) -> GoogleDriveFile:
         ...
 
-    def download_file(
+    def C(
         self,
         *,
         file_id: str,

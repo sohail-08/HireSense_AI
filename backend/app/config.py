@@ -4,9 +4,11 @@ from functools import lru_cache
 from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.environment import ROOT_ENV_FILE
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     database_url: str
     jwt_secret_key: SecretStr

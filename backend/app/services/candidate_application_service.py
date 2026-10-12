@@ -3,7 +3,7 @@ import json
 import logging
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -15,6 +15,7 @@ from app.models.candidate import (
     CVDocument,
 )
 from app.models.job import JobDescription, JobPosting
+from app.models.scoring import CandidateScore, ScoringRequestKey, ScoringRun
 
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,13 @@ class CandidateApplicationService:
                         )
                     )
 
+        # Remove whole immutable calculation snapshots containing this application,
+        # rather than retaining deleted CV evidence or rewriting historical scores.
+        score_run_ids = list(db.scalars(select(CandidateScore.scoring_run_id).where(CandidateScore.application_id == application.id)))
+        if score_run_ids:
+            db.execute(delete(ScoringRequestKey).where(ScoringRequestKey.scoring_run_id.in_(score_run_ids)))
+            db.execute(delete(CandidateScore).where(CandidateScore.scoring_run_id.in_(score_run_ids)))
+            db.execute(delete(ScoringRun).where(ScoringRun.id.in_(score_run_ids)))
         for document in documents:
             db.delete(document)
         db.delete(application)

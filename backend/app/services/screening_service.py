@@ -39,8 +39,8 @@ from app.screening.parsing import CVParser, CVReviewRequired
 from app.screening.workflow import ScreeningWorkflow
 
 
-PROMPT_VERSION = "v1"
-CALCULATION_VERSION = "weighted-coverage-v1"
+PROMPT_VERSION = "three-outcome-v2"
+CALCULATION_VERSION = "three-outcome-coverage-v2"
 STATUS_FACTORS = {
     RequirementMatchStatus.MET: 1.0,
     RequirementMatchStatus.PARTIALLY_MET: 0.5,
@@ -407,6 +407,17 @@ class ScreeningService:
                 interviewer_user_id=batch.created_by_user_id,
                 requirement_snapshot_hash=snapshot_hash,
             )
+            # Scoring follows persisted, evidence-validated matches. Only an
+            # explicitly approved configuration for this requirement version
+            # can trigger the deterministic workflow; no defaults are approved here.
+            from app.services.scoring_service import ScoringService
+            from app.schemas.scoring import ScoreRunRequest
+            configuration = ScoringService.latest_configuration(db, batch.job_posting_id, snapshot_hash)
+            if configuration:
+                ScoringService().run(
+                    db, user_id=batch.created_by_user_id, job_id=batch.job_posting_id,
+                    data=ScoreRunRequest(configuration_id=configuration["id"]),
+                )
             batch = db.get(ScreeningBatch, batch_id)
             batch.status = (
                 ScreeningBatchStatus.COMPLETED_WITH_ERRORS
@@ -500,11 +511,11 @@ class ScreeningService:
             run = db.get(ScreeningRun, run.id)
             item = db.get(ScreeningBatchItem, item.id)
             application = db.get(CandidateApplication, item.application_id)
-            run.status = ScreeningRunStatus.REVIEW_REQUIRED
+            run.status = ScreeningRunStatus.FAILED
             run.error_message = str(exc)
             run.review_flags = [str(exc)]
             run.completed_at = datetime.now(timezone.utc)
-            item.status = ScreeningRunStatus.REVIEW_REQUIRED
+            item.status = ScreeningRunStatus.FAILED
             item.error_message = str(exc)
             if document is not None:
                 saved_document = db.get(CVDocument, document.id)
@@ -600,7 +611,7 @@ class ScreeningService:
         run.met_count = result["counts"]["met"]
         run.partially_met_count = result["counts"]["partially_met"]
         run.unmet_count = result["counts"]["unmet"]
-        run.uncertain_count = result["counts"]["unable_to_determine"]
+        run.uncertain_count = 0
         run.review_flags = result["review_flags"]
         run.status = ScreeningRunStatus.COMPLETED
         run.completed_at = datetime.now(timezone.utc)
@@ -631,7 +642,7 @@ class ScreeningService:
         validated: list[dict[str, Any]] = []
         total_weight = 0.0
         contribution = 0.0
-        counts = {status.value: 0 for status in RequirementMatchStatus}
+        counts = {status.value: 0 for status in (RequirementMatchStatus.MET, RequirementMatchStatus.PARTIALLY_MET, RequirementMatchStatus.UNMET)}
         for requirement in requirements:
             total_weight += requirement["weight"]
             raw = raw_by_key.get(requirement["key"])
@@ -679,6 +690,9 @@ class ScreeningService:
                         or "Independent review did not support the conclusion"
                     )
                     flags.append("evidence_does_not_support_conclusion")
+            if status is RequirementMatchStatus.UNABLE_TO_DETERMINE:
+                status = RequirementMatchStatus.UNMET
+                explanation = "Unmet: sufficient validated CV evidence was not found."
             counts[status.value] += 1
             contribution += STATUS_FACTORS[status] * requirement["weight"]
             validated.append(
@@ -718,10 +732,7 @@ class ScreeningService:
 
         strengths = summary_points("strengths", {"met", "partially_met"})
         gaps = summary_points("gaps", {"unmet", "partially_met"})
-        points_to_verify = summary_points(
-            "points_to_verify",
-            {"unable_to_determine", "partially_met"},
-        )
+        points_to_verify = []
         summary_sections = []
         if strengths:
             summary_sections.append(
@@ -774,18 +785,9 @@ class ScreeningService:
             (
                 run
                 for run in latest_by_application.values()
-                if run.status is ScreeningRunStatus.COMPLETED
-                and run.requirement_coverage is not None
+                if run.status in {ScreeningRunStatus.COMPLETED, ScreeningRunStatus.FAILED, ScreeningRunStatus.REVIEW_REQUIRED}
             ),
-            key=lambda run: (-run.requirement_coverage, run.application_id),
-        )
-        review_runs = sorted(
-            (
-                run
-                for run in latest_by_application.values()
-                if run.status is ScreeningRunStatus.REVIEW_REQUIRED
-            ),
-            key=lambda run: run.application_id,
+            key=lambda run: (-(run.requirement_coverage or 0), run.application_id),
         )
         snapshot = RankingSnapshot(
             job_posting_id=posting_id,
@@ -798,8 +800,9 @@ class ScreeningService:
         previous_score: float | None = None
         previous_rank = 0
         for index, run in enumerate(ranked_runs, start=1):
-            rank = previous_rank if run.requirement_coverage == previous_score else index
-            previous_score = run.requirement_coverage
+            coverage = run.requirement_coverage or 0
+            rank = previous_rank if coverage == previous_score else index
+            previous_score = coverage
             previous_rank = rank
             self._add_ranking_entry(
                 db,
@@ -807,14 +810,6 @@ class ScreeningService:
                 run=run,
                 rank=rank,
                 disposition=RankingDisposition.RANKED,
-            )
-        for run in review_runs:
-            self._add_ranking_entry(
-                db,
-                snapshot=snapshot,
-                run=run,
-                rank=None,
-                disposition=RankingDisposition.REVIEW,
             )
         db.commit()
         return snapshot
@@ -911,7 +906,7 @@ class ScreeningService:
                 application_id=run.application_id,
                 rank=rank,
                 disposition=disposition,
-                requirement_coverage=run.requirement_coverage,
+                requirement_coverage=run.requirement_coverage or 0,
                 met_count=run.met_count,
                 partially_met_count=run.partially_met_count,
                 unmet_count=run.unmet_count,

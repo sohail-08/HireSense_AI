@@ -4,6 +4,7 @@ import os
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app.config import get_settings
 from app.database import Base
 import app.models  # noqa: F401 - register mapped models for Alembic
 
@@ -17,6 +18,7 @@ database_url = (
     config.attributes.get("database_url")
     or os.environ.get("DATABASE_URL")
     or config.get_main_option("sqlalchemy.url")
+    or get_settings().database_url
 )
 
 if not database_url:

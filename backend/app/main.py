@@ -16,6 +16,7 @@ from app.routes.job_postings import router as job_postings_router
 from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
 from app.routes.screening import router as screening_router
+from app.routes.scoring import router as scoring_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
 from app.services.screening_service import ScreeningService
@@ -69,6 +70,7 @@ app.include_router(job_postings_router)
 app.include_router(knowledge_router)
 app.include_router(requirements_router)
 app.include_router(screening_router)
+app.include_router(scoring_router)
 app.include_router(supervisor_router)
 
 

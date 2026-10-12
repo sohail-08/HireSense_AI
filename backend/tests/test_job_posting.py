@@ -483,7 +483,9 @@ def test_mcp_bot_publisher_posts_to_fixed_channel_with_bot_authentication():
 
 
 def test_mcp_bot_publisher_reports_configuration_and_uncertain_delivery():
-    missing = DiscordBotPublisher(DiscordBotSettings())
+    missing = DiscordBotPublisher(DiscordBotSettings(
+        _env_file=None, discord_bot_token=None, discord_channel_id=None,
+    ))
     missing_result = asyncio.run(
         missing.publish(
             content="Hiring",

@@ -3,7 +3,7 @@ import re
 from datetime import date
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.config import get_settings
 from app.llm.gemini import GeminiStructuredClient
@@ -65,10 +65,15 @@ class RequirementAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requirement_key: str
-    status: Literal["met", "partially_met", "unmet", "unable_to_determine"]
+    status: Literal["met", "partially_met", "unmet"]
     explanation: str
     evidence: list[EvidenceItem] = Field(default_factory=list)
     evidence_gaps: list[str] = Field(default_factory=list)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_legacy_status(cls, value):
+        return "unmet" if value == "unable_to_determine" else value
 
 
 class SummaryPoint(BaseModel):
@@ -142,15 +147,16 @@ only the supplied requirements and do not use protected characteristics.
 
 Use met only when sufficient CV evidence demonstrates the full requirement.
 Use partially_met when relevant evidence exists but does not fully demonstrate
-it. Use unmet when the adequately parsed CV contains no supporting evidence.
-Use unable_to_determine when the evidence is ambiguous or unreliable. A skill
+it. Use unmet when supporting evidence is missing, ambiguous, or unreliable.
+Return only met, partially_met, or unmet; never request manual verification. A skill
 list mention alone does not prove professional experience. Say 'not evidenced
 in this CV', never claim that the person lacks a capability.
 
 Every evidence quote must be copied verbatim from its referenced source block.
 Explanations and summary points must be supported by the returned matches. Do
 not add requirements or make hiring decisions. Return exactly one match for
-each supplied requirement key and JSON matching the schema.
+each supplied requirement key and JSON matching the schema. Return an empty
+points_to_verify list; describe missing evidence in evidence_gaps instead.
 """
 
 
