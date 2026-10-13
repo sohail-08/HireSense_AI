@@ -88,24 +88,64 @@ def test_link_lifetime_and_nested_snapshot_redaction(room_setup):
     state = redact_join_links({"messages": [{"body": "Join: " + url}], "link": url})
     assert token not in json.dumps(state) and JOIN_PLACEHOLDER in state["link"]
     far = clock.value + timedelta(days=rooms.settings.interview_link_max_days + 1)
-    with pytest.raises(ValueError, match="link lifetime"):
-        rooms.links.material(row.application_id, far, far + timedelta(minutes=30))
+    material = rooms.links.material(row.application_id, far, far + timedelta(minutes=30))
+    assert datetime.fromisoformat(material["expires_at"]) == clock.value + timedelta(days=rooms.settings.interview_link_max_days)
 
 
 @pytest.mark.parametrize("case,code", [("expired", "expired_link"), ("revoked", "revoked_link"),
-    ("early", "too_early"), ("late", "expired_link"), ("cancelled", "cancelled"), ("ended", "ended")])
-def test_invalid_lifecycle_and_time_window_reject_candidate(room_setup, case, code):
+    ("cancelled", "cancelled"), ("ended", "ended")])
+def test_invalid_lifecycle_and_expired_credentials_reject_candidate(room_setup, case, code):
     setup, rooms, _, clock, row, token, _ = room_setup
     db = setup[0]
     if case == "expired": row.join_token_expires_at = clock.value - timedelta(seconds=1)
     elif case == "revoked": row.join_token_revoked_at = clock.value
-    elif case == "early": clock.value = row.start_utc.replace(tzinfo=UTC) - timedelta(minutes=16)
-    elif case == "late": clock.value = row.start_utc.replace(tzinfo=UTC) + timedelta(minutes=61)
     elif case == "cancelled": row.status = "cancelled"
     elif case == "ended": row.room_status = "ended"
     db.commit()
     with pytest.raises(RoomAccessError) as error: rooms.exchange(db, token)
     assert error.value.code == code and "Candidate" not in str(error.value)
+
+
+@pytest.mark.parametrize("offset", [timedelta(days=-1), timedelta(days=2)])
+def test_candidates_and_interviewers_can_join_outside_the_booked_slot(room_setup, offset):
+    setup, rooms, media, clock, row, token, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    clock.value = utc(row.start_utc) + offset
+    cookie, expiry, info = rooms.exchange(db, token)
+    assert expiry == min(clock.value + timedelta(minutes=rooms.settings.candidate_session_minutes), utc(row.join_token_expires_at))
+    assert "join_opens_at" not in info and "join_closes_at" not in info
+    assert rooms.waiting(db, cookie)["waiting"]
+    with pytest.raises(RoomAccessError): rooms.media_access(db, candidate_token=cookie)
+    rooms.admit(db, owner.id, row.id)
+    assert rooms.media_access(db, candidate_token=cookie)["role"] == "candidate"
+    assert rooms.media_access(db, user_id=owner.id, interview_id=row.id)["role"] == "interviewer"
+    # Link operations must also work after the booked slot, not require a reschedule.
+    assert rooms.link(db, owner.id, row.id, retrieve_only=True)["join_url"].endswith(token)
+
+
+def test_expired_link_can_be_regenerated_after_the_scheduled_end(room_setup):
+    setup, rooms, _, clock, row, token, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    clock.value = utc(row.end_utc) + timedelta(days=2)
+    row.join_token_expires_at = clock.value - timedelta(seconds=1); db.commit()
+    fresh = rooms.link(db, owner.id, row.id)
+    assert fresh["join_url"].rsplit("/", 1)[-1] != token
+    assert datetime.fromisoformat(fresh["expires_at"]) == clock.value + timedelta(days=rooms.settings.interview_link_max_days)
+
+
+def test_old_time_restricted_invitation_preview_requires_a_fresh_preview(setup):
+    db, owner, _, _, _, _, service, _ = setup
+    preview = prepared(setup, count=1)
+    batch = db.get(InterviewBatch, preview["id"])
+    from app.services.scoring_service import fingerprint
+    from copy import deepcopy
+    snapshot = deepcopy(batch.snapshot)
+    snapshot["recipients"][0]["join_material"].pop("access_policy")
+    batch.snapshot = snapshot; batch.confirmation_hash = fingerprint(snapshot); db.commit()
+    legacy = service.batch(db, owner.id, batch.id)
+    legacy["confirmation_token"] = service.token("invitation", {"batch_id": batch.id, "hash": batch.confirmation_hash}, owner.id)
+    with pytest.raises(ValueError, match="older interview-access rules"):
+        service.confirm(db, owner.id, batch.id, confirm_data(legacy))
 
 
 def test_only_assigned_interviewer_can_admit_and_candidate_media_is_gated(room_setup):
@@ -316,13 +356,11 @@ def test_waiting_heartbeat_and_manual_leave_do_not_complete_interview(room_setup
     assert row.status == "scheduled" and row.room_status == "scheduled"
 
 
-def test_room_migration_preserves_legacy_business_data(room_setup, tmp_path):
-    from sqlalchemy import create_engine, MetaData, text
+def legacy_database(source, url, revision):
+    from sqlalchemy import create_engine, MetaData
     from app.database import Base
     from test_migrations import run_upgrade
-    source = room_setup[0][0]
-    url = f"sqlite:///{tmp_path / 'legacy-interviews.db'}"
-    run_upgrade(url, "0016_interview_scheduling")
+    run_upgrade(url, revision)
     engine = create_engine(url)
     legacy = MetaData(); legacy.reflect(bind=engine)
     # Copy synthetic records using only the legacy schema's columns, exactly as
@@ -334,6 +372,14 @@ def test_room_migration_preserves_legacy_business_data(room_setup, tmp_path):
             rows = list(source.execute(select(table)).mappings())
             if rows:
                 connection.execute(target.insert(), [{key: row[key] for key in target.c.keys() if key in row} for row in rows])
+    return engine
+
+
+def test_room_migration_preserves_legacy_business_data(room_setup, tmp_path):
+    from sqlalchemy import text
+    from test_migrations import run_upgrade
+    url = f"sqlite:///{tmp_path / 'legacy-interviews.db'}"
+    engine = legacy_database(room_setup[0][0], url, "0016_interview_scheduling")
     with engine.connect() as connection:
         before = {name: connection.execute(text(f"SELECT * FROM {name}")).mappings().all()
             for name in ("users", "candidate_applications", "interview_schedules", "interview_deliveries")}
@@ -346,4 +392,36 @@ def test_room_migration_preserves_legacy_business_data(room_setup, tmp_path):
         assert connection.scalar(text("SELECT room_status FROM interview_schedules")) == "scheduled"
         assert connection.scalar(text("SELECT join_token_hash FROM interview_schedules")) is None
         assert connection.scalar(text("SELECT count(*) FROM candidate_interview_sessions")) == 0
+    engine.dispose()
+
+
+@pytest.mark.parametrize("case", ["valid", "expired", "revoked", "ended", "cancelled", "longer_expiry"])
+def test_anytime_migration_preserves_links_without_reactivating_denied_access(room_setup, tmp_path, monkeypatch, case):
+    from sqlalchemy.orm import Session
+    from test_migrations import run_upgrade
+    source, _, _, _, _, _, _, _ = room_setup[0]
+    row = room_setup[4]
+    now = datetime.now(UTC)
+    row.join_token_expires_at = now + timedelta(hours=4)
+    if case == "expired": row.join_token_expires_at = now - timedelta(hours=1)
+    elif case == "revoked": row.join_token_revoked_at = now
+    elif case == "ended": row.room_status, row.status = "ended", "completed"
+    elif case == "cancelled": row.room_status, row.status = "cancelled", "cancelled"
+    elif case == "longer_expiry": row.join_token_expires_at = now + timedelta(days=45)
+    source.commit()
+    before_expiry, version = utc(row.join_token_expires_at), row.version
+    url = f"sqlite:///{tmp_path / 'anytime-upgrade.db'}"
+    engine = legacy_database(source, url, "0017_interview_rooms")
+    monkeypatch.setenv("INTERVIEW_LINK_MAX_DAYS", "30")
+    run_upgrade(url)
+    with Session(engine) as db:
+        upgraded = db.get(InterviewSchedule, row.id)
+        assert upgraded.join_token_hash == row.join_token_hash and upgraded.join_token_nonce == row.join_token_nonce
+        assert upgraded.join_token_id == row.join_token_id and upgraded.join_generation == row.join_generation
+        assert upgraded.room_status == row.room_status and upgraded.status == row.status
+        if case == "valid":
+            assert now + timedelta(days=30) <= utc(upgraded.join_token_expires_at) <= datetime.now(UTC) + timedelta(days=30)
+            assert upgraded.version == version + 1
+        else:
+            assert utc(upgraded.join_token_expires_at) == before_expiry and upgraded.version == version
     engine.dispose()

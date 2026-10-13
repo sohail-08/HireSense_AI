@@ -33,8 +33,7 @@ class CandidateRoomInfo(RoomBoundary):
     room_status: Literal["scheduled", "waiting", "ready", "active", "ending", "ended", "cancelled"]
     waiting: bool
     admitted: bool
-    join_opens_at: datetime
-    join_closes_at: datetime
+    link_expires_at: datetime | None
 
 
 class InterviewerRoomInfo(CandidateRoomInfo):

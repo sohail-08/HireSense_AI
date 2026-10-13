@@ -3,7 +3,7 @@ import { apiRequest, API_URL } from "../../api/apiClient";
 export type RoomStatus = "scheduled" | "waiting" | "ready" | "active" | "ending" | "ended" | "cancelled";
 export type CandidateRoomInfo = {
   job_title: string; scheduled_start: string; scheduled_end: string; timezone: string;
-  room_status: RoomStatus; waiting: boolean; admitted: boolean; join_opens_at: string; join_closes_at: string;
+  room_status: RoomStatus; waiting: boolean; admitted: boolean; link_expires_at: string | null;
 };
 export type InterviewerRoomInfo = CandidateRoomInfo & {
   interview_id: number; candidate_name: string; room_version: number; has_join_link: boolean; link_revoked: boolean;
@@ -14,7 +14,7 @@ export type MediaAccess = { server_url: string; participant_token: string; expir
 export type DeviceChoices = { username: string; audioEnabled: boolean; videoEnabled: boolean; audioDeviceId: string; videoDeviceId: string };
 
 export class RoomApiError extends Error {
-  constructor(public code: string, public status: number, public retryAt?: string) {
+  constructor(public code: string, public status: number) {
     super("Interview access is unavailable.");
   }
 }
@@ -29,7 +29,7 @@ export async function candidateRequest<T>(path: string, data?: object): Promise<
     });
   } catch { throw new RoomApiError("network_error", 0); }
   const value = await response.json().catch(() => null);
-  if (!response.ok) throw new RoomApiError(value?.code || "request_failed", response.status, value?.retry_at);
+  if (!response.ok) throw new RoomApiError(value?.code || "request_failed", response.status);
   return value as T;
 }
 

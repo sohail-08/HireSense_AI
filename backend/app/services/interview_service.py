@@ -20,7 +20,7 @@ from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRe
 from app.services.scoring_service import ScoringService, fingerprint
 from app.services.scoring_calculation import display_score
 from app.services.interview_content import allocate_slots, render_email, calendar_invitation, SMTPInvitationSender, utc
-from app.services.interview_links import InterviewLinks, JOIN_PLACEHOLDER, redact_join_links
+from app.services.interview_links import InterviewLinks, JOIN_PLACEHOLDER, redact_join_links, ACCESS_POLICY
 
 UTC = timezone.utc
 ACTIVE = ("scheduled", "rescheduled")
@@ -243,8 +243,8 @@ class InterviewService:
             raise InterviewConflict("Draft changed; prepare and confirm a new preview")
         if self.mail_identity() != batch.snapshot["sender"]:
             raise InterviewConflict("Email sender settings changed; prepare a new preview")
-        if any(not item.get("join_material") for item in batch.snapshot["recipients"]):
-            raise InterviewConflict("This draft predates candidate join links. Prepare a new invitation preview.")
+        if any(not item.get("join_material") or item["join_material"].get("access_policy") != ACCESS_POLICY for item in batch.snapshot["recipients"]):
+            raise InterviewConflict("This draft uses older interview-access rules. Prepare a new invitation preview.")
         selection = self.validate_selection(db, user_id, batch.snapshot["selection_token"])
         schedule_data = PrepareInvites.model_validate({**batch.snapshot["schedule"], "selection_token": batch.snapshot["selection_token"]})
         slots = allocate_slots(schedule_data, len(selection["selected"]))
@@ -449,8 +449,8 @@ class InterviewService:
         if db.scalar(select(InterviewBatch.id).where(InterviewBatch.created_by_user_id == user_id, InterviewBatch.idempotency_key == data.idempotency_key)):
             raise InterviewConflict("Idempotency key belongs to another invitation")
         materials = {item["schedule_id"]: item.get("join_material") for item in payload["recipients"]}
-        if not all(materials.values()):
-            raise InterviewConflict("Prepare a new rescheduling preview with candidate join links")
+        if any(not item or item.get("access_policy") != ACCESS_POLICY for item in materials.values()):
+            raise InterviewConflict("Prepare a new rescheduling preview with the current interview-access rules")
         # Serialize against admission, credential issuance, link changes and End,
         # not just another scheduling request that locks the interviewer account.
         locked = list(db.scalars(select(InterviewSchedule).where(InterviewSchedule.id.in_(materials),

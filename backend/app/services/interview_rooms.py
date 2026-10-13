@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class RoomAccessError(ValueError):
-    def __init__(self, code="invalid_link", status=403, retry_at=None):
+    def __init__(self, code="invalid_link", status=403):
         super().__init__("This interview access is not available.")
-        self.code, self.status, self.retry_at = code, status, retry_at
+        self.code, self.status = code, status
 
 
 class RoomConflict(ValueError):
@@ -59,7 +59,7 @@ class InterviewRooms:
             raise LookupError("Interview not found")
         return row
 
-    def usable(self, db, row, *, window=True, link=True):
+    def usable(self, db, row, *, link=True):
         if row.room_status == "ending":
             raise RoomAccessError("ending", 410)
         if row.room_status == "ended" or row.status == "completed":
@@ -82,12 +82,6 @@ class InterviewRooms:
                 raise RoomAccessError()
             if utc(row.join_token_expires_at) <= self.now():
                 raise RoomAccessError("expired_link", 410)
-        if window:
-            opens, closes = self.links.window(row.start_utc, row.end_utc)
-            if self.now() < opens:
-                raise RoomAccessError("too_early", 425, opens)
-            if self.now() >= closes:
-                raise RoomAccessError("expired_link", 410)
 
     def revoke_sessions(self, db, row):
         db.execute(update(CandidateInterviewSession).where(CandidateInterviewSession.interview_id == row.id,
@@ -103,9 +97,7 @@ class InterviewRooms:
 
     def link(self, db, user_id, interview_id, *, rotate=False, retrieve_only=False):
         row = self.owned(db, user_id, interview_id, lock=True)
-        self.usable(db, row, window=False, link=False)
-        if self.now() >= self.links.window(row.start_utc, row.end_utc)[1]:
-            raise RoomConflict("The joining window has closed. Reschedule before generating a link.")
+        self.usable(db, row, link=False)
         current = self.links.current(row)
         valid = bool(current and not row.join_token_revoked_at and utc(row.join_token_expires_at) > self.now())
         if retrieve_only and not valid:
@@ -148,8 +140,7 @@ class InterviewRooms:
             raise RoomAccessError()
         self.usable(db, row)
         session_token = secrets.token_urlsafe(32)
-        _, closes = self.links.window(row.start_utc, row.end_utc)
-        expires = min(self.now() + timedelta(minutes=self.settings.candidate_session_minutes), closes, utc(row.join_token_expires_at))
+        expires = min(self.now() + timedelta(minutes=self.settings.candidate_session_minutes), utc(row.join_token_expires_at))
         db.add(CandidateInterviewSession(interview_id=row.id, application_id=row.application_id,
             session_hash=secret_hash(session_token), join_generation=row.join_generation, expires_at=expires))
         self.commit(db)
@@ -175,12 +166,11 @@ class InterviewRooms:
     def info(self, db, row, interviewer=False):
         posting = db.get(JobPosting, row.job_posting_id)
         job = db.get(JobDescription, posting.job_description_id)
-        opens, closes = self.links.window(row.start_utc, row.end_utc)
         waiting = bool(row.candidate_waiting_at and not row.candidate_admitted_at and row.candidate_last_seen_at
             and utc(row.candidate_last_seen_at) > self.now() - timedelta(seconds=self.settings.candidate_waiting_heartbeat_seconds))
         result = {"job_title": job.title, "scheduled_start": utc(row.start_utc), "scheduled_end": utc(row.end_utc),
             "timezone": row.timezone, "room_status": row.room_status, "waiting": waiting,
-            "admitted": bool(row.candidate_admitted_at), "join_opens_at": opens, "join_closes_at": closes}
+            "admitted": bool(row.candidate_admitted_at), "link_expires_at": utc(row.join_token_expires_at) if row.join_token_expires_at else None}
         if interviewer:
             app = db.get(CandidateApplication, row.application_id)
             candidate = db.get(Candidate, app.candidate_id) if app and app.candidate_id else None
@@ -233,8 +223,7 @@ class InterviewRooms:
             self.usable(db, row)
         self.retire_media(row)
         self.media.ensure_room(row.room_name)
-        _, closes = self.links.window(row.start_utc, row.end_utc)
-        result = self.media.token(row.room_name, role, min(closes, utc(row.join_token_expires_at)))
+        result = self.media.token(row.room_name, role, utc(row.join_token_expires_at))
         self.commit(db)  # Release the row lock after token issuance/lifecycle check.
         return result
 

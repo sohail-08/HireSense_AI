@@ -19,6 +19,7 @@ from app.services.interview_content import utc
 JOIN_PLACEHOLDER = "[[HIRESENSE_CANDIDATE_JOIN_LINK]]"
 JOIN_PATTERN = re.compile(r"(?:https?://[^\s<>\"{}]+)?/interview/join/[A-Za-z0-9_-]{43}")
 UTC = timezone.utc
+ACCESS_POLICY = "anytime-v1"
 
 
 def secret_hash(token):
@@ -48,21 +49,13 @@ class InterviewLinks:
         message = f"hiresense-candidate-v1|{material['join_id']}|{material['application_id']}|{material['nonce']}"
         return base64.urlsafe_b64encode(hmac.new(self.key(), message.encode(), hashlib.sha256).digest()).decode().rstrip("=")
 
-    def window(self, start, end):
-        start, end = utc(start), utc(end)
-        opens = start - timedelta(minutes=self.settings.interview_room_early_minutes)
-        closes = min(start + timedelta(minutes=self.settings.interview_room_late_minutes),
-            end + timedelta(minutes=self.settings.interview_room_end_grace_minutes))
-        return opens, closes
-
     def material(self, application_id, start, end, generation=1, room_name=None):
-        opens, closes = self.window(start, end)
-        expires = min(closes, self.now() + timedelta(days=self.settings.interview_link_max_days))
-        if expires <= opens:
-            raise ValueError("Interview is beyond the configured link lifetime. Choose an earlier date or increase INTERVIEW_LINK_MAX_DAYS.")
+        # Booked times are informational; credential expiry is independent.
+        expires = self.now() + timedelta(days=self.settings.interview_link_max_days)
         value = {"room_name": room_name or "hs-" + uuid4().hex, "application_id": application_id,
             "join_id": uuid4().hex,
             "nonce": secrets.token_hex(32), "generation": generation,
+            "access_policy": ACCESS_POLICY,
             "base_url": self.settings.interview_join_base_url.rstrip("/"),
             "expires_at": expires.isoformat()}
         value["hash"] = secret_hash(self.token(value))
@@ -72,6 +65,7 @@ class InterviewLinks:
         if not schedule.join_token_hash or not schedule.join_token_nonce or not schedule.room_name or not schedule.join_token_id:
             return None
         return {"room_name": schedule.room_name, "application_id": schedule.application_id,
+            "access_policy": ACCESS_POLICY,
             "join_id": schedule.join_token_id,
             "nonce": schedule.join_token_nonce, "generation": schedule.join_generation,
             "base_url": schedule.join_base_url or self.settings.interview_join_base_url.rstrip("/"),
@@ -93,11 +87,7 @@ class InterviewLinks:
         # Invitation identity is independent of the media room. A reschedule can
         # retain its valid email token while retiring all previous media grants.
         material["room_name"] = "hs-" + uuid4().hex
-        opens, closes = self.window(start, end)
-        expires = min(closes, self.now() + timedelta(days=self.settings.interview_link_max_days))
-        if expires <= opens:
-            raise ValueError("Interview is beyond the configured link lifetime. Choose an earlier date or increase INTERVIEW_LINK_MAX_DAYS.")
-        material["expires_at"] = expires.isoformat()
+        material["expires_at"] = (self.now() + timedelta(days=self.settings.interview_link_max_days)).isoformat()
         return material
 
     def url(self, material):

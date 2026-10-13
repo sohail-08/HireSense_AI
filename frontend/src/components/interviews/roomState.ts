@@ -1,6 +1,5 @@
-export function accessMessage(code: string, retryAt?: string): { title: string; message: string } {
+export function accessMessage(code: string): { title: string; message: string } {
   switch (code) {
-    case "too_early": return { title: "It is not time to join yet", message: retryAt ? `You can return from ${new Date(retryAt).toLocaleString()}. Reopen your invitation link then.` : "Please return closer to your scheduled interview time." };
     case "expired_link": return { title: "This invitation has expired", message: "Contact the interviewer for an updated invitation." };
     case "revoked_link": return { title: "This invitation is no longer valid", message: "Use the latest invitation from your interviewer." };
     case "cancelled": return { title: "Interview cancelled", message: "Contact the interviewer if you need help." };

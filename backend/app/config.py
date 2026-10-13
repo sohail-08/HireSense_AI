@@ -39,9 +39,6 @@ class Settings(BaseSettings):
     livekit_api_timeout_seconds: int = Field(default=5, ge=1, le=30)
     interview_join_base_url: str = "http://localhost:5173"
     interview_link_secret: SecretStr | None = None
-    interview_room_early_minutes: int = Field(default=15, ge=0, le=120)
-    interview_room_late_minutes: int = Field(default=60, ge=5, le=480)
-    interview_room_end_grace_minutes: int = Field(default=30, ge=0, le=120)
     interview_link_max_days: int = Field(default=30, ge=1, le=365)
     candidate_session_minutes: int = Field(default=120, ge=5, le=480)
     candidate_cookie_secure: bool = True

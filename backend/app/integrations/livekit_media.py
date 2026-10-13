@@ -37,7 +37,7 @@ class LiveKitMedia:
         ttl = min(self.settings.livekit_token_ttl_seconds,
             int((expires_at - datetime.now(timezone.utc)).total_seconds()))
         if ttl <= 0:
-            raise ValueError("The interview joining window has closed")
+            raise ValueError("The interview access credential has expired")
         token = (api.AccessToken(self.settings.livekit_api_key, self.settings.livekit_api_secret.get_secret_value())
             .with_identity(self.identity(room_name, role)).with_name(role.capitalize())
             .with_metadata(json.dumps({"role": role})).with_ttl(timedelta(seconds=ttl))

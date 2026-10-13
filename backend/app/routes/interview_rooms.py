@@ -61,8 +61,6 @@ def run(db, operation):
         return operation()
     except RoomAccessError as exc:
         payload = {"detail": "This interview access is not available.", "code": exc.code}
-        if exc.retry_at:
-            payload["retry_at"] = exc.retry_at.isoformat()
         response = JSONResponse(payload, status_code=exc.status)
         sensitive(response)
         if exc.code in {"invalid_session", "revoked_link", "expired_link", "ended", "ending", "cancelled"}:

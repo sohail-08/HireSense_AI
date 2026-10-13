@@ -11,7 +11,7 @@ const sdk = getSdk();
 
 const api = vi.hoisted(() => ({ exchange: vi.fn(), candidateStatus: vi.fn(), waiting: vi.fn(), candidateMedia: vi.fn(), candidateConnected: vi.fn(), candidateLeave: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
-const info = { job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "scheduled", waiting: false, admitted: false, join_opens_at: "2030-10-14T01:45:00Z", join_closes_at: "2030-10-14T03:00:00Z" };
+const info = { job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "scheduled", waiting: false, admitted: false, link_expires_at: "2030-11-13T02:00:00Z" };
 function open() { return render(<MemoryRouter initialEntries={["/interview/join/" + "a".repeat(43)]}><Routes><Route path="/interview/join/:token" element={<CandidateInterviewPage />} /></Routes></MemoryRouter>); }
 beforeEach(() => {
   api.exchange.mockResolvedValue(info); api.candidateStatus.mockResolvedValue(info);
@@ -21,10 +21,10 @@ beforeEach(() => {
   api.candidateLeave.mockResolvedValue(info);
 });
 
-test.each(["invalid_link", "expired_link", "revoked_link", "cancelled", "too_early", "ended", "invalid_session"])("renders safe candidate %s state", async (code) => {
-  api.exchange.mockRejectedValue(new RoomApiError(code, 403, "2030-10-14T01:45:00Z"));
+test.each(["invalid_link", "expired_link", "revoked_link", "cancelled", "ended", "invalid_session"])("renders safe candidate %s state", async (code) => {
+  api.exchange.mockRejectedValue(new RoomApiError(code, 403));
   open();
-  const expected = accessMessage(code, "2030-10-14T01:45:00Z");
+  const expected = accessMessage(code);
   await screen.findByRole("heading", { name: expected.title });
   expect(sdk.prejoins).toBe(0); expect(api.candidateMedia).not.toHaveBeenCalled();
   expect(window.location.pathname).toBe("/interview/join");

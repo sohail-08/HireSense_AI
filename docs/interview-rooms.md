@@ -30,8 +30,8 @@ There are three distinct credentials:
 
 | Credential | Storage and purpose | Default lifetime |
 | --- | --- | --- |
-| HireSense invitation token | SHA-256 hash in schedule; binds invitation ID and application; email contains the bearer URL | Until joining closes, capped at 30 days |
-| Candidate session | SHA-256 hash in `candidate_interview_sessions`; raw value only in HTTP-only, SameSite=Strict cookie | 120 minutes, additionally capped by invitation expiry/window |
+| HireSense invitation token | SHA-256 hash in schedule; binds invitation ID and application; email contains the bearer URL | 30 days from issuance, independent of booked times |
+| Candidate session | SHA-256 hash in `candidate_interview_sessions`; raw value only in HTTP-only, SameSite=Strict cookie | 120 minutes, additionally capped by invitation expiry |
 | LiveKit participant JWT | Transient backend response and SDK memory only; opaque identity and exact room | At most 120 seconds for connection/reconnection authorization |
 
 The invitation bearer is an HMAC-SHA256 value derived from an independent server
@@ -52,7 +52,7 @@ are not persisted. Nginx disables candidate-link access logging and adds no-stor
 and no-referrer headers. SDK diagnostics are silenced; API errors do not echo tokens.
 Do not add analytics, request-body logging or URL-based error tracking on these paths.
 
-## Lifecycle, time window and authorization
+## Lifecycle, anytime joining and authorization
 
 ```text
 scheduled → waiting → ready (admitted) → active (server-verified participants)
@@ -63,15 +63,16 @@ cancelled / revoked / expired → no candidate access or new participant JWT
 `room_status` is separate from the pre-existing scheduling `status`. End sets
 `room_status=ended` and `status=completed`, freeing the existing active-stage index.
 Leaving/disconnecting does not complete the schedule or revoke admission; rejoin is
-allowed while the window/link/session remain valid. An unadmitted waiting candidate
+allowed while the link/session remain valid. An unadmitted waiting candidate
 who leaves clears waiting state. Waiting heartbeats are fresh for 45 seconds.
 
-The joining window opens 15 minutes before start. It closes at the earlier of
-start + 60 minutes and scheduled end + 30 minutes. These are configuration values,
-not an automatic meeting-duration limit. Already-connected participants are not
-automatically ended at that time; no new token/session can be issued after it.
-Schedules beyond the configured invitation lifetime are rejected instead of
-creating an invitation that expires before the joining window opens.
+Candidates and interviewers may join before or after the scheduled slot. Booked
+times are displayed for planning only; there is no early/late admission or media
+cutoff. Candidates still wait for interviewer admission. Secure links expire after
+`INTERVIEW_LINK_MAX_DAYS` (30 days by default) and sessions/JWTs remain short-lived.
+Expired, revoked, cancelled, ending and ended access remains blocked. For a booking
+farther away than the link lifetime, the interviewer can issue a fresh link later
+without rescheduling the interview just to obtain access.
 
 All controls are checked in FastAPI: active interviewer role **and schedule owner**.
 The existing single-interviewer account constraint is preserved. Candidate bodies
@@ -94,7 +95,7 @@ way as LiveKit Cloud. Therefore `room.auto_create: false` is mandatory here: the
 backend explicitly creates rooms, and a cached JWT cannot recreate one after End.
 Rotation creates a new opaque media room. Rescheduling preserves a still-valid
 HireSense invitation identity but always retires the previous media room, invalidates
-candidate sessions and moves the time window. Pending old rooms are deleted before
+candidate sessions and refreshes the link's credential lifetime. Pending old rooms are deleted before
 any new media credential is issued or when End/revoke/rotation runs. Rescheduling
 an admitted/active interview is rejected. Do not enable automatic room creation.
 See [LiveKit token/revocation behavior](https://docs.livekit.io/frontends/reference/tokens-grants/)
@@ -118,10 +119,7 @@ Never put server secrets in `VITE_*` settings or commit `.env`.
 | `FRONTEND_URL` | Same origin as the browser app; used for CORS and candidate POST origin checks |
 | `LIVEKIT_TOKEN_TTL_SECONDS` | `120`, bounded 30–300 |
 | `LIVEKIT_API_TIMEOUT_SECONDS` | `5` |
-| `INTERVIEW_ROOM_EARLY_MINUTES` | `15` |
-| `INTERVIEW_ROOM_LATE_MINUTES` | `60` |
-| `INTERVIEW_ROOM_END_GRACE_MINUTES` | `30` |
-| `INTERVIEW_LINK_MAX_DAYS` | `30`; raise deliberately for more distant interviews |
+| `INTERVIEW_LINK_MAX_DAYS` | `30` days of credential validity from issuance/renewal, not a scheduled-time restriction |
 | `CANDIDATE_SESSION_MINUTES` | `120` |
 | `CANDIDATE_COOKIE_SECURE` | `false` **only for localhost development**; `true` in production |
 | `CANDIDATE_PUBLIC_RATE_LIMIT` | `20` invitation exchanges per source per minute |
@@ -142,6 +140,12 @@ docker compose ps
 The backend entrypoint runs Alembic `upgrade head` before starting FastAPI. Migration
 `0017_interview_rooms` extends existing schedules/deliveries and adds the candidate
 session table; it does not delete or replace users, candidates, scores or schedules.
+Migration `0018_anytime_interview_access` removes the legacy schedule-based expiry
+cap from still-valid, unrevoked links on open interviews, preserving their URL and
+hash. It never reactivates expired/revoked links or ended/cancelled rooms. Old
+unconfirmed previews must be recreated under the new access policy. Downgrade does
+not guess or shorten original expirations; the previous application version itself
+enforces its original scheduled-window policy.
 Existing schedules have no new link automatically; use their console's **Generate
 candidate link** and share privately, or review/confirm a reschedule notification.
 Historical sent emails are not rewritten or resent automatically.
@@ -158,7 +162,7 @@ computer, not HireSense. Do not send such links to real remote applicants.
 
 1. Sign in as the interviewer at `http://localhost:5173`. Use a test application
    whose email you control. Choose it from an existing ranking and schedule a slot
-   approximately 5–10 minutes ahead so the 15-minute waiting window is already open.
+   at any future date/time. Joining can be tested immediately, regardless of the slot.
 2. Preview the invitation. Confirm the HireSense URL is present. Confirm & send
    only if actual delivery is intended; delivery tests use mocks, not Gmail.
    For mail-only local capture, deliberately configure the existing Mailpit profile
@@ -181,9 +185,10 @@ computer, not HireSense. Do not send such links to real remote applicants.
 7. The interviewer clicks **End interview for everyone**, then **Confirm end interview**.
    Both disconnect; the candidate sees ended/closing status; the schedule is completed.
    Reopen the original invitation: it cannot re-enter or obtain a new media JWT.
-8. Test an invalid URL, too-early visit, replaced/revoked link and permission denial.
-   No candidate details should appear in link errors. Test expired session by reopening
-   the invitation after its permitted window. For a fresh future schedule, preview
+8. Test joining well before and after the booked slot, plus invalid/replaced/revoked
+   links and permission denial. No candidate details should appear in link errors.
+   After session expiry, reopen a still-valid invitation to establish a new session.
+   For a fresh future schedule, preview
    rescheduling, verify link preservation when valid, then confirm the updated email.
 
 ## Automated checks
@@ -239,7 +244,21 @@ The repository had no Playwright suite, so no full two-browser media E2E was add
 or claimed. Use the local RTC integration plus the manual two-browser checklist
 to verify the actual browser permissions, layout and media controls.
 
-### Executed verification — 13 October 2026
+### Anytime joining update — 13 October 2026
+
+Backend regression suite: **188 passed, 9 opt-in tests skipped**. Frontend room
+tests: **16 passed** (the obsolete too-early error case was removed); TypeScript
+and local/Docker builds passed. The separate PostgreSQL concurrency check passed.
+Migration `0018_anytime_interview_access` is applied in the running app. Existing
+invitation identity checksums and schedule count are unchanged; a private backup
+was saved before migration. HTTP health checks and Docker service health passed.
+No real invitation emails were sent during this update.
+
+After an earlier too-early error, **reopen the original emailed/copied invitation**
+instead of refreshing the bare `/interview/join` page: the old flow removed the token
+from the address bar before that failed exchange had established a session cookie.
+
+### Initial feature verification — 13 October 2026 (before anytime joining update)
 
 - Deployed backend image: **180 passed, 9 opt-in tests skipped**. One existing
   LangGraph pending-deprecation warning remains; it is not a failed test.
@@ -316,7 +335,7 @@ hiresense/
 ├── backend/
 │   ├── ~ requirements.txt
 │   ├── + requirements-room-test.txt
-│   ├── alembic/versions/+ 0017_interview_rooms.py
+│   ├── alembic/versions/+ 0017_interview_rooms.py, + 0018_anytime_interview_access.py
 │   ├── app/
 │   │   ├── ~ config.py
 │   │   ├── ~ main.py
@@ -367,6 +386,7 @@ hiresense/
 | `backend/requirements.txt` | Official server SDK |
 | `backend/requirements-room-test.txt` | Optional host-only RTC integration dependencies |
 | `backend/alembic/versions/0017_interview_rooms.py` | Additive migration, session table, constraints/indexes and legacy-state backfill |
+| `backend/alembic/versions/0018_anytime_interview_access.py` | Extend still-valid open-interview invitations without changing their bearer identity or reviving denied access |
 | `backend/app/config.py` | Typed settings, bounds and invitation-secret validation |
 | `backend/app/main.py` | Room routes, credentialed exact-origin CORS, safe validation errors and ending recovery |
 | `backend/app/models/interview.py`, `backend/app/models/__init__.py` | Extend schedules/deliveries, define/export hash-only sessions |
@@ -375,7 +395,7 @@ hiresense/
 | `backend/app/routes/interview_rooms.py` | Interviewer APIs, cookie exchange/session APIs, rate/origin boundaries and safe errors |
 | `backend/app/integrations/livekit_media.py` | Restricted official JWTs and Room Service operations with injected/fake boundary |
 | `backend/app/services/interview_links.py` | HMAC/hash generation, redaction and transient email/ICS reconstruction |
-| `backend/app/services/interview_rooms.py` | Authorization, windows, admission, verified presence, rotation, durable End/recovery |
+| `backend/app/services/interview_rooms.py` | Authorization, credential expiry, admission, verified presence, rotation, durable End/recovery |
 | `backend/app/services/interview_service.py` | Links in exact previews/outbox, current-link delivery checks and secure rescheduling |
 | `backend/app/services/interview_assistant_service.py`, `backend/app/services/supervisor_service.py` | Redact raw join URLs before persisted chat/workflow snapshots |
 | `backend/app/services/candidate_application_service.py` | Remove candidate session rows with application/schedule deletion |

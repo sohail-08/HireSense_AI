@@ -67,7 +67,7 @@ export function CandidateInterviewPage() {
     try { setInfo(await roomApi.candidateLeave()); }
     catch (failure) { setFatal(failure instanceof RoomApiError ? failure : new RoomApiError("network_error", 0)); }
   }
-  const linkState = fatal ? accessMessage(fatal.code, fatal.retryAt) : null;
+  const linkState = fatal ? accessMessage(fatal.code) : null;
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto max-w-5xl">
