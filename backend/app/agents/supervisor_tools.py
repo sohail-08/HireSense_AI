@@ -32,6 +32,7 @@ class SupervisorToolCallbacks:
     help: ToolCallback
     sync_responses: ToolCallback
     screen_candidates: Callable[[str, ScreeningToolRequest], dict[str, Any]]
+    interviews: ToolCallback | None = None
 
 
 def build_supervisor_tools(
@@ -130,8 +131,21 @@ def build_supervisor_tools(
         """
         return result(callbacks.help)
 
-    return [
+    @tool("interviews")
+    def interviews(message: str) -> str:
+        """Select ranked candidates, collect interview times, preview invitations, explicitly confirm sending, or reschedule through MCP tools.
+
+        Use at every page/phase for scheduling and invitation requests, or follow-ups
+        while an interview selection/schedule/confirmation is pending. Pass the real
+        interviewer message. Do not invent candidates, recipients or confirmation.
+        """
+        if not callbacks.interviews:
+            raise ValueError("Interview scheduling is unavailable")
+        return result(callbacks.interviews)
+
+    tools = [
         requirements, generate_job_description, edit_job_description,
         approve_job_description, job_posting, sync_responses,
         screen_candidates, help_tool,
     ]
+    return [*tools, interviews] if callbacks.interviews else tools

@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -17,9 +18,11 @@ from app.routes.knowledge import router as knowledge_router
 from app.routes.requirements import router as requirements_router
 from app.routes.screening import router as screening_router
 from app.routes.scoring import router as scoring_router
+from app.routes.interviews import router as interviews_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
 from app.services.screening_service import ScreeningService
+from app.services.interview_service import InterviewService
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -40,6 +43,11 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         seed_interviewer(db)
         ScreeningService.recover_interrupted(db)
+        pending_invites = InterviewService.recover_interrupted(db)
+
+    # Resume only previously confirmed, never-attempted deliveries. Uncertain
+    # attempts remain uncertain; no automatic retry is performed for them.
+    delivery_tasks = [asyncio.create_task(asyncio.to_thread(InterviewService().deliver_batch, batch_id)) for batch_id in pending_invites]
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -47,6 +55,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    if delivery_tasks:
+        await asyncio.gather(*delivery_tasks, return_exceptions=True)
     engine.dispose()
 
 
@@ -71,6 +81,7 @@ app.include_router(knowledge_router)
 app.include_router(requirements_router)
 app.include_router(screening_router)
 app.include_router(scoring_router)
+app.include_router(interviews_router)
 app.include_router(supervisor_router)
 
 

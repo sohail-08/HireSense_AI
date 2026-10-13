@@ -31,6 +31,7 @@ from app.services.job_posting_assistant_service import JobPostingAssistantServic
 from app.services.requirement_discovery_service import RequirementDiscoveryService
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 from app.services.screening_service import ScreeningService
+from app.services.interview_assistant_service import InterviewAssistantService
 
 
 ToolMethod = Callable[[str], dict[str, Any]]
@@ -48,6 +49,7 @@ class SupervisorService:
         candidate_intake_service: GoogleFormsIntakeService | None = None,
         candidate_intake_factory: Callable[[], GoogleFormsIntakeService] | None = None,
         screening_service: ScreeningService | None = None,
+        interview_service: InterviewAssistantService | None = None,
     ):
         self.model = model
         self.requirement_service = requirement_service
@@ -57,6 +59,7 @@ class SupervisorService:
         self.candidate_intake_service = candidate_intake_service
         self.candidate_intake_factory = candidate_intake_factory
         self.screening_service = screening_service
+        self.interview_service = interview_service
 
     def chat(
         self,
@@ -94,6 +97,10 @@ class SupervisorService:
         )
 
         callbacks = SupervisorToolCallbacks(
+            interviews=self._safe_tool(supervisor, lambda text: self.interview_service.handle(
+                db, supervisor, interviewer_user_id, text,
+                self.screening_service.list_jobs(db, interviewer_user_id=interviewer_user_id) if self.screening_service else [],
+                selected_job_posting_id, selected_application_ids or []), preserve_phase=True) if self.interview_service else None,
             requirements=self._safe_tool(
                 supervisor,
                 lambda text: self._requirements_tool(
@@ -168,6 +175,9 @@ class SupervisorService:
             "refresh_required": False,
         }
         assistant_message = graph_state.get("final_response") or result["assistant_message"]
+        if graph_state.get("tool_name") == "interviews":
+            # Do not let response generation omit recipients, slots or exact email previews.
+            assistant_message = result["assistant_message"]
 
         supervisor.phase = result.get("phase", supervisor.phase)
         state_json = dict(supervisor.state_json or {})
@@ -681,6 +691,8 @@ class SupervisorService:
         return {
             "phase": supervisor.phase,
             "page_context": (supervisor.state_json or {}).get("page_context", "jobs"),
+            "interview_workflow": {key: value for key, value in ((supervisor.state_json or {}).get("interview_workflow") or {}).items()
+                if key in {"rule", "schedule", "selection_preview", "schedule_ids", "rescheduling", "last_batch_id"}},
             "selected_screening_job_posting_id": (supervisor.state_json or {}).get("selected_screening_job_posting_id"),
             "selected_application_ids": (supervisor.state_json or {}).get("selected_application_ids", []),
             "pending_screening_selection": (supervisor.state_json or {}).get("pending_screening_selection", False),
@@ -756,6 +768,7 @@ class SupervisorService:
             "job_posting": self._current_posting(db, supervisor),
             "refresh_required": refresh_required,
             "screening_batch": screening_batch,
+            "interview_batch_id": (state_json.get("interview_workflow") or {}).get("last_batch_id"),
         }
 
     def _requirement_state(

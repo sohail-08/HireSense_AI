@@ -19,6 +19,7 @@ SupervisorPhase = Literal[
     "posting_approval",
     "published",
     "error",
+    "interview_selection", "interview_schedule", "interview_approval", "interview_sent", "interview_reschedule",
 ]
 
 
@@ -26,7 +27,7 @@ class SupervisorMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=20_000)
+    content: str = Field(min_length=1, max_length=200_000)
     outcome: Literal["info", "success", "failure"] = "info"
 
 
@@ -48,7 +49,7 @@ class SupervisorChatRequest(BaseModel):
     session_id: str | None = Field(default=None, min_length=1, max_length=36)
     message: str = Field(min_length=1, max_length=10_000)
     selected_job_description_id: int | None = Field(default=None, gt=0)
-    page_context: Literal["jobs", "candidates", "assessments", "other"] = "jobs"
+    page_context: Literal["jobs", "candidates", "assessments", "interviews", "other"] = "jobs"
     selected_job_posting_id: int | None = Field(default=None, gt=0)
     selected_application_ids: list[int] = Field(default_factory=list, max_length=50)
 
@@ -72,3 +73,4 @@ class SupervisorChatResponse(BaseModel):
     refresh_required: bool = False
     sync_result: GoogleFormsSyncResponse | None = None
     screening_batch: ScreeningBatchResponse | None = None
+    interview_batch_id: int | None = None

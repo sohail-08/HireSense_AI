@@ -2,6 +2,13 @@
 
 ## Current milestone
 
+Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
+calendar attachments and rescheduling are implemented. Both the central assistant
+(via authenticated MCP) and manual UI use the same services. See
+[setup, workflow, tools, delivery safeguards and commit increments](docs/interview-scheduling.md).
+Configure SMTP in the root `.env`; local Mailpit testing is opt-in. No meeting
+platform or external calendar API is connected in this increment.
+
 - Candidate-only registration
 - Email/password sign-in
 - JWT authentication

@@ -9,7 +9,7 @@ import { SupervisorChatPanel } from "../jobs/SupervisorChatPanel";
 import type { ScreeningBatch, SupervisorChatResponse, SupervisorPhase } from "../../types";
 
 const sessionKey = "hiresense_supervisor_session_id";
-const initialMessage = "Tell me the role you want to hire for, or ask me to sync application responses or screen candidates for a job posting.";
+const initialMessage = "Tell me the role you want to hire for, or ask me to sync responses, screen candidates, schedule interviews, or reschedule an interview.";
 type ChatMessage = { role: "user" | "assistant"; content: string; outcome?: "success" | "failure" };
 type AssistantContext = {
   response: SupervisorChatResponse | undefined;
@@ -36,6 +36,8 @@ const phaseLabels: Record<SupervisorPhase, string> = {
   posting_approval: "Confirm publication",
   published: "Published",
   error: "Needs attention",
+  interview_selection: "Choose interview candidates", interview_schedule: "Interview schedule",
+  interview_approval: "Confirm invitations", interview_sent: "Invitation delivery", interview_reschedule: "Reschedule interviews",
 };
 
 export function useSupervisor() {
@@ -47,6 +49,7 @@ export function useSupervisor() {
 export function SupervisorProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const page = pathname.endsWith("/candidates") ? "candidates"
+    : pathname.endsWith("/interviews") ? "interviews"
     : pathname.endsWith("/assessments") ? "assessments"
       : pathname.endsWith("/jobs") ? "jobs" : "other";
   const [open, setOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
@@ -128,6 +131,30 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
     return () => { active = false; window.clearInterval(timer); };
   }, [batch?.id, batch?.status, addTaskMessage]);
 
+  useEffect(() => {
+    const id = response?.interview_batch_id;
+    if (!id) return;
+    let active = true;
+    let polling = false;
+    const timer = window.setInterval(() => {
+      if (polling) return;
+      polling = true;
+      void apiRequest<{ status: string; sent: number; failed: number; uncertain: number }>(`/interviews/batches/${id}`)
+        .then((next) => {
+          if (!active || next.status !== "completed") return;
+          window.clearInterval(timer);
+          setRefreshVersion((current) => current + 1);
+          addTaskMessage(next.failed || next.uncertain ? "failure" : "success",
+            `Interview invitations: ${next.sent} sent, ${next.failed} failed, ${next.uncertain} uncertain. Check Interviews for per-candidate results and safe retries.`);
+        }).catch((error) => {
+          if (!active) return;
+          window.clearInterval(timer);
+          addTaskMessage("failure", error instanceof Error ? error.message : "Could not read invitation delivery status.");
+        }).finally(() => { polling = false; });
+    }, 1500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [response?.interview_batch_id, addTaskMessage]);
+
   async function sendMessage(message: string) {
     const trimmed = message.trim();
     if (!trimmed || busy.current) return;
@@ -176,6 +203,7 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
         open={open}
         phaseLabel={batch && ["queued", "processing"].includes(batch.status)
           ? `Screening ${batch.processed_applications}/${batch.total_applications}`
+          : phase.startsWith("interview_") ? phaseLabels[phase]
           : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : phaseLabels[phase]}
         messages={messages}
         loading={loading}

@@ -34,6 +34,18 @@ services:
       INTERVIEWER_EMAIL: ${INTERVIEWER_EMAIL:?Set INTERVIEWER_EMAIL in .env}
       INTERVIEWER_PASSWORD: ${INTERVIEWER_PASSWORD:?Set INTERVIEWER_PASSWORD in .env}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      INTERVIEW_MCP_URL: http://interview-mcp:8002/mcp
+      INTERVIEW_MCP_TIMEOUT_SECONDS: ${INTERVIEW_MCP_TIMEOUT_SECONDS:-120}
+      INTERVIEW_COMPANY_NAME: ${INTERVIEW_COMPANY_NAME:-BJIT}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-interviews@hiresense.test}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-HireSense}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-15}
+      INTERVIEW_REPLY_TO_EMAIL: ${INTERVIEW_REPLY_TO_EMAIL:-interviews@hiresense.test}
       STORAGE_ROOT: ${STORAGE_ROOT:-/app/storage}
       CV_MAX_FILE_SIZE_MB: ${CV_MAX_FILE_SIZE_MB:-10}
       CV_MAX_PAGES: ${CV_MAX_PAGES:-40}
@@ -125,6 +137,26 @@ services:
       start_period: 10s
 
     restart: unless-stopped
+
+  interview-mcp:
+    build: ./backend
+    command: ["python", "-m", "app.interview_mcp.server"]
+    environment:
+      INTERVIEW_BACKEND_URL: http://backend:8000
+    expose: ["8002"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8002), 3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["mail-test"]
+    ports:
+      - "127.0.0.1:8025:8025"
+    expose: ["1025"]
 
   frontend:
     build: ./frontend

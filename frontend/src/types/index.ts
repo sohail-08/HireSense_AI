@@ -180,7 +180,8 @@ export type SupervisorPhase =
   | "posting_details"
   | "posting_approval"
   | "published"
-  | "error";
+  | "error"
+  | "interview_selection" | "interview_schedule" | "interview_approval" | "interview_sent" | "interview_reschedule";
 
 export interface SupervisorMessage {
   role: "user" | "assistant";
@@ -210,6 +211,7 @@ export interface SupervisorChatResponse {
   refresh_required: boolean;
   sync_result: GoogleFormsSyncResult | null;
   screening_batch: ScreeningBatch | null;
+  interview_batch_id?: number | null;
 }
 
 export type ApplicationSource = "direct_upload" | "google_form" | "import";

@@ -30,6 +30,7 @@ def test_baseline_migration_creates_schema(tmp_path):
     assert "users" in inspector.get_table_names()
     assert "alembic_version" in inspector.get_table_names()
     assert {"scoring_configurations", "scoring_runs", "candidate_scores", "scoring_request_keys"}.issubset(inspector.get_table_names())
+    assert {"interview_schedules", "interview_batches", "interview_deliveries"}.issubset(inspector.get_table_names())
     assert {
         column["name"] for column in inspector.get_columns("users")
     } == {

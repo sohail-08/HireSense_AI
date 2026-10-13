@@ -26,6 +26,7 @@ from app.services.requirement_discovery_service import RequirementDiscoveryServi
 from app.services.supervisor_service import SupervisorService
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 from app.services.screening_service import ScreeningService
+from app.services.interview_assistant_service import InterviewAssistantService
 
 
 router = APIRouter(prefix="/api/supervisor", tags=["Supervisor"])
@@ -51,6 +52,7 @@ def _service() -> SupervisorService:
             GoogleServiceAccountReader(settings.google_service_account_file), settings,
         ),
         screening_service=ScreeningService(settings),
+        interview_service=InterviewAssistantService(),
     )
 
 

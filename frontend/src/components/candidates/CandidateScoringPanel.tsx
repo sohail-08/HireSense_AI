@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { apiRequest } from "../../api/apiClient";
 import { ErrorMessage } from "../common/ErrorMessage";
+import { useSupervisor } from "../assistant/SupervisorProvider";
+import { InterviewSchedulingPanel } from "../interviews/InterviewSchedulingPanel";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
 
 type Category = "technical" | "experience" | "qualification";
@@ -86,6 +88,8 @@ type Props = {
 };
 
 export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, onScreenPending }: Props) {
+  const { setSelectedApplicationIds } = useSupervisor();
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [proposal, setProposal] = useState<Proposal>();
   const [weights, setWeights] = useState<Weights>({ technical: "50", experience: "30", qualification: "20" });
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -101,6 +105,9 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
   const requestVersion = useRef(0);
   const actionBusy = useRef(false);
   const waitingForConfiguration = useRef<number | undefined>(undefined);
+
+  useEffect(() => { setSelectedIds([]); setSelectedApplicationIds([]); }, [run?.id, jobId, setSelectedApplicationIds]);
+  useEffect(() => { setSelectedApplicationIds(selectedIds); }, [selectedIds, setSelectedApplicationIds]);
 
   useEffect(() => {
     let active = true;
@@ -245,8 +252,9 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
       {run && proposal && run.requirement_version !== proposal.requirement_version ? <p className="mt-2 text-sm text-amber-800">This is an earlier ranking. Update it for the current job requirements.</p> : null}
       {run && proposal && run.formula_version !== proposal.formula_version ? <p className="mt-2 text-sm text-slate-600">This result uses an earlier scoring policy. Save weights and rank candidates to apply the current three-outcome policy.</p> : null}
       {ranked.length ? <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
+        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Select</th><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
         <tbody>{ranked.map((result) => <tr key={result.id} className="border-b border-slate-100 last:border-0">
+          <td className="px-2 py-4"><input type="checkbox" aria-label={`Select ${result.candidate_name} for interview`} disabled={busy || processing || result.rank === null} checked={selectedIds.includes(result.application_id)} onChange={() => setSelectedIds((ids) => ids.includes(result.application_id) ? ids.filter((id) => id !== result.application_id) : [...ids, result.application_id])} /></td>
           <td className="px-2 py-4 font-semibold">{result.rank ?? "—"}</td><td className="px-2 py-4 font-medium">{result.candidate_name}</td>
           <td className="whitespace-nowrap px-2 py-4 font-semibold text-blue-700">{result.display_score + "%"}</td>
           <td className="px-2 py-4 text-right"><button type="button" id={"inspect-score-" + result.id} onClick={() => setEvidence(result)}
@@ -265,6 +273,10 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         </label>
       </details> : null}
     </section>
+    {run ? <details className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+      <summary className="cursor-pointer text-sm font-semibold text-blue-700">Schedule interview{selectedIds.length ? ` (${selectedIds.length} checked)` : ""}</summary>
+      <InterviewSchedulingPanel jobId={jobId} rankingRunId={run.id} selectedIds={selectedIds} />
+    </details> : null}
     {evidence ? <EvidencePanel result={evidence} onClose={closeEvidence} /> : null}
   </>;
 }
