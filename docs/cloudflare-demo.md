@@ -1,17 +1,20 @@
-# Cloudflare website demo (self-hosted LiveKit retained)
+# Cloudflare website demo
 
 This optional setup exposes HireSense's website and `/api` through a temporary
 HTTPS Quick Tunnel. The frontend proxies API requests to the private backend.
-PostgreSQL, MCP services, CV storage and LiveKit ports are not directly exposed.
+PostgreSQL, MCP services and CV storage are not directly exposed.
 Authenticated features still require the existing interviewer login. Candidates
 still need a valid private invitation and interviewer admission.
 
-**This is website-only, not a working remote audio/video meeting.** LiveKit stays
-self-hosted on localhost. The room pages display a clear warning and do not issue
-media credentials or attempt a localhost connection in public demo mode. A
-separately reachable self-hosted LiveKit signaling/media endpoint, with appropriate
-TLS, RTC firewall rules and usually TURN, is a later networking task. Do not change
-LiveKit keys or switch providers for this milestone.
+Cloudflare carries website/API requests, not audio/video. For remote calls,
+configure [LiveKit Cloud](livekit-cloud.md) in the single root `.env`. The browser
+SDKs connect directly to Cloud for signaling and media while HireSense stays on
+your laptop. No router port forwarding or separate local TURN server is needed
+for this managed-media setup.
+
+The application is Cloud-only: there is no local media server or provider switch.
+Missing Cloud settings show a configuration warning instead of issuing unusable
+credentials. The LiveKit browser/server SDKs remain required for Cloud.
 
 ## Start
 
@@ -30,8 +33,11 @@ required. The pinned cloudflared image is downloaded on first use.
 Finish/end existing admitted or active interviews and resolve pending email
 deliveries before starting or restoring demo mode: the scripts refuse to restart
 the backend while these are present. They never end interviews or send invitations
-on your behalf. Only the backend is restarted to apply its public origin; the
-database, LiveKit and MCP containers are not restarted.
+on your behalf. The backend is restarted to apply its public origin and the
+frontend is refreshed automatically afterward. A website API health check must
+pass before success is reported. Database and MCP containers are not restarted.
+Nginx also resolves the backend through Docker DNS so a changed container IP does
+not leave the proxy pointing to a removed container.
 
 The normal configuration remains in the **single root `.env`**. The helper reads
 the public hostname from a localhost-only control endpoint, validates it, passes
@@ -64,10 +70,11 @@ not permitted during an admitted/active interview. Use a fresh, unadmitted
 interview for a waiting-room demo. Do not share private invitation URLs in Git,
 screenshots, chat history or logs.
 
-Candidate invitation validation, device checks, waiting status and admission can
-be demonstrated. After admission the candidate sees **Admitted — website-only
-demo**, rather than an endless failed media connection. Audio/video is unavailable
-in this mode, including for an interviewer using the website on the host laptop.
+With valid Cloud settings, demonstrate the complete device-check, waiting,
+admission and two-person audio/video flow. With unavailable media settings, an
+admitted candidate sees **Admitted — audio/video unavailable** rather than an
+endless connection attempt. A successful Cloud API probe does not prove that
+real audio/video works: test two devices on different networks before the demo.
 
 ## Stop and restore localhost
 
@@ -75,8 +82,9 @@ in this mode, including for an interviewer using the website on the host laptop.
 ./scripts/stop-cloudflare-demo.ps1
 ```
 
-This stops only the tunnel, then restores backend configuration from the root
-`.env`. It retains the database and all storage; it never runs `compose down` or
+This stops only the tunnel, then restores website-origin configuration from the
+root `.env` and refreshes the frontend proxy. LiveKit Cloud remains the media
+provider. It retains the database and all storage; it never runs `compose down` or
 deletes volumes. If the restart safety check fails, the public tunnel is still
 stopped, but backend origin restoration waits until you resolve that condition
 and run the stop script again. Replace public-origin candidate links before
@@ -117,11 +125,11 @@ npm run build
 
 Helper tests run offline with mocked Docker and check hostname validation,
 temporary environment restoration, scoped restarts and restart safeguards.
-Backend/UI tests cover demo media warnings, refusal to issue unreachable media
+Backend/UI tests cover Cloud configuration warnings, refusal to issue invalid media
 credentials, explicit link replacement and no-media admission. Public smoke checks
 should cover the website and `/api/health`, plus denial of unauthenticated room
 access. These checks do not prove remote LiveKit media connectivity.
 
 References: [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/),
 [Cloudflare tunnel protocols](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/protocols/),
-[LiveKit ports and firewall](https://docs.livekit.io/transport/self-hosting/ports-firewall/).
+[LiveKit Cloud](https://docs.livekit.io/intro/cloud/).

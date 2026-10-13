@@ -1,7 +1,8 @@
-"""Opt-in local server tests; synthetic identities/media, no email or business DB.
+"""Opt-in real-server tests; synthetic identities/media, no email or business DB.
 
-Run from backend on the Docker host with LIVEKIT_INTEGRATION=1. The RTC test
-requires requirements-room-test.txt. Normal CI skips both tests.
+Run from backend on the Docker host with LIVEKIT_CLOUD_INTEGRATION=1. The RTC
+test requires requirements-room-test.txt. Cloud tests consume media usage.
+Normal CI skips both tests. Never print the generated connection credentials.
 """
 import asyncio
 import gc
@@ -13,11 +14,17 @@ import pytest
 from app.config import get_settings
 from app.integrations.livekit_media import LiveKitMedia
 
-pytestmark = pytest.mark.skipif(os.environ.get("LIVEKIT_INTEGRATION") != "1", reason="Opt-in local LiveKit tests")
+pytestmark = pytest.mark.skipif(os.environ.get("LIVEKIT_CLOUD_INTEGRATION") != "1", reason="Opt-in real Cloud media tests")
+
+
+def integration_media():
+    media = LiveKitMedia(get_settings())
+    media.configured()
+    return media
 
 
 def test_real_room_admin_operations_are_idempotent():
-    media = LiveKitMedia(get_settings())
+    media = integration_media()
     name = "hs-test-" + uuid4().hex
     try:
         media.ensure_room(name)
@@ -34,7 +41,7 @@ def test_two_real_rtc_clients_exchange_synthetic_media_and_room_delete_disconnec
     rtc = pytest.importorskip("livekit.rtc", reason="Install requirements-room-test.txt")
     # SDK diagnostics are not allowed to echo signaling credentials.
     logging.getLogger("livekit").setLevel(logging.CRITICAL)
-    media = LiveKitMedia(get_settings())
+    media = integration_media()
     name = "hs-test-" + uuid4().hex
     media.ensure_room(name)
     deadline = datetime.now(timezone.utc) + timedelta(minutes=2)
@@ -94,8 +101,8 @@ def test_two_real_rtc_clients_exchange_synthetic_media_and_room_delete_disconnec
             assert not microphone.muted and not track.muted
             await asyncio.to_thread(media.close_room, name)
             await asyncio.wait_for(asyncio.gather(*(event.wait() for event in disconnected)), 10)
-            # auto_create:false means a cached, still-unexpired participant JWT
-            # cannot recreate a room after End/delete.
+            # Explicit Cloud identity revocation prevents a cached JWT from
+            # recreating the retired room.
             with pytest.raises(Exception):
                 await asyncio.wait_for(rooms[1].connect(credentials[1]["server_url"], credentials[1]["participant_token"]), 10)
         finally:

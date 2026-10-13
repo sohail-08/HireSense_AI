@@ -2,7 +2,6 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from uuid import uuid4
 import jwt
 from email_validator import validate_email, EmailNotValidError
@@ -14,7 +13,6 @@ from app.models.user import User, UserRole
 from app.models.job import JobDescription, JobPosting
 from app.models.candidate import CandidateApplication, Candidate, CVDocument, CVProcessingStatus, ApplicationStatus
 from app.models.scoring import ScoringRun, CandidateScore
-from app.models.screening import ScreeningRun, ScreeningRunStatus
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery
 from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRequest
 from app.services.scoring_service import ScoringService, fingerprint

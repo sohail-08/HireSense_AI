@@ -44,8 +44,9 @@ class FakeMedia:
 @pytest.fixture
 def room_setup(setup):
     db, owner, other, posting, apps, run, service, sender = setup
-    config = service.settings.model_copy(update={"livekit_api_key": "test-room-key",
-        "livekit_api_secret": SecretStr("test-only-media-secret-" + "x" * 40),
+    config = service.settings.model_copy(update={"livekit_cloud_api_key": "test-room-key",
+        "livekit_cloud_url": "wss://test-project.livekit.cloud",
+        "livekit_cloud_api_secret": SecretStr("test-only-media-secret-" + "x" * 40),
         "interview_link_secret": SecretStr("test-only-invite-secret-" + "y" * 40),
         "candidate_cookie_secure": False, "frontend_url": "http://testserver"})
     service.settings, service.links = config, InterviewLinks(config)
@@ -92,21 +93,22 @@ def test_link_lifetime_and_nested_snapshot_redaction(room_setup):
     assert datetime.fromisoformat(material["expires_at"]) == clock.value + timedelta(days=rooms.settings.interview_link_max_days)
 
 
-def test_public_website_demo_reports_local_media_and_outdated_links(room_setup):
+def test_public_website_reports_missing_cloud_settings_and_outdated_links(room_setup):
     setup, rooms, media, _, row, token, _ = room_setup
     db, owner, _, _, _, _, _, _ = setup
     rooms.settings = rooms.settings.model_copy(update={'frontend_url': 'https://demo.trycloudflare.com',
-        'interview_join_base_url': 'https://demo.trycloudflare.com', 'candidate_cookie_secure': True})
+        'interview_join_base_url': 'https://demo.trycloudflare.com', 'candidate_cookie_secure': True,
+        'livekit_cloud_url': ''})
     rooms.links = InterviewLinks(rooms.settings, rooms.now)
     info = rooms.info(db, row, interviewer=True)
-    assert info['media_notice'].startswith('Website-only demo:') and info['link_origin_outdated']
+    assert 'LIVEKIT_CLOUD_URL' in info['media_notice'] and info['link_origin_outdated']
     cookie, _, _ = rooms.exchange(db, token)
     rooms.waiting(db, cookie); rooms.admit(db, owner.id, row.id)
-    with pytest.raises(MediaUnavailable, match='Website-only demo'):
+    with pytest.raises(MediaUnavailable, match='LIVEKIT_CLOUD_URL'):
         rooms.media_access(db, candidate_token=cookie)
     with pytest.raises(MediaUnavailable): rooms.media_access(db, user_id=owner.id, interview_id=row.id)
     assert not media.created and not media.tokens
-    rooms.settings = rooms.settings.model_copy(update={'livekit_public_url': 'wss://media.example.com'})
+    rooms.settings = rooms.settings.model_copy(update={'livekit_cloud_url': 'wss://test-project.livekit.cloud'})
     assert rooms.media_notice() is None
 
 
@@ -119,6 +121,38 @@ def test_explicit_rotation_updates_invitation_to_demo_origin(room_setup):
     assert replacement['join_url'].startswith('https://demo.trycloudflare.com/interview/join/')
     assert not rooms.info(db, row, interviewer=True)['link_origin_outdated']
     with pytest.raises(RoomAccessError): rooms.exchange(db, token)
+
+
+def test_cloud_room_uses_cloud_credentials_and_preserves_admission_and_end(room_setup):
+    setup, rooms, media, _, row, token, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    rooms.settings = rooms.settings.model_copy(update={
+        'livekit_cloud_url': 'wss://test-project.livekit.cloud',
+        'livekit_cloud_api_key': 'test-cloud-key', 'livekit_cloud_api_secret': SecretStr('cloud-test-secret-' + 'c' * 32),
+        'frontend_url': 'https://demo.trycloudflare.com'})
+    media.settings = rooms.settings
+    assert rooms.info(db, row)['media_notice'] is None
+    cookie, _, _ = rooms.exchange(db, token)
+    with pytest.raises(RoomAccessError): rooms.media_access(db, candidate_token=cookie)
+    rooms.waiting(db, cookie); rooms.admit(db, owner.id, row.id)
+    access = rooms.media_access(db, candidate_token=cookie)
+    assert access['server_url'] == 'wss://test-project.livekit.cloud'
+    decoded = jwt.decode(access['participant_token'], rooms.settings.livekit_cloud_api_secret.get_secret_value(),
+                         algorithms=['HS256'], issuer='test-cloud-key')
+    assert decoded['sub'] == row.room_name + '-c'
+    assert decoded['video']['room'] == row.room_name and not decoded['video']['roomAdmin']
+    rooms.end(db, owner.id, row.id)
+    with pytest.raises(RoomAccessError): rooms.media_access(db, candidate_token=cookie)
+
+
+def test_missing_cloud_credentials_keep_joining_disabled(room_setup):
+    setup, rooms, media, _, row, _, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    rooms.settings = rooms.settings.model_copy(update={'livekit_cloud_url': '',
+        'livekit_cloud_api_key': '', 'livekit_cloud_api_secret': SecretStr('')})
+    assert 'LIVEKIT_CLOUD_URL' in rooms.info(db, row)['media_notice']
+    with pytest.raises(MediaUnavailable): rooms.media_access(db, user_id=owner.id, interview_id=row.id)
+    assert not media.created and not media.tokens
 
 
 @pytest.mark.parametrize("case,code", [("expired", "expired_link"), ("revoked", "revoked_link"),
@@ -196,7 +230,7 @@ def test_only_assigned_interviewer_can_admit_and_candidate_media_is_gated(room_s
     second = rooms.admit(db, owner.id, row.id)
     assert first["room_version"] == second["room_version"] and row.candidate_admitted_at is not None
     access = rooms.media_access(db, candidate_token=session_token)
-    decoded = jwt.decode(access["participant_token"], rooms.settings.livekit_api_secret.get_secret_value(), algorithms=["HS256"], issuer=rooms.settings.livekit_api_key)
+    decoded = jwt.decode(access["participant_token"], rooms.settings.livekit_cloud_api_secret.get_secret_value(), algorithms=["HS256"], issuer=rooms.settings.livekit_cloud_api_key)
     assert decoded["sub"] == row.room_name + "-c" and decoded["video"]["room"] == row.room_name
     assert decoded["video"]["roomJoin"] is True and decoded["video"]["canPublishSources"] == ["camera", "microphone"]
     assert decoded["video"]["canPublishData"] is False and decoded["video"]["roomAdmin"] is False

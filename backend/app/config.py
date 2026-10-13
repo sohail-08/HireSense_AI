@@ -31,10 +31,9 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = False
     smtp_timeout_seconds: float = Field(default=15, ge=1, le=120)
     interview_reply_to_email: str = "interviews@hiresense.test"
-    livekit_api_url: str = "http://localhost:7880"
-    livekit_public_url: str = "ws://localhost:7880"
-    livekit_api_key: str = ""
-    livekit_api_secret: SecretStr = SecretStr("")
+    livekit_cloud_url: str = ""
+    livekit_cloud_api_key: str = ""
+    livekit_cloud_api_secret: SecretStr = SecretStr("")
     livekit_token_ttl_seconds: int = Field(default=120, ge=30, le=300)
     livekit_api_timeout_seconds: int = Field(default=5, ge=1, le=30)
     interview_join_base_url: str = "http://localhost:5173"

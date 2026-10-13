@@ -4,7 +4,6 @@ import logging
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlsplit
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from app.config import get_settings
@@ -18,7 +17,6 @@ from app.services.interview_content import utc
 
 UTC = timezone.utc
 OPEN_SCHEDULES = {"scheduled", "rescheduled"}
-TERMINAL_ROOMS = {"ending", "ended", "cancelled"}
 logger = logging.getLogger(__name__)
 
 
@@ -106,8 +104,8 @@ class InterviewRooms:
         if rotate or not valid:
             if row.room_status in {"ready", "active"}:
                 raise RoomConflict("End the active interview before rotating its candidate link")
-            # Old media credentials must not find a still-existing room. With
-            # auto_create:false they cannot recreate the deleted old room.
+            # Retire old media credentials by revoking both Cloud identities
+            # before deleting the previous room.
             self.retire_media(row, include_current=True)
             material = self.links.material(row.application_id, row.start_utc, row.end_utc, row.join_generation + 1)
             self.links.install(row, material)
@@ -186,11 +184,10 @@ class InterviewRooms:
         return result
 
     def media_notice(self):
-        front = urlsplit(self.settings.frontend_url)
-        media = urlsplit(self.settings.livekit_public_url)
-        loopback = {'localhost', '127.0.0.1', '::1'}
-        if front.scheme == 'https' and front.hostname not in loopback and media.hostname in loopback:
-            return 'Website-only demo: remote audio/video is unavailable because LiveKit is still on localhost. A reachable LiveKit media endpoint must be configured separately.'
+        try:
+            LiveKitMedia(self.settings).configured()
+        except MediaUnavailable as exc:
+            return str(exc)
         return None
 
     def candidate_status(self, db, token):

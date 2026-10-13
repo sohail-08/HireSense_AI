@@ -7,7 +7,7 @@ import { InterviewMediaRoom } from "../../src/components/interviews/InterviewMed
 import { getSdk } from "./setup";
 const sdk = getSdk();
 
-const props = { access: { server_url: "ws://localhost:7880", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" as const }, devices: { username: "Candidate", audioEnabled: true, videoEnabled: false, audioDeviceId: "mic-1", videoDeviceId: "camera-1" }, onConnected: vi.fn(), onLeave: vi.fn(), onEnded: vi.fn() };
+const props = { access: { server_url: "wss://test-project.livekit.cloud", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" as const }, devices: { username: "Candidate", audioEnabled: true, videoEnabled: false, audioDeviceId: "mic-1", videoDeviceId: "camera-1" }, onConnected: vi.fn(), onLeave: vi.fn(), onEnded: vi.fn() };
 test("renders camera/microphone states and remote audio with no unsupported controls", () => {
   const view = render(<InterviewMediaRoom {...props} />);
   expect(screen.getByRole("button", { name: "Mute microphone" }).getAttribute("aria-pressed")).toBe("true");

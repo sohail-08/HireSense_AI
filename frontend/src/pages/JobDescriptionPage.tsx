@@ -12,7 +12,6 @@ import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import type {
-  JobDescriptionDraft,
   JobDescriptionResponse,
   KnowledgeDocumentResponse,
   RequirementProfileDraft,

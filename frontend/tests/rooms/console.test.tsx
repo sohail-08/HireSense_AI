@@ -40,10 +40,10 @@ test("device submission is visible and reveals the interviewer join button", asy
   expect(api.interviewerMedia).not.toHaveBeenCalled();
 });
 
-test("website-only demo explains unavailable media and disables remote joining", async () => {
-  api.status.mockResolvedValue({ ...info, media_notice: "Website-only demo: LiveKit is still on localhost." });
+test.each(["Configure LIVEKIT_CLOUD_URL.", "Add LIVEKIT_CLOUD_API_KEY and LIVEKIT_CLOUD_API_SECRET."])("unavailable media disables joining: %s", async (media_notice) => {
+  api.status.mockResolvedValue({ ...info, media_notice });
   const user = userEvent.setup(); open();
-  await screen.findByText(/Website-only demo/);
+  await screen.findByText(media_notice);
   await user.click(screen.getByRole("button", { name: "Check devices" }));
   await user.click(screen.getByRole("button", { name: "Devices ready" }));
   expect(screen.getByRole("button", { name: "Join interview room" }).hasAttribute("disabled")).toBe(true);

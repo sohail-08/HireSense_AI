@@ -53,15 +53,44 @@ function Enable-DemoOrigin {
     $previous = [Environment]::GetEnvironmentVariable('DEMO_PUBLIC_URL', 'Process')
     try {
         [Environment]::SetEnvironmentVariable('DEMO_PUBLIC_URL', $origin, 'Process')
-        Invoke-DemoCompose -ComposeArgs @('-f', 'docker-compose.yml', '-f', 'docker-compose.cloudflare.yml',
-            'up', '-d', '--no-deps', '--wait', '--wait-timeout', '45', 'backend')
+        Restart-DemoWebApp -ComposeFiles @('docker-compose.yml', 'docker-compose.cloudflare.yml')
     } finally {
         [Environment]::SetEnvironmentVariable('DEMO_PUBLIC_URL', $previous, 'Process')
     }
 }
 
+function Wait-DemoWebsite {
+    $deadline = [DateTime]::UtcNow.AddSeconds(45)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        try {
+            $health = Invoke-WebRequest -Uri 'http://localhost:5173/api/health' -TimeoutSec 3 -UseBasicParsing
+            if ($health.StatusCode -eq 200) { return }
+        } catch {
+            # Bound retries while Nginx/Docker DNS settle; never log private URLs.
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Website API health check failed after restart. Check frontend/backend service health.'
+}
+
+function Restart-DemoWebApp {
+    param([string[]]$ComposeFiles = @('docker-compose.yml'))
+    Assert-DemoRestartSafe
+    $arguments = @()
+    foreach ($file in $ComposeFiles) { $arguments += @('-f', $file) }
+    Invoke-DemoCompose -ComposeArgs ($arguments + @('up', '-d', '--no-deps', '--wait', '--wait-timeout', '45', 'backend'))
+    # Refresh built assets and Nginx after replacing the backend. Database/MCP
+    # services are untouched; dynamic Docker DNS also handles later IP changes.
+    Invoke-DemoCompose -ComposeArgs ($arguments + @('up', '-d', '--no-deps', '--force-recreate', 'frontend'))
+    Wait-DemoWebsite
+}
+
+function Restore-DemoLocalOrigin {
+    Restart-DemoWebApp
+}
+
 function Get-DemoSafetyStatus {
-    $code = "import json; from app.database import SessionLocal; from app.models.interview import InterviewSchedule,InterviewDelivery; from sqlalchemy import select,func; db=SessionLocal(); print(json.dumps({'active_rooms':db.scalar(select(func.count()).select_from(InterviewSchedule).where(InterviewSchedule.room_status.in_(['ready','active','ending']))),'pending_email':db.scalar(select(func.count()).select_from(InterviewDelivery).where((InterviewDelivery.status=='pending') | InterviewDelivery.in_flight))})); db.close()"
+    $code = "import json; from app.database import SessionLocal; from app.models.interview import InterviewSchedule,InterviewDelivery; from sqlalchemy import select,func; db=SessionLocal(); room_busy=InterviewSchedule.room_status.in_(['ready','active','ending']) | (InterviewSchedule.interviewer_joined_at.is_not(None) & InterviewSchedule.room_status.not_in(['ended','cancelled']) & InterviewSchedule.status.in_(['scheduled','rescheduled'])); print(json.dumps({'active_rooms':db.scalar(select(func.count()).select_from(InterviewSchedule).where(room_busy)),'pending_email':db.scalar(select(func.count()).select_from(InterviewDelivery).where((InterviewDelivery.status=='pending') | InterviewDelivery.in_flight))})); db.close()"
     $result = (& docker compose exec -T backend python -c $code | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Unable to check whether the backend can be safely restarted.' }
     return $result | ConvertFrom-Json
@@ -70,6 +99,12 @@ function Get-DemoSafetyStatus {
 function Assert-DemoRestartSafe {
     $status = Get-DemoSafetyStatus
     if ($status.active_rooms -gt 0 -or $status.pending_email -gt 0) {
-        throw 'Finish/end active interviews and resolve pending email deliveries before changing demo mode.'
+        throw 'Finish/end joined or active interviews and resolve pending email deliveries before changing demo mode.'
     }
+}
+
+function Get-DemoMediaStatus {
+    $result = (& docker compose exec -T backend python -m app.check_livekit --check-api | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to check LiveKit configuration. Check backend service health.' }
+    return $result | ConvertFrom-Json
 }

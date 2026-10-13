@@ -6,8 +6,10 @@ Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
 calendar attachments and rescheduling are implemented. Both the central assistant
 (via authenticated MCP) and manual UI use the same services. See
 [setup, workflow, tools, delivery safeguards and commit increments](docs/interview-scheduling.md).
-Candidate waiting rooms and assigned interviewer consoles now use self-hosted
-LiveKit for one-to-one camera/microphone interviews. Secure HireSense join links
+Candidate waiting rooms and assigned interviewer consoles use LiveKit for
+one-to-one camera/microphone interviews. LiveKit Cloud handles remote calls;
+no local LiveKit media server is required. See
+[Cloud setup and remote demo steps](docs/livekit-cloud.md). Secure HireSense join links
 are included in confirmed invitations. See [interview room setup, tests, security,
 file manifest and Git checkpoints](docs/interview-rooms.md).
 Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
@@ -42,9 +44,11 @@ Docker Desktop running with Linux containers.
 
 1. Copy `.env.example` to `.env`.
 2. Set your own database password, JWT secret, interviewer password and
-   `GEMINI_API_KEY` in the root `.env` file. Set unique `LIVEKIT_API_KEY`,
-   `LIVEKIT_API_SECRET` and a separate `INTERVIEW_LINK_SECRET` as shown in
-   [the room setup guide](docs/interview-rooms.md#environment-and-local-startup).
+   `GEMINI_API_KEY` and a separate `INTERVIEW_LINK_SECRET` in the root `.env`.
+   For interviews, fill `LIVEKIT_CLOUD_URL`,
+   `LIVEKIT_CLOUD_API_KEY` and `LIVEKIT_CLOUD_API_SECRET` from your Cloud project.
+   See [the Cloud setup guide](docs/livekit-cloud.md). These settings also work
+   when the website is opened locally at `http://localhost:5173`.
 3. Run:
 
 ```powershell
@@ -415,8 +419,8 @@ database named in the supplied connection URL.
 ## Stop
 
 For a temporary HTTPS website demo on another device, see
-[Cloudflare demo setup](docs/cloudflare-demo.md). This keeps LiveKit self-hosted;
-remote interview audio/video requires separate media networking. Stop the tunnel
+[Cloudflare demo setup](docs/cloudflare-demo.md). Audio/video connects separately
+to LiveKit Cloud when configured; the tunnel exposes the website. Stop the tunnel
 with `./scripts/stop-cloudflare-demo.ps1` when finished.
 
 ```powershell

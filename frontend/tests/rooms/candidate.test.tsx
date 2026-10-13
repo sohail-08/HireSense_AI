@@ -16,7 +16,7 @@ function open() { return render(<MemoryRouter initialEntries={["/interview/join/
 beforeEach(() => {
   api.exchange.mockResolvedValue(info); api.candidateStatus.mockResolvedValue(info);
   api.waiting.mockResolvedValue({ ...info, room_status: "waiting", waiting: true });
-  api.candidateMedia.mockResolvedValue({ server_url: "ws://localhost:7880", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" });
+  api.candidateMedia.mockResolvedValue({ server_url: "wss://test-project.livekit.cloud", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" });
   api.candidateConnected.mockResolvedValue({ ...info, admitted: true, room_status: "active" });
   api.candidateLeave.mockResolvedValue(info);
 });
@@ -30,7 +30,7 @@ test.each(["invalid_link", "expired_link", "revoked_link", "cancelled", "ended",
   expect(window.location.pathname).toBe("/interview/join");
 });
 
-test("devices require an explicit action; waiting has no media connection until admission", async () => {
+test("devices and admission gate Cloud media", async () => {
   const user = userEvent.setup();
   open();
   await screen.findByRole("heading", { name: "Frontend Engineer interview" });
@@ -60,17 +60,17 @@ test("leaving the waiting room does not complete the interview", async () => {
   expect(api.candidateLeave).toHaveBeenCalledOnce(); expect(api.candidateMedia).not.toHaveBeenCalled();
 });
 
-test("website-only demo shows admission without requesting unreachable media", async () => {
+test("missing Cloud settings show admission without requesting unavailable media", async () => {
   const user = userEvent.setup();
-  const demo = { ...info, media_notice: "Website-only demo: remote audio/video is unavailable." };
+  const demo = { ...info, media_notice: "Configure LIVEKIT_CLOUD_URL in the root .env." };
   api.exchange.mockResolvedValue(demo);
   api.waiting.mockResolvedValue({ ...demo, waiting: true, room_status: "waiting" });
   api.candidateStatus.mockResolvedValue({ ...demo, admitted: true, room_status: "ready" });
   open();
   await user.click(await screen.findByRole("button", { name: "Check devices" }));
   await user.click(screen.getByRole("button", { name: "Continue to waiting room" }));
-  await screen.findByRole("heading", { name: "Admitted — website-only demo" }, { timeout: 3500 });
-  expect(screen.getByRole("alert").textContent).toContain("remote audio/video is unavailable");
+  await screen.findByRole("heading", { name: "Admitted — audio/video unavailable" }, { timeout: 3500 });
+  expect(screen.getByRole("alert").textContent).toContain("LIVEKIT_CLOUD_URL");
   expect(api.candidateMedia).not.toHaveBeenCalled();
   expect(sdk.room).toBeNull();
 });
@@ -93,7 +93,7 @@ test("leaving during admission cannot connect a late media-token response", asyn
   api.candidateStatus.mockResolvedValue({ ...info, room_status: "ready", admitted: true });
   await waitFor(() => expect(api.candidateMedia).toHaveBeenCalledOnce(), { timeout: 3500 });
   await user.click(screen.getByRole("button", { name: "Leave waiting room" }));
-  await act(async () => resolve({ server_url: "ws://localhost:7880", participant_token: "fake-only", role: "candidate" }));
+  await act(async () => resolve({ server_url: "wss://test-project.livekit.cloud", participant_token: "fake-only", role: "candidate" }));
   await screen.findByRole("heading", { name: "You left the interview room" });
   expect(sdk.room).toBeNull();
 });
