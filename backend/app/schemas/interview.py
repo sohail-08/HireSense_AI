@@ -108,6 +108,7 @@ class InvitationRecipient(CandidateReference):
     email_hash: str | None = None
     stage: str | None = None
     old_schedule: dict[str, str] | None = None
+    join_url: str | None = None
 
 
 class DeliveryResult(Boundary):
@@ -159,6 +160,8 @@ class InterviewScheduleResult(Boundary):
     sequence: int
     version: int
     meeting_url: str | None
+    room_status: str
+    has_join_link: bool
     delivery_status: str
     delivery_id: int | None
     delivery_in_flight: bool

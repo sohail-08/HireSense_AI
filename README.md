@@ -6,8 +6,12 @@ Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
 calendar attachments and rescheduling are implemented. Both the central assistant
 (via authenticated MCP) and manual UI use the same services. See
 [setup, workflow, tools, delivery safeguards and commit increments](docs/interview-scheduling.md).
-Configure SMTP in the root `.env`; local Mailpit testing is opt-in. No meeting
-platform or external calendar API is connected in this increment.
+Candidate waiting rooms and assigned interviewer consoles now use self-hosted
+LiveKit for one-to-one camera/microphone interviews. Secure HireSense join links
+are included in confirmed invitations. See [interview room setup, tests, security,
+file manifest and Git checkpoints](docs/interview-rooms.md).
+Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
+No external calendar API, recording or transcription is connected.
 
 - Candidate-only registration
 - Email/password sign-in
@@ -38,7 +42,9 @@ Docker Desktop running with Linux containers.
 
 1. Copy `.env.example` to `.env`.
 2. Set your own database password, JWT secret, interviewer password and
-   `GEMINI_API_KEY` in the root `.env` file.
+   `GEMINI_API_KEY` in the root `.env` file. Set unique `LIVEKIT_API_KEY`,
+   `LIVEKIT_API_SECRET` and a separate `INTERVIEW_LINK_SECRET` as shown in
+   [the room setup guide](docs/interview-rooms.md#environment-and-local-startup).
 3. Run:
 
 ```powershell

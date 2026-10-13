@@ -4,6 +4,7 @@ from app.agents.approval import is_explicit_approval
 from app.agents.interview_commands import GeminiInterviewCommandModel
 from app.integrations.interview_mcp import InterviewMCPClient
 from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRequest
+from app.services.interview_links import redact_join_links
 
 
 class InterviewAssistantService:
@@ -84,7 +85,7 @@ class InterviewAssistantService:
             workflow["schedule"] = schedule
             workflow.pop("preview", None)  # Every edit invalidates the old confirmation.
             state["interview_workflow"] = workflow
-            supervisor.state_json = state  # Persist invalidation even when a new preview fails.
+            supervisor.state_json = redact_join_links(state)  # Persist invalidation, never raw links.
             if command.mode == "shared":
                 raise ValueError("All interviews use sequential individual slots; shared/group interviews are not supported.")
             schedule["mode"] = "sequential"
@@ -181,7 +182,7 @@ class InterviewAssistantService:
     @staticmethod
     def save(supervisor, state, workflow, phase, text, outcome="info"):
         state["interview_workflow"] = workflow
-        supervisor.state_json = state
+        supervisor.state_json = redact_join_links(state)
         return {"phase": phase, "outcome": outcome, "assistant_message": text, "refresh_required": outcome == "success"}
 
     @staticmethod

@@ -32,6 +32,7 @@ from app.services.requirement_discovery_service import RequirementDiscoveryServi
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 from app.services.screening_service import ScreeningService
 from app.services.interview_assistant_service import InterviewAssistantService
+from app.services.interview_links import redact_join_links
 
 
 ToolMethod = Callable[[str], dict[str, Any]]
@@ -194,8 +195,8 @@ class SupervisorService:
                 "outcome": result.get("outcome", "info"),
             }
         )
-        state_json["messages"] = messages[-100:]
-        supervisor.state_json = state_json
+        state_json["messages"] = redact_join_links(messages[-100:])
+        supervisor.state_json = redact_join_links(state_json)
         db.commit()
         db.refresh(supervisor)
 

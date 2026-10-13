@@ -31,6 +31,22 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = False
     smtp_timeout_seconds: float = Field(default=15, ge=1, le=120)
     interview_reply_to_email: str = "interviews@hiresense.test"
+    livekit_api_url: str = "http://localhost:7880"
+    livekit_public_url: str = "ws://localhost:7880"
+    livekit_api_key: str = ""
+    livekit_api_secret: SecretStr = SecretStr("")
+    livekit_token_ttl_seconds: int = Field(default=120, ge=30, le=300)
+    livekit_api_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    interview_join_base_url: str = "http://localhost:5173"
+    interview_link_secret: SecretStr | None = None
+    interview_room_early_minutes: int = Field(default=15, ge=0, le=120)
+    interview_room_late_minutes: int = Field(default=60, ge=5, le=480)
+    interview_room_end_grace_minutes: int = Field(default=30, ge=0, le=120)
+    interview_link_max_days: int = Field(default=30, ge=1, le=365)
+    candidate_session_minutes: int = Field(default=120, ge=5, le=480)
+    candidate_cookie_secure: bool = True
+    candidate_public_rate_limit: int = Field(default=20, ge=1, le=1000)
+    candidate_waiting_heartbeat_seconds: int = Field(default=45, ge=10, le=300)
 
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
@@ -115,6 +131,13 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET_KEY must contain at least 32 characters"
             )
+        return value
+
+    @field_validator("interview_link_secret")
+    @classmethod
+    def validate_interview_link_secret(cls, value):
+        if value is not None and len(value.get_secret_value()) < 32:
+            raise ValueError("INTERVIEW_LINK_SECRET must contain at least 32 characters")
         return value
 
     @field_validator("interviewer_password")

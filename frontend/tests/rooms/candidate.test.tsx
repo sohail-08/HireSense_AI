@@ -1,0 +1,84 @@
+import React from "react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, expect, test, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { CandidateInterviewPage } from "../../src/pages/CandidateInterviewPage";
+import { RoomApiError } from "../../src/components/interviews/roomApi";
+import { accessMessage } from "../../src/components/interviews/roomState";
+import { getSdk } from "./setup";
+const sdk = getSdk();
+
+const api = vi.hoisted(() => ({ exchange: vi.fn(), candidateStatus: vi.fn(), waiting: vi.fn(), candidateMedia: vi.fn(), candidateConnected: vi.fn(), candidateLeave: vi.fn() }));
+vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
+const info = { job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "scheduled", waiting: false, admitted: false, join_opens_at: "2030-10-14T01:45:00Z", join_closes_at: "2030-10-14T03:00:00Z" };
+function open() { return render(<MemoryRouter initialEntries={["/interview/join/" + "a".repeat(43)]}><Routes><Route path="/interview/join/:token" element={<CandidateInterviewPage />} /></Routes></MemoryRouter>); }
+beforeEach(() => {
+  api.exchange.mockResolvedValue(info); api.candidateStatus.mockResolvedValue(info);
+  api.waiting.mockResolvedValue({ ...info, room_status: "waiting", waiting: true });
+  api.candidateMedia.mockResolvedValue({ server_url: "ws://localhost:7880", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" });
+  api.candidateConnected.mockResolvedValue({ ...info, admitted: true, room_status: "active" });
+  api.candidateLeave.mockResolvedValue(info);
+});
+
+test.each(["invalid_link", "expired_link", "revoked_link", "cancelled", "too_early", "ended", "invalid_session"])("renders safe candidate %s state", async (code) => {
+  api.exchange.mockRejectedValue(new RoomApiError(code, 403, "2030-10-14T01:45:00Z"));
+  open();
+  const expected = accessMessage(code, "2030-10-14T01:45:00Z");
+  await screen.findByRole("heading", { name: expected.title });
+  expect(sdk.prejoins).toBe(0); expect(api.candidateMedia).not.toHaveBeenCalled();
+  expect(window.location.pathname).toBe("/interview/join");
+});
+
+test("devices require an explicit action; waiting has no media connection until admission", async () => {
+  const user = userEvent.setup();
+  open();
+  await screen.findByRole("heading", { name: "Frontend Engineer interview" });
+  expect(sdk.prejoins).toBe(0);
+  await user.click(screen.getByRole("button", { name: "Check devices" }));
+  expect(screen.getByLabelText("Camera device")).toBeTruthy();
+  expect(screen.getByLabelText("Microphone device")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Deny device permission" }));
+  expect(screen.getByRole("alert").textContent).toContain("permission was denied");
+  expect(screen.queryByText("private-device-diagnostics")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Continue to waiting room" }));
+  await screen.findByRole("heading", { name: "Waiting for interviewer" });
+  expect(sdk.room).toBeNull(); expect(api.candidateMedia).not.toHaveBeenCalled();
+  api.candidateStatus.mockResolvedValue({ ...info, room_status: "ready", admitted: true });
+  await waitFor(() => expect(api.candidateMedia).toHaveBeenCalledOnce(), { timeout: 3500 });
+  expect(screen.getByTestId("media-room")).toBeTruthy();
+  expect(screen.getByTestId("remote-audio")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "End interview for everyone" })).toBeNull();
+});
+
+test("leaving the waiting room does not complete the interview", async () => {
+  const user = userEvent.setup(); open();
+  await user.click(await screen.findByRole("button", { name: "Check devices" }));
+  await user.click(screen.getByRole("button", { name: "Continue to waiting room" }));
+  await user.click(await screen.findByRole("button", { name: "Leave waiting room" }));
+  await screen.findByRole("heading", { name: "You left the interview room" });
+  expect(api.candidateLeave).toHaveBeenCalledOnce(); expect(api.candidateMedia).not.toHaveBeenCalled();
+});
+
+test("unsupported browsers get guidance without mounting media devices", async () => {
+  const user = userEvent.setup(); open();
+  await screen.findByRole("heading", { name: "Frontend Engineer interview" });
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined });
+  await user.click(screen.getByRole("button", { name: "Check devices" }));
+  expect(screen.getByRole("alert").textContent).toContain("This browser cannot start an interview");
+  expect(sdk.prejoins).toBe(0);
+});
+
+test("leaving during admission cannot connect a late media-token response", async () => {
+  const user = userEvent.setup(); open();
+  await user.click(await screen.findByRole("button", { name: "Check devices" }));
+  await user.click(screen.getByRole("button", { name: "Continue to waiting room" }));
+  let resolve: (value: any) => void = () => {};
+  api.candidateMedia.mockImplementation(() => new Promise((done) => { resolve = done; }));
+  api.candidateStatus.mockResolvedValue({ ...info, room_status: "ready", admitted: true });
+  await waitFor(() => expect(api.candidateMedia).toHaveBeenCalledOnce(), { timeout: 3500 });
+  await user.click(screen.getByRole("button", { name: "Leave waiting room" }));
+  await act(async () => resolve({ server_url: "ws://localhost:7880", participant_token: "fake-only", role: "candidate" }));
+  await screen.findByRole("heading", { name: "You left the interview room" });
+  expect(sdk.room).toBeNull();
+});

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { InterviewSchedulingPanel } from "../components/interviews/InterviewSchedulingPanel";
@@ -55,6 +56,7 @@ export function InterviewsPage() {
                   </td>
                   <td className="p-2">
                     <p className="font-semibold">{item.candidate_name}</p>
+                    <Link className="mt-2 inline-block font-medium text-blue-700" to={`/interviews/${item.id}/console`}>Open interview console</Link>
                     <p className="mt-1 text-xs text-slate-500">{item.job_title} · {item.stage} · Interview #{item.id}</p>
                     {item.history.length ? (
                       <details className="mt-2">

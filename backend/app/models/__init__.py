@@ -35,10 +35,11 @@ from app.models.screening import (
 from app.models.supervisor import SupervisorSession
 from app.models.scoring import CandidateScore, ScoringConfiguration, ScoringRequestKey, ScoringRun
 from app.models.user import User, UserRole
-from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery
+from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery, CandidateInterviewSession
 
 __all__ = [
     "InterviewBatch", "InterviewSchedule", "InterviewDelivery",
+    "CandidateInterviewSession",
     "CandidateScore",
     "ScoringConfiguration",
     "ScoringRequestKey",

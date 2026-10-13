@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+.hiresense-device-check .lk-username-container { display: none; }
+
 .interviewer-main {
   transition: padding-right 300ms ease-out;
 }

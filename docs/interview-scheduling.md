@@ -1,8 +1,10 @@
 # Candidate selection and interview invitations
 
 This increment adds internal schedules and SMTP email with `.ics` attachments.
-It does **not** generate meeting links or connect Google Calendar, Outlook, Meet,
-Teams or Zoom. `interview_schedules.meeting_url` remains nullable for later work.
+The subsequent [LiveKit interview-room increment](interview-rooms.md) adds secure
+HireSense candidate links to invitation previews, SMTP email and ICS descriptions.
+It still does not connect Google Calendar, Outlook, Meet, Teams or Zoom.
+`interview_schedules.meeting_url` remains nullable; bearer links are never stored there.
 No real invitations were sent during implementation; automated delivery tests use mocks.
 
 ## Setup

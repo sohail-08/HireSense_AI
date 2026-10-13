@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "test:scoring": "node --test tests/scoring-display.test.mjs",
     "test:interviews": "node --test tests/interview-schedule.test.mjs",
+    "test:rooms": "vitest run --config vitest.rooms.config.ts",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
@@ -15,13 +16,20 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "livekit-client": "2.22.4",
+    "@livekit/components-react": "2.9.24",
+    "@livekit/components-styles": "1.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.9.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "5.0.4",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.1",
+    "jsdom": "26.1.0"
   }
 }
