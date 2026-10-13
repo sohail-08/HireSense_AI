@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 from app.agents.approval import is_explicit_approval
 from app.agents.interview_commands import GeminiInterviewCommandModel
@@ -17,19 +18,25 @@ class InterviewAssistantService:
         schedules = client.call("list_interview_schedules", {})
         public_context = {"jobs": jobs, "selected_job_posting_id": selected_job_id,
             "selected_application_ids": selected_ids, "schedules": schedules,
+            "selection_rule": workflow.get("rule", {}),
             "selection": workflow.get("selection_preview"), "schedule": workflow.get("schedule", {}),
             "awaiting_confirmation": bool(workflow.get("preview"))}
         command = self.model.interpret(message, public_context)
+        self.ground_selection(command, message)
         if command.intent == "cancel":
             workflow = {}
             text, phase, outcome = "Unconfirmed workflow cancelled. No additional emails were sent; existing interview schedules are unchanged. Scheduled-interview cancellation is not supported in this increment.", "interview_selection", "info"
         elif command.intent == "approve":
-            import re
             wrong_object = re.search(r"\b(?:job description|job post|publish|requirements)\b", message.casefold())
             if wrong_object or supervisor.phase != "interview_approval" or not is_explicit_approval(message) or not workflow.get("preview"):
                 raise ValueError("Prepare a preview, then explicitly confirm sending invitations.")
             if "@" in message:
                 raise ValueError("Recipients must come from the database selection preview. Confirm without adding email addresses, or change the selection and preview again.")
+            for source, target in (("job_posting_id", "job_posting_id"), ("selection_mode", "mode"),
+                ("top_n", "top_n"), ("threshold", "threshold"), ("operator", "operator"), ("stage", "stage")):
+                value = getattr(command, source)
+                if value is not None and value != workflow.get("rule", {}).get(target):
+                    raise ValueError("Candidate selection changes need a new preview before confirmation.")
             for key in ("date", "start_time", "timezone", "duration_minutes", "mode", "buffer_minutes", "instructions", "subject_template", "body_template"):
                 value = getattr(command, key)
                 if value is not None and value != workflow.get("schedule", {}).get(key):
@@ -52,7 +59,9 @@ class InterviewAssistantService:
             text = f"Confirmed {result['recipient_count']} invitations. Delivery is queued; sent, failed and uncertain results will appear after processing."
         else:
             updates = command.model_dump(exclude_none=True)
-            if command.intent == "selection":
+            # An interpreter's "selection" label is not a new-workflow command.
+            # Date/time follow-ups must retain the previously chosen candidates.
+            if command.intent == "selection" and command.selection_mode and workflow.get("rescheduling"):
                 workflow = {}
             if command.intent == "reschedule":
                 if command.needs_schedule_selection:
@@ -93,7 +102,6 @@ class InterviewAssistantService:
                     workflow["rule"] = rule
                     return self.save(supervisor, state, workflow, "interview_selection", "Choose a job posting by ID: " + ", ".join(f"#{job['id']} {job['title']}" for job in jobs) + ".")
                 if command.selection_mode == "threshold" or command.threshold is not None:
-                    import re
                     lowered = message.casefold()
                     if re.search(r"at least|greater than or equal|more than or equal|no less than|>=", lowered):
                         rule["operator"] = "gte"
@@ -101,16 +109,24 @@ class InterviewAssistantService:
                         rule["operator"] = "gt"
                 if rule.get("mode") == "manual" and (selected_ids or not rule.get("application_ids")):
                     rule["application_ids"] = selected_ids
+                irrelevant = {"top_n": ("threshold", "operator", "application_ids"),
+                    "threshold": ("top_n", "application_ids"), "manual": ("top_n", "threshold", "operator")}
+                for key in irrelevant.get(rule.get("mode"), ()):
+                    rule.pop(key, None)
                 workflow["rule"] = rule
-                missing = [label for key, label in (("job_posting_id", "job posting"), ("mode", "selection method: top N, score threshold, or checked candidates")) if not rule.get(key)]
+                questions = []
+                if not rule.get("job_posting_id"):
+                    questions.append("Which job posting should I use?")
+                if not rule.get("mode"):
+                    questions.append("How many candidates from the top should I select, or above which score should I select candidates?")
                 if rule.get("mode") == "top_n" and not rule.get("top_n"):
-                    missing.append("number of candidates")
+                    questions.append("How many candidates from the top should I select?")
                 if rule.get("mode") == "threshold" and rule.get("threshold") is None:
-                    missing.append("threshold and whether you mean greater than or at least")
+                    questions.append("Candidates above which score should I select?")
                 elif rule.get("mode") == "threshold" and not rule.get("operator"):
-                    missing.append("whether the threshold is strictly greater than or at least")
-                if missing:
-                    return self.save(supervisor, state, workflow, "interview_selection", "Please provide " + ", ".join(missing) + ".")
+                    questions.append(f"Should candidates score more than {rule['threshold']}%, or is exactly {rule['threshold']}% also acceptable?")
+                if questions:
+                    return self.save(supervisor, state, workflow, "interview_selection", "\n".join(questions))
                 if rule["job_posting_id"] not in {job["id"] for job in jobs}:
                     raise ValueError("Select a job from the authorized job postings")
                 selection = client.call("preview_candidate_selection", {"data": SelectionRequest.model_validate(rule).model_dump(mode="json")})
@@ -137,6 +153,30 @@ class InterviewAssistantService:
             phase, outcome = "interview_approval", "info"
             text = prefix + "\n\n" + self.preview_text(preview) + "\n\nReply ‘confirm’ to send, or tell me what to change. No email has been sent."
         return self.save(supervisor, state, workflow, phase, text, outcome)
+
+    @staticmethod
+    def ground_selection(command, message):
+        """Do not let schedule-only follow-ups overwrite a known candidate rule."""
+        text = message.casefold()
+        numbers = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+        top = re.search(r"\b(?:top|best|first|highest(?:[- ]ranked)?)\s+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\b", text)
+        cue = re.search(r"\b(?:top|best|highest|first|scores?|scored|threshold|checkboxes?)\b|\b(?:checked|selected)\s+candidates\b", text)
+        bare_score = re.fullmatch(r"\s*(?:above|over|more than|at least|greater than(?: or equal to)?|[<>]=?)\s*\d+(?:\.\d+)?\s*%?[.!]?\s*", text)
+        score = re.search(r"(>=|>|\b(?:greater than or equal(?: to)?|more than or equal(?: to)?|at least|no less than|more than|greater than|above|over)\b)\s*(\d+(?:\.\d+)?)\s*%?", text)
+        score_context = bool(re.search(r"\b(?:candidates?|applicants?|scores?|scored)\b", text) or bare_score)
+        score_units = bool(score and re.match(r"(?:minutes?|mins?|hours?|hrs?|days?)\b", text[score.end():].lstrip()))
+        if not cue and not bare_score and not (score and score_context and not score_units):
+            command.selection_mode = command.top_n = command.threshold = command.operator = None
+        elif top:
+            value = top.group(1)
+            command.selection_mode = "top_n"
+            command.top_n = int(value) if value.isdigit() else numbers[value]
+            command.threshold = command.operator = None
+        elif score and score_context and not score_units:
+            command.selection_mode, command.threshold = "threshold", score.group(2)
+            command.operator = "gte" if score.group(1) in {">=", "at least", "no less than"} or "equal" in score.group(1) else "gt"
+            command.top_n = None
 
     @staticmethod
     def save(supervisor, state, workflow, phase, text, outcome="info"):

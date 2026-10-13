@@ -141,6 +141,83 @@ def test_chat_rejects_group_mode_without_preparing_or_sending(setup):
     assert not sender.calls and "prepare_interview_invites" not in client.calls
 
 
+@pytest.mark.parametrize("user_text,mode,value", [
+    ("schedule interview with top 3 candidates", "top_n", 3),
+    ("select candidates above 0", "threshold", "0"),
+])
+def test_chat_keeps_selection_across_reload_and_misclassified_schedule_followup(setup, user_text, mode, value):
+    from app.models.supervisor import SupervisorSession
+    db, owner, _, posting, _, _, service, sender = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        command = InterviewCommand(intent="selection", job_posting_id=posting.id)
+        def interpret(self, message, context):
+            self.context = context
+            return self.command.model_copy()
+    model = Commands()
+    assistant = InterviewAssistantService(model, lambda user_id: client)
+    supervisor = SupervisorSession(interviewer_user_id=owner.id, state_json={}, phase="published")
+    db.add(supervisor)
+    db.flush()
+    result = assistant.handle(db, supervisor, owner.id, user_text, [{"id": posting.id}], posting.id, [])
+    supervisor.phase = result["phase"]
+    assert result["phase"] == "interview_schedule"
+    db.commit()
+    session_id = supervisor.id
+    db.expunge(supervisor)
+    supervisor = db.get(SupervisorSession, session_id)
+    # Reproduce the LLM error from the screenshot: date/time marked "selection",
+    # plus an invented different method that the human never requested.
+    model.command = InterviewCommand(intent="selection", selection_mode="manual", date=(date.today() + timedelta(days=20)).isoformat(), start_time="08:00", duration_minutes=30)
+    result = assistant.handle(db, supervisor, owner.id, "date: 20 days later\ntime: 8.00 am\nduration: 30 minutes", [{"id": posting.id}], posting.id, [])
+    assert model.context["selection_rule"]["mode"] == mode
+    rule = supervisor.state_json["interview_workflow"]["rule"]
+    assert rule["mode"] == mode and rule["top_n" if mode == "top_n" else "threshold"] == value
+    assert result["phase"] == "interview_approval"
+    assert "Reply ‘confirm’" in result["assistant_message"]
+    assert "selection method" not in result["assistant_message"]
+    assert not sender.calls and db.scalar(select(func.count(InterviewSchedule.id))) == 0
+
+
+def test_chat_asks_for_candidate_choice_in_plain_language_when_missing(setup):
+    db, owner, _, posting, _, _, service, _ = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        def interpret(self, message, context):
+            return InterviewCommand(intent="selection", job_posting_id=posting.id, selection_mode="top_n", top_n=5)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    assistant = InterviewAssistantService(Commands(), lambda user_id: client)
+    result = assistant.handle(db, supervisor, owner.id, "schedule interviews", [{"id": posting.id}], posting.id, [])
+    assert result["phase"] == "interview_selection"
+    assert "How many candidates from the top" in result["assistant_message"]
+    assert "above which score" in result["assistant_message"]
+    assert "top N" not in result["assistant_message"] and "threshold" not in result["assistant_message"]
+    assert "preview_candidate_selection" not in client.calls
+
+
+def test_explicit_changed_candidate_choice_replaces_rule_but_keeps_schedule(setup):
+    db, owner, _, posting, _, _, service, _ = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        command = InterviewCommand(intent="selection", job_posting_id=posting.id, date=(date.today() + timedelta(days=20)).isoformat(), start_time="10:00", duration_minutes=30)
+        def interpret(self, message, context): return self.command.model_copy()
+    model = Commands()
+    assistant = InterviewAssistantService(model, lambda user_id: client)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    result = assistant.handle(db, supervisor, owner.id, "top 3, 20 days later at 10:00, 30 minutes", [{"id": posting.id}], posting.id, [])
+    first_id = supervisor.state_json["interview_workflow"]["preview"]["id"]
+    model.command = InterviewCommand(intent="selection")
+    result = assistant.handle(db, supervisor, owner.id, "make it top 2 instead", [{"id": posting.id}], posting.id, [])
+    workflow = supervisor.state_json["interview_workflow"]
+    assert workflow["rule"]["top_n"] == 2 and workflow["schedule"]["start_time"] == "10:00"
+    assert result["phase"] == "interview_approval" and workflow["preview"]["id"] != first_id
+    supervisor.phase = result["phase"]
+    model.command = InterviewCommand(intent="approve")
+    with pytest.raises(ValueError, match="selection changes need a new preview"):
+        assistant.handle(db, supervisor, owner.id, "confirm but select top 1", [{"id": posting.id}], posting.id, [])
+    assert "confirm_and_send_interview_invites" not in client.calls
+
+
 def test_command_interpretation_does_not_invent_missing_schedule_fields(monkeypatch):
     from app.agents.interview_commands import GeminiInterviewCommandModel
     import app.agents.interview_commands as commands
@@ -151,6 +228,9 @@ def test_command_interpretation_does_not_invent_missing_schedule_fields(monkeypa
     assert all(getattr(parsed, key) is None for key in ("date", "start_time", "timezone", "duration_minutes", "mode", "buffer_minutes"))
     parsed = GeminiInterviewCommandModel().interpret("2030-01-01 at 10:00 Asia/Dhaka, 30 minutes, shared, 10 minute buffer", {})
     assert parsed.date == "2030-01-01" and parsed.mode == "shared" and parsed.buffer_minutes == 10
+    invented.update({"date": "2030-10-14", "start_time": "08:00"})
+    parsed = GeminiInterviewCommandModel().interpret("date: 14th October, 2030\ntime: 8.00 am\nduration: 30 minutes", {})
+    assert parsed.date == "2030-10-14" and parsed.start_time == "08:00"
 
 
 def test_chat_threshold_operator_and_named_job_are_grounded(setup):

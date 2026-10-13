@@ -45,8 +45,8 @@ delivery receipt. Configure domain authentication and privacy policies separatel
 ## Manual interviewer flow
 
 1. On **Assessments**, select a job and a current saved ranking.
-2. Use row checkboxes, or expand **Schedule interview** and choose top N or a score
-   threshold. `Greater than` uses `>`; `At least` uses `>=`. Comparisons use saved,
+2. Use row checkboxes, or expand **Schedule interview** and choose **Highest-ranked
+   candidates** or **Candidates above a score**. `Above` uses `>`; `At least` uses `>=`. Comparisons use saved,
    unrounded decimal scores. Selection previews filter candidates and list exclusions.
 3. Review selected names, ranks, display scores and masked emails. Top N examines
    the original first N saved ranking entries, then excludes ineligible applicants
@@ -90,6 +90,14 @@ Use the existing central assistant, including on Interviews:
 
 The assistant automatically uses sequential slots and defaults to `Asia/Dhaka`;
 it asks for date, start time and duration, not scheduling mode or a missing time zone.
+An existing choice such as “top 3” or “candidates above 70” stays in persistent
+workflow state through date/time follow-ups and reloads, even if the command
+interpreter mislabels a follow-up as selection. The user need not repeat it.
+Without a choice, it asks “How many candidates from the top should I select, or
+above which score should I select candidates?” Technical selection names are
+kept internal. Supplying the date/time prepares an exact email preview; explicit
+confirmation is still required before sending. Changing the selection invalidates
+the old preview rather than sending to its previous recipients.
 
 - “Schedule interviews for the top 5 frontend engineer candidates.”
 - “Send invitations to candidates who scored more than 70.”
@@ -211,6 +219,20 @@ Sequential-only simplification verified on 13 October 2026: 161 backend tests,
 the production build. Stage/time-zone/mode controls are removed from the form;
 date, start time, duration and buffer remain. No migration or historical-record
 rewrite is required. Delivery tests remained mocked.
+
+Top-N selection correction: eligibility filtering now occurs **after** restricting
+the candidate pool to the first N saved ranking entries. Existing active interviews
+or invalid addresses reduce the invitation count rather than pulling candidates
+from lower positions. A regression test reproduces top 3 incorrectly including
+rank 6, and the backend suite now passes 162 tests. Existing schedules are not
+changed; obtain a fresh selection preview before confirming an older workflow.
+
+Conversation follow-up correction: candidate rules are no longer cleared solely
+because the interpreter returns `selection` for a scheduling detail. Rules persist
+through database reloads, and explicit rule changes receive a new preview. Tests
+cover omitted choices, misclassified date/time messages, ordinal dates such as
+“14th October”, and confirmation that attempts to change recipients. All 166
+backend tests, 9 frontend tests and the production build passed; email tests were mocked.
 
 Suggested commits (you perform Git operations):
 
