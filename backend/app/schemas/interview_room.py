@@ -34,6 +34,7 @@ class CandidateRoomInfo(RoomBoundary):
     waiting: bool
     admitted: bool
     link_expires_at: datetime | None
+    media_notice: str | None = None
 
 
 class InterviewerRoomInfo(CandidateRoomInfo):
@@ -42,6 +43,7 @@ class InterviewerRoomInfo(CandidateRoomInfo):
     room_version: int
     has_join_link: bool
     link_revoked: bool
+    link_origin_outdated: bool = False
     candidate_joined_at: datetime | None
     interviewer_joined_at: datetime | None
     interview_started_at: datetime | None

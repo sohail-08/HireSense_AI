@@ -92,6 +92,35 @@ def test_link_lifetime_and_nested_snapshot_redaction(room_setup):
     assert datetime.fromisoformat(material["expires_at"]) == clock.value + timedelta(days=rooms.settings.interview_link_max_days)
 
 
+def test_public_website_demo_reports_local_media_and_outdated_links(room_setup):
+    setup, rooms, media, _, row, token, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    rooms.settings = rooms.settings.model_copy(update={'frontend_url': 'https://demo.trycloudflare.com',
+        'interview_join_base_url': 'https://demo.trycloudflare.com', 'candidate_cookie_secure': True})
+    rooms.links = InterviewLinks(rooms.settings, rooms.now)
+    info = rooms.info(db, row, interviewer=True)
+    assert info['media_notice'].startswith('Website-only demo:') and info['link_origin_outdated']
+    cookie, _, _ = rooms.exchange(db, token)
+    rooms.waiting(db, cookie); rooms.admit(db, owner.id, row.id)
+    with pytest.raises(MediaUnavailable, match='Website-only demo'):
+        rooms.media_access(db, candidate_token=cookie)
+    with pytest.raises(MediaUnavailable): rooms.media_access(db, user_id=owner.id, interview_id=row.id)
+    assert not media.created and not media.tokens
+    rooms.settings = rooms.settings.model_copy(update={'livekit_public_url': 'wss://media.example.com'})
+    assert rooms.media_notice() is None
+
+
+def test_explicit_rotation_updates_invitation_to_demo_origin(room_setup):
+    setup, rooms, _, _, row, token, _ = room_setup
+    db, owner, _, _, _, _, _, _ = setup
+    rooms.settings = rooms.settings.model_copy(update={'interview_join_base_url': 'https://demo.trycloudflare.com'})
+    rooms.links = InterviewLinks(rooms.settings, rooms.now)
+    replacement = rooms.link(db, owner.id, row.id, rotate=True)
+    assert replacement['join_url'].startswith('https://demo.trycloudflare.com/interview/join/')
+    assert not rooms.info(db, row, interviewer=True)['link_origin_outdated']
+    with pytest.raises(RoomAccessError): rooms.exchange(db, token)
+
+
 @pytest.mark.parametrize("case,code", [("expired", "expired_link"), ("revoked", "revoked_link"),
     ("cancelled", "cancelled"), ("ended", "ended")])
 def test_invalid_lifecycle_and_expired_credentials_reject_candidate(room_setup, case, code):

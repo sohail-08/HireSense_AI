@@ -422,6 +422,11 @@ hiresense/
 
 ## Suggested Git checkpoints
 
+For a website-only remote demo without deploying the project, see
+[Cloudflare demo setup](cloudflare-demo.md). Cloudflare exposes the website, not
+LiveKit RTC media; the app explicitly warns when the public website still uses
+a localhost media endpoint.
+
 No Git add/commit/push is performed by the implementation. Changes are delivered
 together and tests run against the integrated working tree. These are suggested
 logical review boundaries, not claims that every possible partial staging order

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-.hiresense-device-check .lk-username-container { display: none; }
+/* LiveKit places the submit button in this same form. Hide only the name field. */
+.hiresense-device-check .lk-username-container input[name="username"] { display: none; }
+.hiresense-device-check .lk-username-container .lk-join-button { width: 100%; }
 
 .interviewer-main {
   transition: padding-right 300ms ease-out;

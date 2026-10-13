@@ -414,6 +414,11 @@ database named in the supplied connection URL.
 
 ## Stop
 
+For a temporary HTTPS website demo on another device, see
+[Cloudflare demo setup](docs/cloudflare-demo.md). This keeps LiveKit self-hosted;
+remote interview audio/video requires separate media networking. Stop the tunnel
+with `./scripts/stop-cloudflare-demo.ps1` when finished.
+
 ```powershell
 docker compose down
 ```

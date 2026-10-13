@@ -4,6 +4,7 @@ import logging
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from app.config import get_settings
@@ -170,16 +171,27 @@ class InterviewRooms:
             and utc(row.candidate_last_seen_at) > self.now() - timedelta(seconds=self.settings.candidate_waiting_heartbeat_seconds))
         result = {"job_title": job.title, "scheduled_start": utc(row.start_utc), "scheduled_end": utc(row.end_utc),
             "timezone": row.timezone, "room_status": row.room_status, "waiting": waiting,
-            "admitted": bool(row.candidate_admitted_at), "link_expires_at": utc(row.join_token_expires_at) if row.join_token_expires_at else None}
+            "admitted": bool(row.candidate_admitted_at), "link_expires_at": utc(row.join_token_expires_at) if row.join_token_expires_at else None,
+            "media_notice": self.media_notice()}
         if interviewer:
             app = db.get(CandidateApplication, row.application_id)
             candidate = db.get(Candidate, app.candidate_id) if app and app.candidate_id else None
             result.update(interview_id=row.id, candidate_name=candidate.name if candidate else "Candidate",
                 room_version=row.room_version, has_join_link=bool(row.join_token_hash),
+                link_origin_outdated=bool(row.join_token_hash and
+                    (row.join_base_url or '').rstrip('/') != self.settings.interview_join_base_url.rstrip('/')),
                 link_revoked=bool(row.join_token_revoked_at), candidate_joined_at=row.candidate_joined_at,
                 interviewer_joined_at=row.interviewer_joined_at, interview_started_at=row.interview_started_at,
                 interview_ended_at=row.interview_ended_at)
         return result
+
+    def media_notice(self):
+        front = urlsplit(self.settings.frontend_url)
+        media = urlsplit(self.settings.livekit_public_url)
+        loopback = {'localhost', '127.0.0.1', '::1'}
+        if front.scheme == 'https' and front.hostname not in loopback and media.hostname in loopback:
+            return 'Website-only demo: remote audio/video is unavailable because LiveKit is still on localhost. A reachable LiveKit media endpoint must be configured separately.'
+        return None
 
     def candidate_status(self, db, token):
         row = self.session(db, token, lock=True)
@@ -221,6 +233,8 @@ class InterviewRooms:
         else:
             row, role = self.owned(db, user_id, interview_id, lock=True), "interviewer"
             self.usable(db, row)
+        if notice := self.media_notice():
+            raise MediaUnavailable(notice)
         self.retire_media(row)
         self.media.ensure_room(row.room_name)
         result = self.media.token(row.room_name, role, utc(row.join_token_expires_at))

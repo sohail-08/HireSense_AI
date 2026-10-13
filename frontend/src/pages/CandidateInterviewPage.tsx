@@ -36,7 +36,7 @@ export function CandidateInterviewPage() {
       void roomApi.candidateStatus().then(async (result) => {
         if (!active) return;
         setInfo(result);
-        if (view === "waiting" && result.admitted && devices && !busy.current) {
+        if (view === "waiting" && result.admitted && devices && !result.media_notice && !busy.current) {
           busy.current = true;
           const attempt = operation.current;
           setMessage("You have been admitted. Connecting…");
@@ -75,9 +75,10 @@ export function CandidateInterviewPage() {
         {linkState ? <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm"><h1 className="text-2xl font-bold">{linkState.title}</h1><p className="mt-3 text-slate-600">{linkState.message}</p></section> : !info ? <p role="status" className="mt-6">Checking your interview invitation…</p> : <>
           <h1 className="mt-6 text-2xl font-bold">{info.job_title} interview</h1>
           <p className="mt-2 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} ({info.timezone}) · Private one-to-one room · No recording</p>
+          {info.media_notice ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{info.media_notice}</p> : null}
           <div className="mt-6">
             {view === "prejoin" ? <DeviceCheck role="candidate" onReady={(choices) => void ready(choices)} /> : null}
-            {view === "waiting" ? <section className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-xl font-semibold">Waiting for interviewer</h2><p role="status" className="mt-3 text-slate-600">{message || "You will enter when the interviewer admits you. No live media connection has been made yet."}</p><p className="mt-3 text-sm text-slate-500">Microphone: {devices?.audioEnabled ? "ready" : "off"} · Camera: {devices?.videoEnabled ? "ready" : "off"}</p><button className="mt-5 rounded-lg border px-4 py-2" onClick={() => void leave()}>Leave waiting room</button></section> : null}
+            {view === "waiting" ? <section className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-xl font-semibold">{info.admitted && info.media_notice ? "Admitted — website-only demo" : "Waiting for interviewer"}</h2><p role="status" className="mt-3 text-slate-600">{info.admitted && info.media_notice ? "The interviewer admitted you, but audio/video requires a separately reachable LiveKit server." : message || "You will enter when the interviewer admits you. No live media connection has been made yet."}</p><p className="mt-3 text-sm text-slate-500">Microphone: {devices?.audioEnabled ? "ready" : "off"} · Camera: {devices?.videoEnabled ? "ready" : "off"}</p><button className="mt-5 rounded-lg border px-4 py-2" onClick={() => void leave()}>Leave waiting room</button></section> : null}
             {view === "room" && access && devices ? <InterviewMediaRoom access={access} devices={devices}
               onConnected={() => { void roomApi.candidateConnected().then(setInfo).catch(() => setMessage("Media connected; interview status could not be updated yet.")); }}
               onLeave={() => void leave()} onEnded={() => setFatal(new RoomApiError("ended", 410))} /> : null}

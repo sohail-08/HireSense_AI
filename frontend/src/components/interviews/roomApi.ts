@@ -4,10 +4,12 @@ export type RoomStatus = "scheduled" | "waiting" | "ready" | "active" | "ending"
 export type CandidateRoomInfo = {
   job_title: string; scheduled_start: string; scheduled_end: string; timezone: string;
   room_status: RoomStatus; waiting: boolean; admitted: boolean; link_expires_at: string | null;
+  media_notice?: string | null;
 };
 export type InterviewerRoomInfo = CandidateRoomInfo & {
   interview_id: number; candidate_name: string; room_version: number; has_join_link: boolean; link_revoked: boolean;
   candidate_joined_at: string | null; interviewer_joined_at: string | null;
+  link_origin_outdated?: boolean;
   interview_started_at: string | null; interview_ended_at: string | null;
 };
 export type MediaAccess = { server_url: string; participant_token: string; expires_at: string; role: "candidate" | "interviewer" };

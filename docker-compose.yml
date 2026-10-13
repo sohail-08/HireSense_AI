@@ -204,5 +204,18 @@ services:
 
     restart: unless-stopped
 
+  # Opt-in website-only demo. No app credentials are passed to this service.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    profiles: ["cloudflare-demo"]
+    command: ["tunnel", "--no-autoupdate", "--url", "http://frontend:80", "--metrics", "0.0.0.0:2000", "--protocol", "http2", "--loglevel", "fatal"]
+    # Read the hostname through /quicktunnel, not credential-bearing request logs.
+    ports:
+      - "127.0.0.1:${CLOUDFLARE_METRICS_PORT:-20241}:2000"
+    depends_on:
+      frontend:
+        condition: service_started
+    restart: "no"
+
 volumes:
   postgres_data:

@@ -1,0 +1,7 @@
+# Demo-only runtime override. The root .env remains the sole environment file.
+services:
+  backend:
+    environment:
+      FRONTEND_URL: ${DEMO_PUBLIC_URL:?Run scripts/start-cloudflare-demo.ps1 first}
+      INTERVIEW_JOIN_BASE_URL: ${DEMO_PUBLIC_URL:?Run scripts/start-cloudflare-demo.ps1 first}
+      CANDIDATE_COOKIE_SECURE: "true"

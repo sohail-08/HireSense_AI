@@ -60,6 +60,21 @@ test("leaving the waiting room does not complete the interview", async () => {
   expect(api.candidateLeave).toHaveBeenCalledOnce(); expect(api.candidateMedia).not.toHaveBeenCalled();
 });
 
+test("website-only demo shows admission without requesting unreachable media", async () => {
+  const user = userEvent.setup();
+  const demo = { ...info, media_notice: "Website-only demo: remote audio/video is unavailable." };
+  api.exchange.mockResolvedValue(demo);
+  api.waiting.mockResolvedValue({ ...demo, waiting: true, room_status: "waiting" });
+  api.candidateStatus.mockResolvedValue({ ...demo, admitted: true, room_status: "ready" });
+  open();
+  await user.click(await screen.findByRole("button", { name: "Check devices" }));
+  await user.click(screen.getByRole("button", { name: "Continue to waiting room" }));
+  await screen.findByRole("heading", { name: "Admitted — website-only demo" }, { timeout: 3500 });
+  expect(screen.getByRole("alert").textContent).toContain("remote audio/video is unavailable");
+  expect(api.candidateMedia).not.toHaveBeenCalled();
+  expect(sdk.room).toBeNull();
+});
+
 test("unsupported browsers get guidance without mounting media devices", async () => {
   const user = userEvent.setup(); open();
   await screen.findByRole("heading", { name: "Frontend Engineer interview" });

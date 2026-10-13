@@ -64,15 +64,17 @@ export function InterviewerConsolePage() {
           <h1 className="mt-5 text-2xl font-bold">Interview console</h1>
           <p className="mt-2 font-medium">{info.candidate_name} · {info.job_title}</p>
           <p className="mt-1 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} ({info.timezone}) · {info.room_status}</p>
+          {info.media_notice ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{info.media_notice}</p> : null}
+          {info.link_origin_outdated ? <p className="mt-3 text-sm text-amber-900">This invitation uses a different website address. Update the candidate link before sharing it for this demo.</p> : null}
           {message ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{message}</p> : null}
           {!closed ? <section className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
             <p role="status" className="mr-auto font-medium">{info.waiting ? "Candidate is waiting" : info.admitted ? "Candidate admitted" : "Candidate has not entered the waiting room"}</p>
             <button className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:bg-slate-300" disabled={busy || !info.waiting || info.admitted} onClick={() => void action(async () => setInfo(await roomApi.admit(id)))}>Admit candidate</button>
-            <button className="rounded-lg border px-3 py-2 text-sm" disabled={busy} onClick={() => void copyLink()}>{info.has_join_link && !info.link_revoked ? "Copy candidate link" : "Generate candidate link"}</button>
+            <button className="rounded-lg border px-3 py-2 text-sm" disabled={busy} onClick={() => info.link_origin_outdated ? setConfirmLink("rotate") : void copyLink()}>{info.link_origin_outdated ? "Update candidate link" : info.has_join_link && !info.link_revoked ? "Copy candidate link" : "Generate candidate link"}</button>
             <button className="text-sm text-blue-700" disabled={busy} onClick={() => setConfirmLink("rotate")}>Replace link</button>
             <button className="text-sm text-red-700" disabled={busy || !info.has_join_link || info.link_revoked} onClick={() => setConfirmLink("revoke")}>Revoke link</button>
           </section> : <section className="mt-5 rounded-xl bg-white p-5"><h2 className="text-lg font-semibold">{info.room_status === "ending" ? "Room access is closed; finishing room shutdown" : info.room_status === "cancelled" ? "Interview cancelled" : "Interview ended"}</h2><p className="mt-2 text-slate-600">No new participant access can be issued.</p></section>}
-          {!closed && !access ? <div className="mt-6"><DeviceCheck role="interviewer" onReady={setDevices} />{devices ? <button className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white" disabled={busy} onClick={() => void connect()}>Join interview room</button> : null}</div> : null}
+          {!closed && !access ? <div className="mt-6"><DeviceCheck role="interviewer" onReady={setDevices} />{devices ? <button className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white" disabled={busy || Boolean(info.media_notice)} onClick={() => void connect()}>Join interview room</button> : null}</div> : null}
           {!closed && access && devices ? <div className="mt-6"><InterviewMediaRoom access={access} devices={devices}
             onConnected={() => { void roomApi.interviewerConnected(id).then(setInfo).catch(() => setMessage("Media connected; room status could not be updated yet.")); }}
             onLeave={() => { setAccess(undefined); void roomApi.interviewerLeave(id).then(setInfo).catch(() => setMessage("You left media, but the application could not update your leave status.")); }}
