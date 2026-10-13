@@ -48,12 +48,17 @@ delivery receipt. Configure domain authentication and privacy policies separatel
 2. Use row checkboxes, or expand **Schedule interview** and choose top N or a score
    threshold. `Greater than` uses `>`; `At least` uses `>=`. Comparisons use saved,
    unrounded decimal scores. Selection previews filter candidates and list exclusions.
-3. Review selected names, ranks, display scores and masked emails. Top N selects
-   exactly N eligible applications when available; ties follow saved rank/application
-   order and a boundary warning is shown. Historical/stale rankings must be refreshed.
-4. Choose the interview stage, date, local time, IANA zone, duration, mode and buffer.
-   UI starts with `Asia/Dhaka`; you can change it. Multiple candidates require an
-   explicit shared/group or sequential mode. A 30-minute duration and 10-minute buffer
+3. Review selected names, ranks, display scores and masked emails. Top N examines
+   the original first N saved ranking entries, then excludes ineligible applicants
+   without backfilling from lower positions. Thus top 3 can yield fewer than 3
+   invitations, but never select someone from position 6. Ties follow saved
+   rank/application order and a boundary warning is shown. Historical/stale rankings
+   must be refreshed.
+4. Enter the date, start time, duration and buffer. The form uses the default
+   `technical` stage internally and `Asia/Dhaka` automatically; neither is an input.
+   Every invitation and reschedule uses **sequential individual slots**. There is no
+   scheduling-mode selector, and API/MCP requests for shared/group mode are rejected.
+   A 30-minute duration and 10-minute buffer
    allocate 10:00, 10:40, 11:20, etc. UTC instants and original local times are saved.
 5. Optionally edit instructions and subject/body templates. Supported fields are
    `{candidate_name}`, `{job_title}`, `{company_name}`, `{local_date}`,
@@ -76,17 +81,20 @@ for the same stage. This is **invitation eligibility**, not a return to a rankin
 queue: the three-outcome scoring/ranking policy remains unchanged. Recipients cannot
 be arbitrary addresses supplied in a chat command. IANA-invalid, past, ambiguous and
 nonexistent DST times are rejected. Conflicting interview slots must be changed;
-there is no silent conflict override. Shared time is allowed only within the explicitly
-chosen new group, not over another existing interview.
+there is no silent conflict override. Older shared/group schedules remain readable;
+their history is preserved, but new previews and reschedules are sequential-only.
 
 ## Central chatbot and MCP
 
 Use the existing central assistant, including on Interviews:
 
+The assistant automatically uses sequential slots and defaults to `Asia/Dhaka`;
+it asks for date, start time and duration, not scheduling mode or a missing time zone.
+
 - “Schedule interviews for the top 5 frontend engineer candidates.”
 - “Send invitations to candidates who scored more than 70.”
 - “Select candidates scoring at least 80.”
-- “Use 15 October 2026, 10:00, Asia/Dhaka, 30 minutes, sequential, 10-minute buffer.”
+- “Use 15 October 2026 at 10:00, 30 minutes, with a 10-minute buffer.”
 - “Confirm.” (only after an exact invitation preview)
 - “Reschedule Farhan Ahmed's interview to 15 October at 15:00.”
 
@@ -173,12 +181,13 @@ docker compose exec backend python -m pytest -q -p no:cacheprovider
 cd frontend
 npm run build
 npm run test:scoring
+npm run test:interviews
 ```
 
 Real PostgreSQL tests use `PGVECTOR_TEST_SERVER_URL` to create/drop **only disposable
 test databases**. They verify concurrent confirmation/delivery and fresh-session persistence.
 SMTP/MCP tests cover masking, threshold operators, ties, wrong-job rejection, missing
-email, stale previews, shared/sequential/DST times, MIME and parsed ICS, partial failure,
+email, stale previews, sequential slots/group rejection/DST times, MIME and parsed ICS, partial failure,
 safe retry, rescheduling history, restart recovery, native ToolNode and manual/MCP parity.
 
 Verified on 12 October 2026:
@@ -196,6 +205,12 @@ Verified on 12 October 2026:
   is currently unconfigured and needs the local Mailpit or provider setup above.
 - A pre-migration PostgreSQL backup is saved under ignored
   `backend/storage/backups/hiresense-before-interviews-20261012-0016.dump`.
+
+Sequential-only simplification verified on 13 October 2026: 161 backend tests,
+2 scheduling-default frontend tests and 7 scoring display tests passed, along with
+the production build. Stage/time-zone/mode controls are removed from the form;
+date, start time, duration and buffer remain. No migration or historical-record
+rewrite is required. Delivery tests remained mocked.
 
 Suggested commits (you perform Git operations):
 

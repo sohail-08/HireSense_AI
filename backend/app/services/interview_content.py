@@ -17,6 +17,8 @@ def utc(value):
 
 
 def allocate_slots(data, count, now=None):
+    if data.mode != "sequential":
+        raise ValueError("Only sequential individual interview slots are supported")
     try:
         zone = ZoneInfo(data.timezone)
     except (ZoneInfoNotFoundError, ValueError):
@@ -34,7 +36,7 @@ def allocate_slots(data, count, now=None):
         raise ValueError("Interview start must be in the future")
     slots = []
     for index in range(count):
-        offset = 0 if data.mode == "shared" else index * (data.duration_minutes + data.buffer_minutes)
+        offset = index * (data.duration_minutes + data.buffer_minutes)
         begins = start + timedelta(minutes=offset)
         end = begins + timedelta(minutes=data.duration_minutes)
         slots.append({"start_utc": begins.isoformat(), "end_utc": end.isoformat(),

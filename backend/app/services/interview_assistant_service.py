@@ -38,6 +38,8 @@ class InterviewAssistantService:
                 workflow.pop("preview", None)
                 return self.save(supervisor, state, workflow, "interview_selection", "Checked candidates changed. Preview the new selection before sending.")
             preview = workflow["preview"]
+            if any(item.get("mode") != "sequential" for item in preview["recipients"]):
+                raise ValueError("This preview uses the old scheduling mode. Prepare a new sequential interview preview before confirming.")
             arguments = {"data": {"confirmed": True, "confirmation_token": preview["confirmation_token"],
                 "idempotency_key": workflow["idempotency_key"]}}
             tool = "confirm_interview_reschedule" if workflow.get("rescheduling") else "confirm_and_send_interview_invites"
@@ -74,6 +76,10 @@ class InterviewAssistantService:
             workflow.pop("preview", None)  # Every edit invalidates the old confirmation.
             state["interview_workflow"] = workflow
             supervisor.state_json = state  # Persist invalidation even when a new preview fails.
+            if command.mode == "shared":
+                raise ValueError("All interviews use sequential individual slots; shared/group interviews are not supported.")
+            schedule["mode"] = "sequential"
+            schedule.setdefault("timezone", "Asia/Dhaka")
             if not workflow.get("rescheduling"):
                 rule = dict(workflow.get("rule", {}))
                 for target, source in (("job_posting_id", "job_posting_id"), ("mode", "selection_mode"), ("top_n", "top_n"),
@@ -116,12 +122,9 @@ class InterviewAssistantService:
                     return self.save(supervisor, state, workflow, "interview_selection", prefix + "\nNo eligible recipients; change the selection or resolve the listed exclusions.")
             else:
                 count, prefix = len(workflow["schedule_ids"]), "Rescheduling " + str(len(workflow["schedule_ids"])) + " interview(s)."
-            if count == 1:
-                schedule.setdefault("mode", "sequential")
-            missing = [key for key in ("date", "start_time", "timezone", "duration_minutes", "mode") if schedule.get(key) in (None, "")]
+            missing = [key for key in ("date", "start_time", "duration_minutes") if schedule.get(key) in (None, "")]
             if missing:
-                labels = {"date": "date", "start_time": "local start time", "timezone": "IANA time zone (e.g. Asia/Dhaka)",
-                    "duration_minutes": "duration in minutes", "mode": "shared/group or sequential slots"}
+                labels = {"date": "date", "start_time": "local start time", "duration_minutes": "duration in minutes"}
                 return self.save(supervisor, state, workflow, "interview_schedule", prefix + "\nPlease provide: " + ", ".join(labels[key] for key in missing) + ".")
             if workflow.get("rescheduling"):
                 data = RescheduleRequest.model_validate({**schedule, "schedule_ids": workflow["schedule_ids"]})

@@ -109,12 +109,32 @@ def test_invalid_email_withdrawal_and_existing_interview_are_visible(setup):
     db.commit()
     selection = select_preview(setup, mode="top_n", top_n=2)
     assert len(selection["excluded"]) == 2
-    assert [item["application_id"] for item in selection["selected"]] == [apps[2].id, apps[3].id]
+    assert selection["selected"] == []
+    assert any("not replaced" in warning for warning in selection["warnings"])
+    selection = select_preview(setup, mode="manual", application_ids=[apps[2].id, apps[3].id])
     preview = service.prepare(db, owner.id, schedule_data(selection["selection_token"]))
     service.confirm(db, owner.id, preview["id"], confirm_data(preview))
-    later = select_preview(setup, mode="top_n", top_n=2)
+    later = select_preview(setup, mode="manual", application_ids=[apps[2].id, apps[3].id])
     assert later["recipient_count"] == 0
     assert any("active interview" in reason for item in later["excluded"] for reason in item["reasons"])
+
+
+def test_top_three_does_not_backfill_rank_six_when_higher_candidates_have_interviews(setup):
+    db, owner, _, _, apps, run, service, sender = setup
+    scores = list(db.scalars(select(CandidateScore).where(CandidateScore.scoring_run_id == run["id"]).order_by(CandidateScore.application_id)))
+    for score, rank in zip(scores, [1, 2, 3, 6]):
+        score.rank = rank
+    db.commit()
+    # Candidates in the original first and third places already have interviews.
+    selection = select_preview(setup, mode="manual", application_ids=[apps[0].id, apps[2].id])
+    preview = service.prepare(db, owner.id, schedule_data(selection["selection_token"]))
+    service.confirm(db, owner.id, preview["id"], confirm_data(preview))
+    top_three = select_preview(setup, mode="top_n", top_n=3)
+    assert [(item["application_id"], item["rank"]) for item in top_three["selected"]] == [(apps[1].id, 2)]
+    assert {item["application_id"] for item in top_three["excluded"]} == {apps[0].id, apps[2].id}
+    assert apps[3].id not in {item["application_id"] for item in top_three["selected"]}
+    assert top_three["recipient_count"] == 1 and any("not replaced" in warning for warning in top_three["warnings"])
+    assert not sender.calls
 
 
 def test_preview_then_confirm_is_atomic_and_idempotent(setup):
@@ -204,13 +224,13 @@ def test_reschedule_keeps_uid_increases_sequence_preserves_history_and_failed_no
         service.preview_reschedule(db, owner.id, request.model_copy(update={"date": date.today() - timedelta(days=1)}))
 
 
-def test_shared_sequential_time_conversion_and_invalid_times():
+def test_sequential_time_conversion_and_invalid_times():
     data = schedule_data("placeholder-token")
     slots = allocate_slots(data, 3)
     assert [item["local_start"][11:16] for item in slots] == ["10:00", "10:40", "11:20"]
     assert slots[0]["start_utc"][11:16] == "04:00"
-    shared = allocate_slots(data.model_copy(update={"mode": "shared"}), 3)
-    assert len({item["start_utc"] for item in shared}) == 1
+    with pytest.raises(ValueError, match="sequential individual"):
+        allocate_slots(data.model_copy(update={"mode": "shared"}), 3)
     with pytest.raises(ValueError, match="future"):
         allocate_slots(data.model_copy(update={"date": date.today() - timedelta(days=1)}), 1)
     with pytest.raises(ValueError, match="IANA"):
@@ -219,6 +239,15 @@ def test_shared_sequential_time_conversion_and_invalid_times():
         from datetime import time
         with pytest.raises(ValueError):
             allocate_slots(data.model_copy(update={"date": day, "start_time": time.fromisoformat(local), "timezone": "America/New_York"}), 1)
+
+
+def test_hidden_schedule_defaults_and_rejection_of_group_requests():
+    from app.schemas.interview import ScheduleRequest
+    defaults = {"date": (date.today() + timedelta(days=20)).isoformat(), "start_time": "10:00", "duration_minutes": 30}
+    data = ScheduleRequest.model_validate(defaults)
+    assert data.timezone == "Asia/Dhaka" and data.mode == "sequential"
+    with pytest.raises(ValueError):
+        ScheduleRequest.model_validate({**defaults, "mode": "shared"})
 
 
 def test_conflicts_and_stale_schedule_version(setup):
@@ -250,6 +279,8 @@ def test_api_authorization_confirmation_and_mocked_background_delivery(setup, mo
         headers = {"Authorization": "Bearer " + create_access_token(owner.id)}
         selection = client.post("/api/interviews/selection/preview", headers=headers, json={"job_posting_id": posting.id, "mode": "top_n", "top_n": 1}).json()
         data = schedule_data(selection["selection_token"])
+        rejected = client.post("/api/interviews/invitations/prepare", headers=headers, json={**data.model_dump(mode="json"), "mode": "shared"})
+        assert rejected.status_code == 422 and not sender.calls
         preview = client.post("/api/interviews/invitations/prepare", headers=headers, json=data.model_dump(mode="json")).json()
         assert sender.calls == []
         response = client.post(f"/api/interviews/batches/{preview['id']}/confirm", headers=headers, json={"confirmed": False, "confirmation_token": preview["confirmation_token"], "idempotency_key": "api"})

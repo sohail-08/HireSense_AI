@@ -120,8 +120,14 @@ class InterviewService:
                 raise ValueError("Select at least one candidate")
             if not set(data.application_ids).issubset({score.application_id for score in scores}):
                 raise LookupError("Selected applications must belong to this job and ranking")
-        selected, excluded, eligible = [], [], []
-        for score in scores:
+        # Top N refers to the original saved ranking positions, not the first N
+        # candidates remaining after eligibility filtering. Never backfill an
+        # excluded top-ranked candidate with someone outside that boundary.
+        pool = scores[:data.top_n] if data.mode == "top_n" else scores
+        tie = bool(data.mode == "top_n" and len(scores) > len(pool) and pool
+            and pool[-1].rank is not None and pool[-1].rank == scores[len(pool)].rank)
+        selected, excluded = [], []
+        for score in pool:
             if data.mode == "manual" and score.application_id not in data.application_ids:
                 continue
             if data.mode == "threshold" and not (score.final_score > data.threshold if data.operator == "gt" else score.final_score >= data.threshold):
@@ -137,15 +143,14 @@ class InterviewService:
             if reasons:
                 excluded.append({**entry, "reasons": reasons})
             else:
-                eligible.append(entry)
-        selected = eligible[:data.top_n] if data.mode == "top_n" else eligible
-        tie = bool(data.mode == "top_n" and len(eligible) > len(selected) and selected and selected[-1]["rank"] == eligible[len(selected)]["rank"])
+                selected.append(entry)
         seal = fingerprint({"rule": data.model_dump(mode="json"), "run": run.id, "input_hash": run.input_hash,
             "selected": selected, "emails": [db.get(Candidate, db.get(CandidateApplication, item["application_id"]).candidate_id).email for item in selected]})
         payload = {"rule": data.model_dump(mode="json"), "run_id": run.id, "fingerprint": seal}
         warnings = ["The top-N boundary crosses a tie; stable application order determines selection."] if tie else []
         if data.mode == "top_n" and len(selected) < data.top_n:
-            warnings.append(f"Only {len(selected)} eligible applications are available, fewer than the requested {data.top_n}.")
+            warnings.append(f"Only {len(selected)} of the original top {data.top_n} candidates are eligible. "
+                "Excluded candidates are not replaced by lower-ranked candidates.")
         return {"job_posting_id": data.job_posting_id, "job_title": job.title, "ranking_run_id": run.id,
             "selection_type": data.mode, "stage": data.stage, "selected": selected, "excluded": excluded,
             "recipient_count": len(selected), "tie_at_boundary": tie,

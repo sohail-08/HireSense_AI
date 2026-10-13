@@ -41,8 +41,13 @@ missing scheduling details must be null. Dates must be ISO YYYY-MM-DD and local
 times HH:MM. Resolve relative dates against current_time. Do not invent dates,
 times, time zones, duration, scheduling mode, application IDs or emails. Initial
 requests are selection, not approval. More than/greater than/above means gt;
-at least/greater than or equal means gte. Shared/group mode requires explicit
-user choice; otherwise ask when multiple candidates need slots. Resolve jobs
+Top N means the original first N candidates in the saved ranking, without
+replacing excluded candidates with lower-ranked candidates.
+at least/greater than or equal means gte. All interviews use sequential individual
+slots; never ask for scheduling mode. Asia/Dhaka is the default time zone; never
+ask for a time zone when omitted. Keep absent fields null; the service applies defaults.
+Recognize explicitly requested shared/group mode so the service can reject it.
+Resolve jobs
 and schedules only against authorized resources in context. Use details for
 follow-ups. If a named job is absent/ambiguous, set needs_job_selection=true;
 do not fall back to another selected job. If a candidate has several active

@@ -107,11 +107,13 @@ def test_chat_collects_details_previews_and_requires_real_user_confirmation(setu
         supervisor.phase = result["phase"]
         return result
     result = run("Schedule interviews for the top 2 candidates")
-    assert result["phase"] == "interview_schedule" and "time zone" in result["assistant_message"]
+    assert result["phase"] == "interview_schedule"
+    assert "time zone" not in result["assistant_message"] and "shared/group" not in result["assistant_message"]
     assert "preview_candidate_selection" in client.calls and not sender.calls
-    model.command = InterviewCommand(intent="details", date=(date.today() + timedelta(days=20)).isoformat(), start_time="10:00",
-        timezone="Asia/Dhaka", duration_minutes=30, mode="sequential")
-    assert run("20 days later, 10:00 Asia/Dhaka, 30 minutes, sequential")["phase"] == "interview_approval"
+    model.command = InterviewCommand(intent="details", date=(date.today() + timedelta(days=20)).isoformat(), start_time="10:00", duration_minutes=30)
+    assert run("20 days later at 10:00, 30 minutes")["phase"] == "interview_approval"
+    assert supervisor.state_json["interview_workflow"]["schedule"]["timezone"] == "Asia/Dhaka"
+    assert supervisor.state_json["interview_workflow"]["schedule"]["mode"] == "sequential"
     assert db.scalar(select(func.count(InterviewSchedule.id))) == 0
     model.command = InterviewCommand(intent="approve")
     with pytest.raises(ValueError): run("not approved")
@@ -124,6 +126,19 @@ def test_chat_collects_details_previews_and_requires_real_user_confirmation(setu
     assert "confirm_and_send_interview_invites" in client.calls
     assert db.scalar(select(func.count(InterviewSchedule.id))) == 2
     assert sender.calls == []  # Confirmation persists outbox; SMTP worker runs separately.
+
+
+def test_chat_rejects_group_mode_without_preparing_or_sending(setup):
+    db, owner, _, posting, _, _, service, sender = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        def interpret(self, message, context):
+            return InterviewCommand(intent="selection", job_posting_id=posting.id, selection_mode="top_n", top_n=2, mode="shared")
+    assistant = InterviewAssistantService(Commands(), lambda user_id: client)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    with pytest.raises(ValueError, match="sequential individual"):
+        assistant.handle(db, supervisor, owner.id, "Schedule a group interview for top 2", [{"id": posting.id}], posting.id, [])
+    assert not sender.calls and "prepare_interview_invites" not in client.calls
 
 
 def test_command_interpretation_does_not_invent_missing_schedule_fields(monkeypatch):

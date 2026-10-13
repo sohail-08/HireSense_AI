@@ -30,9 +30,9 @@ class SelectionRequest(Boundary):
 class ScheduleRequest(Boundary):
     date: date
     start_time: time
-    timezone: str = Field(min_length=1, max_length=100)
+    timezone: str = Field(default="Asia/Dhaka", min_length=1, max_length=100)
     duration_minutes: int = Field(ge=5, le=480)
-    mode: Literal["shared", "sequential"]
+    mode: Literal["sequential"] = "sequential"
     buffer_minutes: int = Field(default=0, ge=0, le=240)
     instructions: str = Field(default="", max_length=4000)
     subject_template: str = Field(default="", max_length=250)
