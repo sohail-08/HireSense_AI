@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
+import { ApplicationNotifications } from "./ApplicationNotifications";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -59,6 +60,7 @@ export function Navbar() {
         </nav>
 
         <div className="ml-auto flex min-w-0 items-center gap-3">
+          {user.role === "interviewer" ? <ApplicationNotifications /> : null}
           <div className="hidden min-w-0 text-right sm:block">
             <p className="max-w-40 truncate text-sm font-semibold text-slate-900">
               {user.name}

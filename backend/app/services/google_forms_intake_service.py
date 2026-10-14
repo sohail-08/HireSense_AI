@@ -21,6 +21,7 @@ from app.models.candidate import (
 )
 from app.models.job import JobDescription, JobPosting
 from app.services.candidate_application_service import google_form_reference
+from app.services.google_forms_notifications import sheet_snapshots
 
 
 HEADER_ALIASES = {
@@ -68,6 +69,64 @@ class GoogleFormsIntakeService:
     ):
         self.reader = reader
         self.settings = settings
+
+    def pending_responses(self, db: Session, *, interviewer_user_id: int) -> dict[str, Any]:
+        """Count only new responses; all DB work is read-only and Drive is unused.
+
+        Reconcile every request against current imports/exclusions, even when the
+        source sheet is cached. Syncing therefore updates counts immediately.
+        """
+        spreadsheet_id = self.settings.google_forms_spreadsheet_id
+        if not spreadsheet_id:
+            raise ValueError("Google Forms is not configured")
+        sheet_name = self.settings.google_forms_sheet_name
+        key = (interviewer_user_id, spreadsheet_id, sheet_name, str(self.settings.google_service_account_file))
+        rows, checked_at = sheet_snapshots.read(key, lambda: self.reader.read_sheet(
+            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name))
+        result = {"status": "ready", "pending_count": 0, "unmatched_count": 0,
+                  "jobs": [], "checked_at": checked_at, "message": None}
+        if not rows:
+            return result
+        headers = [str(value).strip() for value in rows[0]]
+        mapping = self._column_mapping(headers)
+        postings = self._owned_postings(db, interviewer_user_id=interviewer_user_id)
+        posting_ids = [posting.id for posting, _ in postings]
+        existing_rows = self._existing_applications_by_row(db, postings=postings,
+            spreadsheet_id=spreadsheet_id, sheet_name=sheet_name)
+        seen = set(db.scalars(select(CandidateApplication.source_reference).where(
+            CandidateApplication.job_posting_id.in_(posting_ids),
+            CandidateApplication.source == ApplicationSource.GOOGLE_FORM)))
+        seen.update(db.scalars(select(ApplicationImportExclusion.source_reference).where(
+            ApplicationImportExclusion.created_by_user_id == interviewer_user_id,
+            ApplicationImportExclusion.source == ApplicationSource.GOOGLE_FORM)))
+        counts = {}
+        for row_number, raw in enumerate(rows[1:], start=2):
+            values = [str(value).strip() for value in raw]
+            if not any(values) or row_number in existing_rows:
+                continue
+            record = {header: values[index] if index < len(values) else ""
+                      for index, header in enumerate(headers) if header}
+            reference = google_form_reference(spreadsheet_id=spreadsheet_id, sheet_name=sheet_name, record=record)
+            if reference in seen:
+                continue
+            seen.add(reference)
+            name, email = self._value(values, mapping.get("name")), self._value(values, mapping.get("email"))
+            if email:
+                try:
+                    email = validate_email(email, check_deliverability=False).normalized
+                except EmailNotValidError:
+                    email = ""
+            if not name and not email:
+                continue  # The sync operation skips these malformed rows too.
+            resolved, _ = self._resolve_posting(self._value(values, mapping.get("job")), postings)
+            if resolved is None:
+                result["unmatched_count"] += 1
+                continue
+            posting, job = resolved
+            counts.setdefault(posting.id, {"job_posting_id": posting.id, "job_title": job.title, "count": 0})["count"] += 1
+            result["pending_count"] += 1
+        result["jobs"] = sorted(counts.values(), key=lambda item: (-item["count"], item["job_posting_id"]))
+        return result
 
     def sync(
         self,

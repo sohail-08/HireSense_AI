@@ -13,6 +13,7 @@ from app.schemas.candidate import (
     GoogleFormsConfigurationResponse,
     GoogleFormsSyncRequest,
     GoogleFormsSyncResponse,
+    ApplicationNotificationsResponse,
 )
 from app.security import require_interviewer
 from app.services.candidate_application_service import CandidateApplicationService
@@ -28,6 +29,28 @@ def _service() -> GoogleFormsIntakeService:
         GoogleServiceAccountReader(settings.google_service_account_file),
         settings,
     )
+
+
+def _notification_service() -> GoogleFormsIntakeService:
+    settings = get_settings()
+    return GoogleFormsIntakeService(
+        GoogleServiceAccountReader(settings.google_service_account_file, sheet_timeout_seconds=15), settings)
+
+
+@router.get("/notifications", response_model=ApplicationNotificationsResponse)
+def application_notifications(response: Response, db: Session = Depends(get_db),
+                              interviewer: User = Depends(require_interviewer)):
+    response.headers["Cache-Control"] = "no-store"
+    settings = get_settings()
+    if not settings.google_forms_spreadsheet_id or not Path(settings.google_service_account_file).is_file():
+        return {"status": "not_configured", "pending_count": None, "unmatched_count": None,
+            "jobs": [], "checked_at": None, "message": "Configure Google Forms response collection to receive application notifications."}
+    try:
+        return _notification_service().pending_responses(db, interviewer_user_id=interviewer.id)
+    except (RuntimeError, ValueError, OSError):
+        return {"status": "unavailable", "pending_count": None, "unmatched_count": None,
+            "jobs": [], "checked_at": None,
+            "message": "Could not check new applications. Verify Google Sheets access and the response-sheet columns, then retry."}
 
 
 @router.get(

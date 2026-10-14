@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 
 import { ApiError, apiRequest } from "../../api/apiClient";
 import { SupervisorChatPanel } from "../jobs/SupervisorChatPanel";
+import { notifyApplicationsChanged } from "../common/applicationNotificationEvents";
 import type { ScreeningBatch, SupervisorChatResponse, SupervisorPhase } from "../../types";
 
 const sessionKey = "hiresense_supervisor_session_id";
@@ -79,7 +80,10 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
       ...message, outcome: message.outcome === "info" ? undefined : message.outcome,
     })));
     if (value.screening_batch) setBatch(value.screening_batch);
-    if (value.refresh_required) setRefreshVersion((current) => current + 1);
+    if (value.refresh_required) {
+      setRefreshVersion((current) => current + 1);
+      notifyApplicationsChanged();
+    }
   }, []);
 
   useEffect(() => {

@@ -14,6 +14,7 @@ are included in confirmed invitations. See [interview room setup, tests, securit
 file manifest and Git checkpoints](docs/interview-rooms.md).
 
 The interviewer console also includes [private candidate information and a RAG question assistant](docs/interview-copilot.md), backed by a separately indexed synthetic interview question bank.
+The interviewer navigation bar shows [new application notifications](docs/application-notifications.md), including per-job counts of Google Form responses waiting to be synced.
 Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
 No external calendar API, recording or transcription is connected.
 
