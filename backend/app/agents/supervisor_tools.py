@@ -10,6 +10,32 @@ from pydantic import BaseModel, ConfigDict, Field
 ToolCallback = Callable[[str], dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class InterviewRoomToolCallbacks:
+    suggest_questions: ToolCallback
+    help: ToolCallback
+
+
+def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_message: str) -> list[BaseTool]:
+    """A server-scoped allowlist, not the recruitment tools with a prompt warning."""
+
+    @tool("suggest_interview_questions")
+    def suggest_interview_questions(message: str) -> str:
+        """Retrieve question-bank evidence and suggest JD-relevant questions or follow-ups.
+
+        Uses only the interview authorized by the server. It cannot select a
+        different candidate or job and cannot mutate recruitment business data.
+        """
+        return json.dumps(callbacks.suggest_questions(user_message), ensure_ascii=False)
+
+    @tool("help")
+    def interview_help(message: str) -> str:
+        """Explain interview-room capabilities or decline unsupported business actions."""
+        return json.dumps(callbacks.help(user_message), ensure_ascii=False)
+
+    return [suggest_interview_questions, interview_help]
+
+
 class ScreeningToolRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

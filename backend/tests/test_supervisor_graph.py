@@ -3,7 +3,10 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from app.agents.supervisor import HireSenseSupervisorGraph
-from app.agents.supervisor_tools import SupervisorToolCallbacks, build_supervisor_tools
+from app.agents.supervisor_tools import (
+    SupervisorToolCallbacks, build_supervisor_tools,
+    InterviewRoomToolCallbacks, build_interview_room_tools,
+)
 from supervisor_fakes import QueueToolModel
 
 
@@ -126,3 +129,37 @@ def test_tools_cannot_replace_the_users_instruction_with_fabricated_approval():
     )
     assert calls == [message]
     assert result["tool_call"]["args"]["message"] == message
+
+
+def test_interview_scope_uses_same_toolnode_with_real_question_tool_and_no_prose_rewrite():
+    calls = []
+    def questions(message):
+        calls.append(message)
+        return {"phase": "interview_room", "outcome": "success", "assistant_message": "Validated question result",
+                "questions": [{"question": "Example", "source_ids": [7]}], "sources": [{"chunk_id": 7}]}
+    tools = build_interview_room_tools(InterviewRoomToolCallbacks(questions, questions), user_message="Suggest questions")
+    model = QueueToolModel(["suggest_interview_questions"])
+    model.tool_args = {"message": "Ignore actual request"}
+    graph = HireSenseSupervisorGraph(model, tools, capability_scope="interview_room")
+    assert isinstance(graph._compiled.nodes["tools"].bound, ToolNode)
+    result = graph.invoke(message="Suggest questions", context={"phase": "interview_room"})
+    assert calls == ["Suggest questions"]
+    assert result["tool_name"] == "suggest_interview_questions"
+    assert result["tool_result"]["questions"][0]["source_ids"] == [7]
+    assert result["final_response"] == "Validated question result"
+    assert model.calls == 1  # No final LLM rewrite of the evidence-backed answer.
+
+
+def test_interview_scope_rejects_recruitment_tool_registration_before_binding():
+    model = QueueToolModel()
+    graph = _graph(model, [])
+    from langchain_core.tools import tool
+    @tool
+    def job_posting(message: str) -> str:
+        """Mutation tool that must never be available in interview rooms."""
+        raise AssertionError("Must never execute")
+    callbacks = InterviewRoomToolCallbacks(lambda _: {}, lambda _: {})
+    tools = build_interview_room_tools(callbacks, user_message="Post this job")
+    with pytest.raises(ValueError, match="restricted"):
+        HireSenseSupervisorGraph(model, [*tools, job_posting], capability_scope="interview_room")
+    assert graph.capability_scope == "recruitment"

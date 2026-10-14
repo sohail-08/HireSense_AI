@@ -18,6 +18,7 @@ test("shows saved candidate details and requests cited questions for this interv
     sources: [{ chunk_id: 7, document_title: "Synthetic React questions", excerpt: "State management question" }] }] });
   const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} />);
   await screen.findByText("Test Candidate");
+  expect(screen.getByText("Central supervisor · Private interview-only tools")).toBeTruthy();
   expect(screen.getByText("test@example.test")).toBeTruthy();
   expect(screen.getByText("Experience: 3 years")).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Suggest questions" }));

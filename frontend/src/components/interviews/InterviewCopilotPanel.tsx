@@ -72,7 +72,7 @@ export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) 
       </details>
     </section>
     <section aria-label="Interview assistant" className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="border-b px-5 py-4"><h2 className="text-lg font-bold">HireSense assistant</h2><p className="mt-1 text-xs text-slate-500">Private to you · Questions grounded in the knowledge base</p></header>
+      <header className="border-b px-5 py-4"><h2 className="text-lg font-bold">HireSense assistant</h2><p className="mt-1 text-xs text-slate-500">Central supervisor · Private interview-only tools</p></header>
       <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className="max-h-[28rem] min-h-48 space-y-4 overflow-y-auto overscroll-contain p-4">
         {!context.messages.length ? <div><p className="text-sm leading-6 text-slate-600">Ask me for questions relevant to this job, or request a more practical or challenging follow-up.</p><button disabled={busy} className="mt-3 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></div> : null}
         {context.messages.map((item, index) => <article key={index} className={`min-w-0 rounded-xl p-3 text-sm ${item.role === "user" ? "ml-6 bg-blue-600 text-white" : "mr-2 bg-slate-50 text-slate-800"}`}>

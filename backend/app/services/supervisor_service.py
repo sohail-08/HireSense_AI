@@ -7,10 +7,13 @@ from sqlalchemy.orm import Session
 from app.agents.job_description import JobDescriptionEditModel
 from app.agents.approval import is_explicit_approval
 from app.agents.supervisor import (
+    GeminiSupervisorModel,
     HireSenseSupervisorGraph,
     SupervisorChatModel,
 )
 from app.agents.supervisor_tools import (
+    InterviewRoomToolCallbacks,
+    build_interview_room_tools,
     ScreeningToolRequest,
     SupervisorToolCallbacks,
     build_supervisor_tools,
@@ -39,6 +42,23 @@ ToolMethod = Callable[[str], dict[str, Any]]
 
 
 class SupervisorService:
+    @staticmethod
+    def chat_interview(*, message: str, context: dict[str, Any],
+                       callbacks: InterviewRoomToolCallbacks,
+                       model: SupervisorChatModel | None = None) -> dict[str, Any]:
+        """Run the central supervisor with interview-only tools and isolated state.
+
+        The caller authorizes the interview and owns its persistence. Recruitment
+        session state and mutation callbacks never enter this capability scope.
+        """
+        tools = build_interview_room_tools(callbacks, user_message=message.strip())
+        state = HireSenseSupervisorGraph(model or GeminiSupervisorModel(), tools,
+            capability_scope="interview_room").invoke(message=message, context=context)
+        result = state.get("tool_result") or {}
+        if result.get("outcome") == "failure" or state.get("tool_name") not in {"suggest_interview_questions", "help"}:
+            raise RuntimeError("The supervisor could not complete this interview request. Please retry.")
+        return {**result, "tool_name": state["tool_name"]}
+
     def __init__(
         self,
         *,

@@ -39,6 +39,7 @@ class CopilotMessage(BaseModel):
     content: str
     questions: list[SuggestedQuestion] = Field(default_factory=list)
     sources: list[QuestionSource] = Field(default_factory=list)
+    tool_name: Literal["suggest_interview_questions", "help"] | None = None
 
 
 class CandidateContext(BaseModel):

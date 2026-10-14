@@ -12,6 +12,8 @@ from app.rag.embeddings import OllamaEmbeddingProvider
 from app.rag.service import KnowledgeBaseService
 from app.schemas.interview_copilot import CopilotAnswer, InterviewCopilotContext
 from app.services.interview_rooms import InterviewRooms, RoomConflict
+from app.agents.supervisor_tools import InterviewRoomToolCallbacks
+from app.services.supervisor_service import SupervisorService
 
 
 def names(items):
@@ -19,9 +21,12 @@ def names(items):
 
 
 class InterviewCopilot:
-    def __init__(self, knowledge=None, model=None):
+    """Interview context/persistence and the RAG sub-agent, not a separate router."""
+
+    def __init__(self, knowledge=None, model=None, supervisor_model=None):
         self.knowledge = knowledge or KnowledgeBaseService(OllamaEmbeddingProvider())
         self.model = model or GeminiStructuredClient()
+        self.supervisor_model = supervisor_model
 
     def context(self, db, user_id, interview_id):
         row = InterviewRooms().owned(db, user_id, interview_id)
@@ -59,7 +64,40 @@ class InterviewCopilot:
             raise RoomConflict("This conversation changed. Reload it before sending again.")
         if len(context["messages"]) >= 100:
             raise RoomConflict("This interview has reached its 50-message limit.")
-        query = " ".join([context["job_title"], *context["required_skills"], request.message])[:5000]
+        # Private contacts, other interviews and recruiter sessions are never
+        # included in the central supervisor's routing state.
+        routing_context = {key: value for key, value in context.items() if key not in {"candidate", "messages"}}
+        routing_context.update({"phase": "interview_room", "recent_conversation": [
+            {"role": item["role"], "content": item["content"], "questions": item["questions"]}
+            for item in context["messages"][-8:]]})
+        db.rollback()
+        callbacks = InterviewRoomToolCallbacks(
+            suggest_questions=lambda text: self._suggest_questions(db, context, interview_id, text),
+            help=lambda _: {"phase": "interview_room", "outcome": "info", "refresh_required": False,
+                "assistant_message": "I am the HireSense central assistant. In the interview room I can suggest job-relevant questions and follow-ups using the knowledge base. For posting, email, scheduling, screening or JD changes, return to the relevant recruitment page. No business action was performed.",
+                "questions": [], "sources": []},
+        )
+        result = SupervisorService.chat_interview(message=request.message, context=routing_context,
+            callbacks=callbacks, model=self.supervisor_model)
+        answer = CopilotAnswer.model_validate({"message": result["assistant_message"], "questions": result["questions"]})
+        messages = context["messages"] + [
+            {"role": "user", "content": request.message, "questions": [], "sources": []},
+            {"role": "assistant", "content": answer.message,
+                "questions": [item.model_dump() for item in answer.questions],
+                "sources": result["sources"], "tool_name": result["tool_name"]},
+        ]
+        InterviewRooms().owned(db, user_id, interview_id)
+        result = db.execute(update(InterviewSchedule).where(InterviewSchedule.id == interview_id,
+            InterviewSchedule.created_by_user_id == user_id, InterviewSchedule.copilot_version == request.version
+        ).values(copilot_messages=messages, copilot_version=request.version + 1))
+        if result.rowcount != 1:
+            db.rollback()
+            raise RoomConflict("This conversation changed. Reload it before sending again.")
+        db.commit()
+        return self.context(db, user_id, interview_id)
+
+    def _suggest_questions(self, db, context, interview_id, message):
+        query = " ".join([context["job_title"], *context["required_skills"], message])[:5000]
         # The provider/model filter and pgvector cosine search are shared with JD RAG.
         chunks = self.knowledge.search(db, query, top_k=6, min_score=0.25,
             source_type=KnowledgeSourceType.INTERVIEW_QUESTION)
@@ -82,28 +120,17 @@ class InterviewCopilot:
                     "religion or other discriminatory questions. If sources do not support the request, explain and return no questions. "
                     "You cannot send messages to candidates, post jobs, score candidates, schedule, or control the meeting."),
                 prompt=json.dumps({"job": prompt_context, "job_description": jd_content,
-                    "recent_conversation": context["messages"][-8:], "request": request.message,
+                    "recent_conversation": context["messages"][-8:], "request": message,
                     "question_bank": sources}, ensure_ascii=False), schema=CopilotAnswer.model_json_schema())
             answer = CopilotAnswer.model_validate(raw)
             available = {item.chunk_id for item in chunks}
             if any(not set(question.source_ids).issubset(available) for question in answer.questions):
                 raise RuntimeError("Question sources could not be validated. Please retry.")
         used = {value for question in answer.questions for value in question.source_ids}
-        messages = context["messages"] + [
-            {"role": "user", "content": request.message, "questions": [], "sources": []},
-            {"role": "assistant", "content": answer.message,
-                "questions": [item.model_dump() for item in answer.questions],
-                "sources": [item for item in sources if item["chunk_id"] in used]},
-        ]
-        InterviewRooms().owned(db, user_id, interview_id)
-        result = db.execute(update(InterviewSchedule).where(InterviewSchedule.id == interview_id,
-            InterviewSchedule.created_by_user_id == user_id, InterviewSchedule.copilot_version == request.version
-        ).values(copilot_messages=messages, copilot_version=request.version + 1))
-        if result.rowcount != 1:
-            db.rollback()
-            raise RoomConflict("This conversation changed. Reload it before sending again.")
-        db.commit()
-        return self.context(db, user_id, interview_id)
+        return {"phase": "interview_room", "outcome": "success" if answer.questions else "info",
+            "assistant_message": answer.message, "refresh_required": False,
+            "questions": [item.model_dump() for item in answer.questions],
+            "sources": [item for item in sources if item["chunk_id"] in used]}
 
     @staticmethod
     def _jd_content(db, interview_id):
