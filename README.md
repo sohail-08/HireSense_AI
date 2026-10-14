@@ -202,8 +202,6 @@ mode and copy the channel ID. Put the bot token and channel ID only in the root
 ```dotenv
 DISCORD_BOT_TOKEN=your-private-bot-token
 DISCORD_CHANNEL_ID=your-numeric-channel-id
-JOB_POSTING_MCP_URL=http://localhost:8001/mcp
-JOB_POSTING_MCP_TIMEOUT_SECONDS=30
 DISCORD_DEFAULT_HEADING=BJIT is Hiring!
 JOB_POST_DEFAULT_APPLICATION_URL=
 JOB_POST_DEFAULT_CONTACT_EMAIL=
@@ -213,7 +211,9 @@ JOB_POST_DEFAULT_INSTRUCTIONS=
 ```
 
 The bot token is supplied only to the `job-posting-mcp` container. The main
-backend receives only the MCP URL. Do not place the token in `frontend/.env`, a
+backend reads both MCP endpoints and timeouts from the root `mcp.json` registry,
+mounted read-only in Docker. See [MCP configuration](docs/mcp-configuration.md).
+Do not place the token in `frontend/.env`, a
 `VITE_*` variable, source code, screenshots, or logs. Recreate the MCP server
 and backend after changing the configuration:
 

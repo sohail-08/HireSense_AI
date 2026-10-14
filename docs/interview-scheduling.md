@@ -122,8 +122,10 @@ graph nodes/edges are unchanged (`supervisor_agent`, `tools`, `capture_tool_resu
 The SDK is pinned to **mcp 2.3.0**, using v2 `MCPServer`, `Client` and Streamable HTTP.
 `interview-mcp` listens on container port **8002** and forwards to the authenticated
 FastAPI APIs at `http://backend:8000/api/interviews`. Backend client URL in Compose:
-`http://interview-mcp:8002/mcp`. For native development set `INTERVIEW_MCP_URL` and
-`INTERVIEW_BACKEND_URL` appropriately. SMTP secrets exist only in the backend process;
+`http://interview-mcp:8002/mcp`, resolved from root `mcp.json`. The registry also
+contains native `localUrl` addresses; see [MCP configuration](mcp-configuration.md).
+`INTERVIEW_BACKEND_URL` still configures where the scheduling server forwards
+backend API calls, not the MCP client connection. SMTP secrets exist only in the backend process;
 the MCP container receives only the backend URL, not SMTP credentials or database access.
 
 Tools:

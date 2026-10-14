@@ -1,5 +1,6 @@
 from datetime import date
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,8 +20,8 @@ class Settings(BaseSettings):
     interviewer_password: SecretStr
 
     frontend_url: str = "http://localhost:5173"
-    interview_mcp_url: str = "http://localhost:8002/mcp"
-    interview_mcp_timeout_seconds: float = Field(default=120, ge=1, le=600)
+    mcp_config_file: str = str(ROOT_ENV_FILE.with_name("mcp.json"))
+    mcp_profile: Literal["local", "docker"] = "local"
     interview_company_name: str = "BJIT"
     smtp_host: str = ""
     smtp_port: int = Field(default=1025, ge=1, le=65535)
@@ -78,8 +79,6 @@ class Settings(BaseSettings):
     gemini_chat_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
 
-    job_posting_mcp_url: str = "http://localhost:8001/mcp"
-    job_posting_mcp_timeout_seconds: float = Field(default=30, ge=1, le=120)
     discord_default_heading: str = Field(
         default="BJIT is Hiring!",
         min_length=1,

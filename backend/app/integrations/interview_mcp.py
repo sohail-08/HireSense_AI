@@ -2,18 +2,25 @@ import asyncio
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 import httpx2
-from app.config import get_settings
+from app.mcp_config import resolve_mcp_server
 from app.security import create_access_token
 
 
 class InterviewMCPClient:
-    def __init__(self, user_id, url=None):
+    def __init__(self, user_id, url=None, timeout_seconds=None):
         self.user_id = user_id
-        self.url = url or get_settings().interview_mcp_url
+        if url is None or timeout_seconds is None:
+            connection = resolve_mcp_server("interview_scheduling")
+            if url is None:
+                url = connection.url
+            if timeout_seconds is None:
+                timeout_seconds = connection.timeout_seconds
+        self.url = url
+        self.timeout_seconds = timeout_seconds
 
     def call(self, name, arguments):
         try:
-            return asyncio.run(asyncio.wait_for(self.call_async(name, arguments), get_settings().interview_mcp_timeout_seconds))
+            return asyncio.run(asyncio.wait_for(self.call_async(name, arguments), self.timeout_seconds))
         except TimeoutError:
             raise RuntimeError("Interview tool timed out. Check invitation status before retrying confirmation.") from None
         except (ValueError, RuntimeError):
@@ -23,7 +30,7 @@ class InterviewMCPClient:
 
     async def call_async(self, name, arguments):
         # The identity is bound by the authenticated application, never an LLM argument.
-        async with httpx2.AsyncClient(headers={"Authorization": "Bearer " + create_access_token(self.user_id)}, timeout=120) as http:
+        async with httpx2.AsyncClient(headers={"Authorization": "Bearer " + create_access_token(self.user_id)}, timeout=self.timeout_seconds) as http:
             async with Client(streamable_http_client(self.url, http_client=http), cache=None) as client:
                 result = await client.call_tool(name, arguments)
         if result.is_error:

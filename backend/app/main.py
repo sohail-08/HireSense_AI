@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.mcp_config import resolve_mcp_server
 from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
@@ -41,6 +42,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validate deployment configuration before initializing data or recovering
+    # previously confirmed deliveries. This does not contact either MCP server.
+    resolve_mcp_server("job_posting")
+    resolve_mcp_server("interview_scheduling")
     ensure_storage_root()
     ensure_cv_storage_root()
     ensure_knowledge_storage_root()
