@@ -141,7 +141,7 @@ class KnowledgeBaseService:
         *,
         top_k: int = 5,
         min_score: float = 0.0,
-        source_type: KnowledgeSourceType | None = None,
+        source_type: KnowledgeSourceType | None = KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
     ) -> list[RetrievedKnowledgeChunk]:
         if not query.strip():
             raise ValueError("Knowledge search query cannot be empty")
@@ -237,10 +237,10 @@ class KnowledgeBaseService:
         ]
 
     @staticmethod
-    def list_documents(db: Session) -> list[KnowledgeDocument]:
+    def list_documents(db: Session, source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION) -> list[KnowledgeDocument]:
         return list(
             db.scalars(
-                select(KnowledgeDocument).order_by(
+                select(KnowledgeDocument).where(KnowledgeDocument.source_type == source_type).order_by(
                     KnowledgeDocument.created_at.desc()
                 )
             )

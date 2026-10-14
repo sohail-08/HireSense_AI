@@ -49,6 +49,9 @@ test("devices and admission gate Cloud media", async () => {
   expect(screen.getByTestId("media-room")).toBeTruthy();
   expect(screen.getByTestId("remote-audio")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "End interview for everyone" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Candidate information" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Interview assistant" })).toBeNull();
+  expect(screen.queryByLabelText("Ask the interview assistant")).toBeNull();
 });
 
 test("leaving the waiting room does not complete the interview", async () => {

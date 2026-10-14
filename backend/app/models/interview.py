@@ -43,6 +43,8 @@ class InterviewSchedule(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
     meeting_url: Mapped[str | None] = mapped_column(String(2048))
     history: Mapped[list] = mapped_column(JSON, default=list)
+    copilot_messages: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    copilot_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     room_name: Mapped[str | None] = mapped_column(String(100), unique=True)
     join_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
     join_token_nonce: Mapped[str | None] = mapped_column(String(64))

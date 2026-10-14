@@ -14,6 +14,8 @@ from app.security import require_interviewer
 from app.services.interview_rooms import InterviewRooms, RoomAccessError, RoomConflict
 from app.integrations.livekit_media import MediaUnavailable
 from app.schemas.interview_room import ExchangeInvitation, ConfirmRoomAction, EmptyRoomAction, CandidateRoomInfo, InterviewerRoomInfo, LinkResult, MediaAccess
+from app.schemas.interview_copilot import CopilotRequest, InterviewCopilotContext
+from app.services.interview_copilot import InterviewCopilot
 
 router = APIRouter(prefix="/api/interview-rooms", tags=["Interview rooms"])
 COOKIE_NAME = "hiresense_candidate_session"
@@ -44,6 +46,30 @@ limiter = PublicRateLimiter()
 
 def get_rooms():
     return InterviewRooms()
+
+
+def get_copilot():
+    return InterviewCopilot()
+
+
+@router.get("/{interview_id}/copilot", response_model=InterviewCopilotContext)
+def copilot_context(interview_id: int, response: Response, db: Session = Depends(get_db),
+                    user: User = Depends(require_interviewer), copilot: InterviewCopilot = Depends(get_copilot)):
+    sensitive(response)
+    return run(db, lambda: copilot.context(db, user.id, interview_id))
+
+
+@router.post("/{interview_id}/copilot", response_model=InterviewCopilotContext)
+def copilot_message(interview_id: int, data: CopilotRequest, response: Response, db: Session = Depends(get_db),
+                    user: User = Depends(require_interviewer), copilot: InterviewCopilot = Depends(get_copilot)):
+    sensitive(response)
+    if not limiter.allow(("copilot", user.id), 10):
+        raise HTTPException(429, "Please wait a moment before asking again", headers={"Retry-After": "60"})
+    try:
+        return run(db, lambda: copilot.ask(db, user.id, interview_id, data))
+    except RuntimeError:
+        db.rollback()
+        raise HTTPException(503, "The interview assistant is unavailable. Check Gemini and the knowledge embedding service, then retry.") from None
 
 
 def sensitive(response):

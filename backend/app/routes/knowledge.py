@@ -9,6 +9,7 @@ from fastapi import (
     status,
 )
 from app.config import get_settings
+from app.models.knowledge import KnowledgeSourceType
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -103,10 +104,11 @@ def upload_knowledge_document(
 
 @router.get("/documents", response_model=list[KnowledgeDocumentResponse])
 def list_knowledge_documents(
+    source_type: KnowledgeSourceType = KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION,
     db: Session = Depends(get_db),
     _interviewer: User = Depends(require_interviewer),
 ):
-    return _service().list_documents(db)
+    return _service().list_documents(db, source_type)
 
 
 @router.delete(

@@ -8,6 +8,7 @@ import { ApiError } from "../../src/api/apiClient";
 
 const api = vi.hoisted(() => ({ status: vi.fn(), admit: vi.fn(), end: vi.fn(), interviewerMedia: vi.fn(), interviewerConnected: vi.fn(), interviewerLeave: vi.fn(), link: vi.fn(), revoke: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
+vi.mock("../../src/components/interviews/InterviewCopilotPanel", () => ({ InterviewCopilotPanel: () => <aside>Private interview assistance</aside> }));
 const info = { interview_id: 1, candidate_name: "Test Candidate", job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "waiting", waiting: true, admitted: false, has_join_link: true, link_revoked: false, room_version: 1 };
 function open() { render(<MemoryRouter initialEntries={["/interviews/1/console"]}><Routes><Route path="/interviews/:interviewId/console" element={<InterviewerConsolePage />} /></Routes></MemoryRouter>); }
 beforeEach(() => {
@@ -18,6 +19,7 @@ test("console authorization failure does not expose candidate or room controls",
   api.status.mockRejectedValue(new ApiError("Forbidden", 403)); open();
   expect((await screen.findByRole("alert")).textContent).toContain("not authorized");
   expect(screen.queryByText("Test Candidate")).toBeNull(); expect(screen.queryByRole("button", { name: "Admit candidate" })).toBeNull();
+  expect(screen.queryByText("Private interview assistance")).toBeNull();
 });
 test("shows a waiting candidate and admits them without joining media automatically", async () => {
   const user = userEvent.setup(); open();

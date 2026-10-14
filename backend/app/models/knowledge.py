@@ -17,6 +17,7 @@ KNOWLEDGE_EMBEDDING_DIMENSIONS = 768
 
 class KnowledgeSourceType(str, Enum):
     PREVIOUS_JOB_DESCRIPTION = "previous_job_description"
+    INTERVIEW_QUESTION = "interview_question"
 
 
 def _values(enum_type: type[Enum]) -> list[str]:
