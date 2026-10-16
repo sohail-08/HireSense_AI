@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -107,6 +107,21 @@ class GoogleFormsConfigurationResponse(BaseModel):
 
 class GoogleFormsSyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class PendingJobApplications(BaseModel):
+    job_posting_id: int
+    job_title: str
+    count: int
+
+
+class ApplicationNotificationsResponse(BaseModel):
+    status: Literal["ready", "not_configured", "unavailable"]
+    pending_count: int | None
+    unmatched_count: int | None
+    jobs: list[PendingJobApplications]
+    checked_at: datetime | None
+    message: str | None
 
 
 class GoogleFormsSyncIssue(BaseModel):

@@ -85,8 +85,8 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
     method: "POST", body: JSON.stringify({ confirmed: true, expected_attempts: attempts }),
   }))); }
   return <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <h2 className="text-lg font-semibold">{rescheduling ? "Reschedule selected interviews" : "Schedule interviews"}</h2>
-    <p className="mt-1 text-sm text-slate-500">Preview recipients, times and email before confirming. No meeting platform is connected.</p><ErrorMessage message={error} />
+    <h2 className="text-lg font-semibold">{rescheduling ? (scheduleIds?.length === 1 ? "Reschedule interview" : "Reschedule selected interviews") : "Schedule interviews"}</h2>
+    <p className="mt-1 text-sm text-slate-500">Preview recipients, times and email before confirming.</p><ErrorMessage message={error} />
     <fieldset disabled={busy || batch?.status === "sending"} className="min-w-0">
       {!rescheduling ? <>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

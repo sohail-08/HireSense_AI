@@ -3,11 +3,15 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.mcp_config import resolve_mcp_server
 from app.database import SessionLocal, engine, get_db
 from app.logging_config import configure_logging
 from app.routes.auth import router as auth_router
@@ -19,10 +23,12 @@ from app.routes.requirements import router as requirements_router
 from app.routes.screening import router as screening_router
 from app.routes.scoring import router as scoring_router
 from app.routes.interviews import router as interviews_router
+from app.routes.interview_rooms import router as interview_rooms_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
 from app.services.screening_service import ScreeningService
 from app.services.interview_service import InterviewService
+from app.services.interview_rooms import InterviewRooms
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -36,6 +42,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validate deployment configuration before initializing data or recovering
+    # previously confirmed deliveries. This does not contact either MCP server.
+    resolve_mcp_server("job_posting")
+    resolve_mcp_server("interview_scheduling")
     ensure_storage_root()
     ensure_cv_storage_root()
     ensure_knowledge_storage_root()
@@ -48,6 +58,7 @@ async def lifespan(app: FastAPI):
     # Resume only previously confirmed, never-attempted deliveries. Uncertain
     # attempts remain uncertain; no automatic retry is performed for them.
     delivery_tasks = [asyncio.create_task(asyncio.to_thread(InterviewService().deliver_batch, batch_id)) for batch_id in pending_invites]
+    room_recovery = asyncio.create_task(asyncio.to_thread(InterviewRooms().recover_ending, SessionLocal))
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -57,6 +68,7 @@ async def lifespan(app: FastAPI):
 
     if delivery_tasks:
         await asyncio.gather(*delivery_tasks, return_exceptions=True)
+    await room_recovery
     engine.dispose()
 
 
@@ -68,7 +80,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_url],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
@@ -82,7 +94,16 @@ app.include_router(requirements_router)
 app.include_router(screening_router)
 app.include_router(scoring_router)
 app.include_router(interviews_router)
+app.include_router(interview_rooms_router)
 app.include_router(supervisor_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_candidate_validation(request, exc):
+    if request.url.path.startswith("/api/interview-rooms/candidate/"):
+        return JSONResponse({"detail": "This interview access is not available.", "code": "invalid_link"},
+            422, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.get("/api/health", tags=["Health"])

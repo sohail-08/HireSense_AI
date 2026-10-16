@@ -18,4 +18,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/@livekit/protocol")) return "livekit-protocol";
+          if (id.includes("node_modules/livekit-client")) return "livekit-client";
+          if (id.includes("node_modules/@livekit/")) return "livekit-components";
+        },
+      },
+    },
+  },
 });

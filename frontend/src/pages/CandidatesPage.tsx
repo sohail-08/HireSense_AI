@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
+import { notifyApplicationsChanged } from "../components/common/applicationNotificationEvents";
 import type {
   CandidateApplicationSummary,
   CandidateJobPostingOption,
@@ -96,6 +97,7 @@ export function CandidatesPage() {
         },
       );
       setSyncResult(result);
+      notifyApplicationsChanged();
       await refreshApplications();
     } catch (requestError) {
       setError(errorMessage(requestError));
@@ -123,6 +125,7 @@ export function CandidatesPage() {
       await apiRequest<void>(`/candidates/applications/${application.id}`, {
         method: "DELETE",
       });
+      notifyApplicationsChanged();
       await refreshApplications();
       setNotice(`Deleted the application for ${candidateName}.`);
     } catch (requestError) {

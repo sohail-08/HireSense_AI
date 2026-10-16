@@ -6,8 +6,17 @@ Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
 calendar attachments and rescheduling are implemented. Both the central assistant
 (via authenticated MCP) and manual UI use the same services. See
 [setup, workflow, tools, delivery safeguards and commit increments](docs/interview-scheduling.md).
-Configure SMTP in the root `.env`; local Mailpit testing is opt-in. No meeting
-platform or external calendar API is connected in this increment.
+Candidate waiting rooms and assigned interviewer consoles use LiveKit for
+one-to-one camera/microphone interviews. LiveKit Cloud handles remote calls;
+no local LiveKit media server is required. See
+[Cloud setup and remote demo steps](docs/livekit-cloud.md). Secure HireSense join links
+are included in confirmed invitations. See [interview room setup, tests, security,
+file manifest and Git checkpoints](docs/interview-rooms.md).
+
+The interviewer console also includes [private candidate information and a RAG question assistant](docs/interview-copilot.md), backed by a separately indexed synthetic interview question bank.
+The interviewer navigation bar shows [new application notifications](docs/application-notifications.md), including per-job counts of Google Form responses waiting to be synced.
+Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
+No external calendar API, recording or transcription is connected.
 
 - Candidate-only registration
 - Email/password sign-in
@@ -38,7 +47,11 @@ Docker Desktop running with Linux containers.
 
 1. Copy `.env.example` to `.env`.
 2. Set your own database password, JWT secret, interviewer password and
-   `GEMINI_API_KEY` in the root `.env` file.
+   `GEMINI_API_KEY` and a separate `INTERVIEW_LINK_SECRET` in the root `.env`.
+   For interviews, fill `LIVEKIT_CLOUD_URL`,
+   `LIVEKIT_CLOUD_API_KEY` and `LIVEKIT_CLOUD_API_SECRET` from your Cloud project.
+   See [the Cloud setup guide](docs/livekit-cloud.md). These settings also work
+   when the website is opened locally at `http://localhost:5173`.
 3. Run:
 
 ```powershell
@@ -189,8 +202,6 @@ mode and copy the channel ID. Put the bot token and channel ID only in the root
 ```dotenv
 DISCORD_BOT_TOKEN=your-private-bot-token
 DISCORD_CHANNEL_ID=your-numeric-channel-id
-JOB_POSTING_MCP_URL=http://localhost:8001/mcp
-JOB_POSTING_MCP_TIMEOUT_SECONDS=30
 DISCORD_DEFAULT_HEADING=BJIT is Hiring!
 JOB_POST_DEFAULT_APPLICATION_URL=
 JOB_POST_DEFAULT_CONTACT_EMAIL=
@@ -200,7 +211,9 @@ JOB_POST_DEFAULT_INSTRUCTIONS=
 ```
 
 The bot token is supplied only to the `job-posting-mcp` container. The main
-backend receives only the MCP URL. Do not place the token in `frontend/.env`, a
+backend reads both MCP endpoints and timeouts from the root `mcp.json` registry,
+mounted read-only in Docker. See [MCP configuration](docs/mcp-configuration.md).
+Do not place the token in `frontend/.env`, a
 `VITE_*` variable, source code, screenshots, or logs. Recreate the MCP server
 and backend after changing the configuration:
 
@@ -407,6 +420,11 @@ creates and removes its own randomly named database; it never migrates the
 database named in the supplied connection URL.
 
 ## Stop
+
+For a temporary HTTPS website demo on another device, see
+[Cloudflare demo setup](docs/cloudflare-demo.md). Audio/video connects separately
+to LiveKit Cloud when configured; the tunnel exposes the website. Stop the tunnel
+with `./scripts/stop-cloudflare-demo.ps1` when finished.
 
 ```powershell
 docker compose down

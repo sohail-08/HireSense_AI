@@ -2,7 +2,6 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from uuid import uuid4
 import jwt
 from email_validator import validate_email, EmailNotValidError
@@ -14,12 +13,12 @@ from app.models.user import User, UserRole
 from app.models.job import JobDescription, JobPosting
 from app.models.candidate import CandidateApplication, Candidate, CVDocument, CVProcessingStatus, ApplicationStatus
 from app.models.scoring import ScoringRun, CandidateScore
-from app.models.screening import ScreeningRun, ScreeningRunStatus
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery
 from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRequest
 from app.services.scoring_service import ScoringService, fingerprint
 from app.services.scoring_calculation import display_score
 from app.services.interview_content import allocate_slots, render_email, calendar_invitation, SMTPInvitationSender, utc
+from app.services.interview_links import InterviewLinks, JOIN_PLACEHOLDER, redact_join_links, ACCESS_POLICY
 
 UTC = timezone.utc
 ACTIVE = ("scheduled", "rescheduled")
@@ -49,6 +48,7 @@ class InterviewService:
         self.settings = settings or get_settings()
         self.sender = sender or SMTPInvitationSender(self.settings)
         self.session_factory = session_factory or SessionLocal
+        self.links = InterviewLinks(self.settings)
 
     def actor(self, db, user_id, *, lock=False):
         user = db.scalar(select(User).where(User.id == user_id).with_for_update()) if lock else db.get(User, user_id)
@@ -183,10 +183,14 @@ class InterviewService:
         self.conflicts(db, user_id, slots)
         previews = []
         for candidate, slot in zip(selection["selected"], slots):
+            email = redact_join_links(render_email(self.settings, candidate, selection["job_title"], selection["stage"], slot, data))
+            if JOIN_PLACEHOLDER not in email["body"]:
+                email["body"] += "\n\nJoin your HireSense interview: " + JOIN_PLACEHOLDER
+            material = self.links.material(candidate["application_id"], datetime.fromisoformat(slot["start_utc"]), datetime.fromisoformat(slot["end_utc"]))
             previews.append({**candidate, **slot, "calendar_uid": str(uuid4()) + "@hiresense", "sequence": 0,
-                **render_email(self.settings, candidate, selection["job_title"], selection["stage"], slot, data)})
+                "join_material": material, **email})
         snapshot = {"selection": selection, "selection_token": data.selection_token,
-            "schedule": data.model_dump(mode="json", exclude={"selection_token"}), "recipients": previews,
+            "schedule": redact_join_links(data.model_dump(mode="json", exclude={"selection_token"})), "recipients": previews,
             "sender": self.mail_identity()}
         batch = InterviewBatch(job_posting_id=selection["job_posting_id"], ranking_run_id=selection["ranking_run_id"],
             snapshot=snapshot, confirmation_hash=fingerprint(snapshot), created_by_user_id=user_id)
@@ -212,7 +216,7 @@ class InterviewService:
             raise LookupError("Invitation batch not found")
         deliveries = list(db.scalars(select(InterviewDelivery).where(InterviewDelivery.batch_id == batch.id).order_by(InterviewDelivery.id)))
         return {"id": batch.id, "kind": batch.kind, "job_posting_id": batch.job_posting_id, "status": batch.status,
-            "recipient_count": len(batch.snapshot["recipients"]), "recipients": batch.snapshot["recipients"],
+            "recipient_count": len(batch.snapshot["recipients"]), "recipients": [self.links.preview(item) for item in batch.snapshot["recipients"]],
             "sender": batch.snapshot["sender"], "selection": batch.snapshot.get("selection"),
             "deliveries": [{"id": item.id, "schedule_id": item.schedule_id, "application_id": item.application_id,
                 "masked_email": masked_email(item.recipient_email), "status": item.status, "attempts": item.attempts,
@@ -237,6 +241,8 @@ class InterviewService:
             raise InterviewConflict("Draft changed; prepare and confirm a new preview")
         if self.mail_identity() != batch.snapshot["sender"]:
             raise InterviewConflict("Email sender settings changed; prepare a new preview")
+        if any(not item.get("join_material") or item["join_material"].get("access_policy") != ACCESS_POLICY for item in batch.snapshot["recipients"]):
+            raise InterviewConflict("This draft uses older interview-access rules. Prepare a new invitation preview.")
         selection = self.validate_selection(db, user_id, batch.snapshot["selection_token"])
         schedule_data = PrepareInvites.model_validate({**batch.snapshot["schedule"], "selection_token": batch.snapshot["selection_token"]})
         slots = allocate_slots(schedule_data, len(selection["selected"]))
@@ -249,6 +255,7 @@ class InterviewService:
                 stage=selection["stage"], calendar_uid=preview["calendar_uid"], start_utc=datetime.fromisoformat(preview["start_utc"]),
                 end_utc=datetime.fromisoformat(preview["end_utc"]), timezone=preview["timezone"], local_start=preview["local_start"],
                 duration_minutes=preview["duration_minutes"], buffer_minutes=preview["buffer_minutes"], mode=preview["mode"], created_by_user_id=user_id)
+            self.links.install(schedule, preview["join_material"])
             db.add(schedule)
             db.flush()
             self.create_delivery(db, batch, schedule, preview)
@@ -269,7 +276,8 @@ class InterviewService:
         calendar = calendar_invitation(self.settings, schedule.calendar_uid, schedule.sequence, preview, preview["subject"], preview["body"], email, batch.snapshot["sender"])
         db.add(InterviewDelivery(batch_id=batch.id, schedule_id=schedule.id, application_id=application.id,
             recipient_email=email, subject=preview["subject"], body=preview["body"], calendar_text=calendar,
-            calendar_checksum=hashlib.sha256(calendar.encode()).hexdigest(), sequence=schedule.sequence))
+            calendar_checksum=hashlib.sha256(calendar.encode()).hexdigest(), sequence=schedule.sequence,
+            join_material=preview.get("join_material")))
 
     def deliver_batch(self, batch_id):
         from sqlalchemy.exc import SQLAlchemyError
@@ -303,13 +311,22 @@ class InterviewService:
                 delivery.status, delivery.error_category = "failed", "recipient_became_ineligible"
                 db.commit()
                 continue
+            if delivery.join_material and (schedule.join_token_revoked_at or schedule.join_token_hash != delivery.join_material["hash"]
+                or not schedule.join_token_expires_at or utc(schedule.join_token_expires_at) <= datetime.now(UTC)
+                or schedule.room_status in {"ending", "ended", "cancelled"}):
+                delivery.status, delivery.error_category = "failed", "candidate_join_link_changed"
+                db.commit()
+                continue
             # Crash after this commit is conservatively uncertain: never auto-retry.
             delivery.status, delivery.in_flight = "uncertain", True
             delivery.attempts += 1
             db.commit()
             try:
-                delivery.sender_snapshot = db.get(InterviewBatch, batch_id).snapshot["sender"]
-                result = self.sender.send(delivery)
+                transport = self.links.delivery(delivery)
+                transport.sender_snapshot = db.get(InterviewBatch, batch_id).snapshot["sender"]
+                delivery.calendar_checksum = hashlib.sha256(transport.calendar_text.encode()).hexdigest()
+                db.commit()
+                result = self.sender.send(transport)
                 if not isinstance(result, dict):
                     raise ValueError("Invalid transport result")
             except Exception:
@@ -364,13 +381,14 @@ class InterviewService:
                 "start_utc": utc(schedule.start_utc).isoformat(), "end_utc": utc(schedule.end_utc).isoformat(),
                 "local_start": schedule.local_start, "timezone": schedule.timezone, "duration_minutes": schedule.duration_minutes,
                 "status": schedule.status, "sequence": schedule.sequence, "version": schedule.version, "meeting_url": schedule.meeting_url,
+                "room_status": schedule.room_status, "has_join_link": bool(schedule.join_token_hash),
                 "delivery_status": last.status if last else "pending", "delivery_id": last.id if last else None,
                 "delivery_in_flight": last.in_flight if last else False,
                 "delivery_retryable": self.retryable(db, last) if last else False,
                 "delivery_attempts": last.attempts if last else 0, "history": schedule.history, "batch_id": last.batch_id if last else schedule.batch_id})
         return items
 
-    def preview_reschedule(self, db, user_id, data):
+    def preview_reschedule(self, db, user_id, data, *, approved_join_materials=None):
         self.actor(db, user_id)
         ids = list(dict.fromkeys(data.schedule_ids))
         schedules = list(db.scalars(select(InterviewSchedule).where(InterviewSchedule.id.in_(ids), InterviewSchedule.created_by_user_id == user_id)
@@ -379,6 +397,8 @@ class InterviewService:
             raise LookupError("Interview schedule not found")
         if len({item.job_posting_id for item in schedules}) != 1 or any(item.status not in ACTIVE for item in schedules):
             raise ValueError("Reschedule active interviews for one job at a time")
+        if any(item.room_status not in {"scheduled", "waiting"} for item in schedules):
+            raise InterviewConflict("An admitted or active interview cannot be rescheduled. End it first.")
         slots = allocate_slots(data, len(schedules))
         self.conflicts(db, user_id, slots, ids)
         recipients = []
@@ -396,15 +416,24 @@ class InterviewService:
                 "name": candidate.name, "masked_email": masked_email(candidate.email), "email_hash": fingerprint(candidate.email),
                 "stage": schedule.stage, "old_schedule": old, **slot,
                 **render_email(self.settings, {"name": candidate.name}, self.job(db, user_id, schedule.job_posting_id).title, schedule.stage, slot, data, old)}
+            recipient = redact_join_links(recipient)
+            recipient["join_material"] = (approved_join_materials or {}).get(schedule.id) or self.links.rescheduled_material(
+                schedule, datetime.fromisoformat(slot["start_utc"]), datetime.fromisoformat(slot["end_utc"]))
+            if approved_join_materials and recipient["join_material"]["hash"] == schedule.join_token_hash and (
+                schedule.join_token_revoked_at or utc(schedule.join_token_expires_at) <= datetime.now(UTC)):
+                raise InterviewConflict("Candidate link expired or was revoked. Prepare a new rescheduling preview.")
+            self.links.url(recipient["join_material"])  # Check signing/domain configuration before approval.
+            if JOIN_PLACEHOLDER not in recipient["body"]:
+                recipient["body"] += "\n\nJoin your HireSense interview: " + JOIN_PLACEHOLDER
             recipients.append(recipient)
         identity = self.mail_identity()
         original_identity = db.get(InterviewBatch, schedules[0].batch_id).snapshot["sender"]
         identity.update({"from_email": original_identity["from_email"], "from_name": original_identity["from_name"]})
         if any(db.get(InterviewBatch, item.batch_id).snapshot["sender"]["from_email"] != identity["from_email"] for item in schedules):
             raise InterviewConflict("Batch rescheduling requires the same original calendar organizer")
-        payload = {"job_posting_id": schedules[0].job_posting_id, "schedule": data.model_dump(mode="json"),
+        payload = {"job_posting_id": schedules[0].job_posting_id, "schedule": redact_join_links(data.model_dump(mode="json")),
             "recipients": recipients, "sender": identity}
-        return {"recipient_count": len(recipients), "recipients": recipients, "sender": payload["sender"],
+        return {"recipient_count": len(recipients), "recipients": [self.links.preview(item) for item in recipients], "sender": payload["sender"],
             "confirmation_token": self.token("reschedule", payload, user_id)}
 
     def confirm_reschedule(self, db, user_id, data):
@@ -417,7 +446,17 @@ class InterviewService:
         self.decode("reschedule", data.confirmation_token, user_id)  # Expired tokens may acknowledge, never mutate.
         if db.scalar(select(InterviewBatch.id).where(InterviewBatch.created_by_user_id == user_id, InterviewBatch.idempotency_key == data.idempotency_key)):
             raise InterviewConflict("Idempotency key belongs to another invitation")
-        fresh = self.preview_reschedule(db, user_id, RescheduleRequest.model_validate(payload["schedule"]))
+        materials = {item["schedule_id"]: item.get("join_material") for item in payload["recipients"]}
+        if any(not item or item.get("access_policy") != ACCESS_POLICY for item in materials.values()):
+            raise InterviewConflict("Prepare a new rescheduling preview with the current interview-access rules")
+        # Serialize against admission, credential issuance, link changes and End,
+        # not just another scheduling request that locks the interviewer account.
+        locked = list(db.scalars(select(InterviewSchedule).where(InterviewSchedule.id.in_(materials),
+            InterviewSchedule.created_by_user_id == user_id).order_by(InterviewSchedule.id)
+            .with_for_update().execution_options(populate_existing=True)))
+        if len(locked) != len(materials):
+            raise LookupError("Interview schedule not found")
+        fresh = self.preview_reschedule(db, user_id, RescheduleRequest.model_validate(payload["schedule"]), approved_join_materials=materials)
         fresh_payload = self.decode("reschedule", fresh["confirmation_token"], user_id)
         if fingerprint(fresh_payload) != digest:
             raise InterviewConflict("Schedule or recipient changed. Prepare a new rescheduling preview.")
@@ -435,6 +474,14 @@ class InterviewService:
             schedule.sequence += 1
             schedule.version += 1
             schedule.status = "rescheduled"
+            if schedule.room_name and schedule.room_name != preview["join_material"]["room_name"]:
+                schedule.media_cleanup_rooms = list(dict.fromkeys([*(schedule.media_cleanup_rooms or []), schedule.room_name]))
+            self.links.install(schedule, preview["join_material"])
+            from app.models.interview import CandidateInterviewSession
+            db.execute(CandidateInterviewSession.__table__.update().where(CandidateInterviewSession.interview_id == schedule.id).values(revoked_at=datetime.now(UTC)))
+            schedule.room_status, schedule.candidate_waiting_at, schedule.candidate_last_seen_at = "scheduled", None, None
+            schedule.candidate_admitted_at = None
+            schedule.room_version += 1
             self.create_delivery(db, batch, schedule, preview)
         db.commit()
         return self.batch(db, user_id, batch.id)

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "job_posting": {
+      "type": "http",
+      "url": "http://job-posting-mcp:8001/mcp",
+      "localUrl": "http://localhost:8001/mcp",
+      "timeoutSeconds": 30
+    },
+    "interview_scheduling": {
+      "type": "http",
+      "url": "http://interview-mcp:8002/mcp",
+      "localUrl": "http://localhost:8002/mcp",
+      "timeoutSeconds": 120
+    }
+  }
+}

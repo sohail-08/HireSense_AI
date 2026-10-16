@@ -4,7 +4,7 @@ from typing import Any
 
 from mcp import Client
 
-from app.config import get_settings
+from app.mcp_config import resolve_mcp_server
 
 
 class DiscordPublishError(RuntimeError):
@@ -36,13 +36,14 @@ class DiscordMCPPublisher:
         mcp_url: str | None = None,
         timeout_seconds: float | None = None,
     ):
-        settings = get_settings()
-        self.mcp_url = mcp_url or settings.job_posting_mcp_url
-        self.timeout_seconds = (
-            timeout_seconds
-            if timeout_seconds is not None
-            else settings.job_posting_mcp_timeout_seconds
-        )
+        if mcp_url is None or timeout_seconds is None:
+            connection = resolve_mcp_server("job_posting")
+            if mcp_url is None:
+                mcp_url = connection.url
+            if timeout_seconds is None:
+                timeout_seconds = connection.timeout_seconds
+        self.mcp_url = mcp_url
+        self.timeout_seconds = timeout_seconds
 
     def is_configured(self) -> bool:
         try:

@@ -1,5 +1,6 @@
 from datetime import date
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import EmailStr, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,8 +20,8 @@ class Settings(BaseSettings):
     interviewer_password: SecretStr
 
     frontend_url: str = "http://localhost:5173"
-    interview_mcp_url: str = "http://localhost:8002/mcp"
-    interview_mcp_timeout_seconds: float = Field(default=120, ge=1, le=600)
+    mcp_config_file: str = str(ROOT_ENV_FILE.with_name("mcp.json"))
+    mcp_profile: Literal["local", "docker"] = "local"
     interview_company_name: str = "BJIT"
     smtp_host: str = ""
     smtp_port: int = Field(default=1025, ge=1, le=65535)
@@ -31,6 +32,18 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = False
     smtp_timeout_seconds: float = Field(default=15, ge=1, le=120)
     interview_reply_to_email: str = "interviews@hiresense.test"
+    livekit_cloud_url: str = ""
+    livekit_cloud_api_key: str = ""
+    livekit_cloud_api_secret: SecretStr = SecretStr("")
+    livekit_token_ttl_seconds: int = Field(default=120, ge=30, le=300)
+    livekit_api_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    interview_join_base_url: str = "http://localhost:5173"
+    interview_link_secret: SecretStr | None = None
+    interview_link_max_days: int = Field(default=30, ge=1, le=365)
+    candidate_session_minutes: int = Field(default=120, ge=5, le=480)
+    candidate_cookie_secure: bool = True
+    candidate_public_rate_limit: int = Field(default=20, ge=1, le=1000)
+    candidate_waiting_heartbeat_seconds: int = Field(default=45, ge=10, le=300)
 
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
@@ -66,8 +79,6 @@ class Settings(BaseSettings):
     gemini_chat_model: str = "gemini-3.5-flash-lite"
     gemini_timeout_seconds: float = Field(default=60, ge=1, le=300)
 
-    job_posting_mcp_url: str = "http://localhost:8001/mcp"
-    job_posting_mcp_timeout_seconds: float = Field(default=30, ge=1, le=120)
     discord_default_heading: str = Field(
         default="BJIT is Hiring!",
         min_length=1,
@@ -115,6 +126,13 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET_KEY must contain at least 32 characters"
             )
+        return value
+
+    @field_validator("interview_link_secret")
+    @classmethod
+    def validate_interview_link_secret(cls, value):
+        if value is not None and len(value.get_secret_value()) < 32:
+            raise ValueError("INTERVIEW_LINK_SECRET must contain at least 32 characters")
         return value
 
     @field_validator("interviewer_password")

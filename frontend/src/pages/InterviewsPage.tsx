@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { InterviewSchedulingPanel } from "../components/interviews/InterviewSchedulingPanel";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 
 type Schedule = { id: number; candidate_name: string; job_title: string; stage: string; local_start: string; timezone: string;
-  duration_minutes: number; status: string; sequence: number; delivery_status: string; batch_id: number;
+  duration_minutes: number; status: string; room_status: string; sequence: number; delivery_status: string; batch_id: number;
   delivery_id: number; delivery_attempts: number; delivery_in_flight: boolean; delivery_retryable: boolean; job_posting_id: number; history: { local_start: string; timezone: string; reason: string }[] };
+
+function isCompleted(item: Schedule) { return item.status === "completed" || item.room_status === "ended"; }
+function canReschedule(item: Schedule) {
+  return !isCompleted(item) && ["scheduled", "rescheduled"].includes(item.status)
+    && ["scheduled", "waiting"].includes(item.room_status);
+}
 
 export function InterviewsPage() {
   const { refreshVersion } = useSupervisor();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [rescheduleId, setRescheduleId] = useState<number>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  async function refresh() { const result = await apiRequest<Schedule[]>("/interviews/schedules"); setSchedules(result); setSelectedIds((ids) => ids.filter((id) => result.some((item) => item.id === id))); }
+  async function refresh() { const result = await apiRequest<Schedule[]>("/interviews/schedules"); setSchedules(result); setRescheduleId((id) => result.some((item) => item.id === id && canReschedule(item)) ? id : undefined); }
   useEffect(() => { void refresh().catch((failure) => setError(failure instanceof Error ? failure.message : "Could not load interviews.")).finally(() => setLoading(false)); }, [refreshVersion]);
-  const sameJob = new Set(schedules.filter((item) => selectedIds.includes(item.id)).map((item) => item.job_posting_id)).size <= 1;
+  const needsRefresh = schedules.some((item) => item.delivery_status === "pending" || item.delivery_in_flight
+    || (!isCompleted(item) && (["scheduled", "rescheduled"].includes(item.status) || item.room_status === "ending")));
   async function retry(item: Schedule) {
     if (busy) return;
     setBusy(true); setError(undefined);
@@ -26,12 +34,12 @@ export function InterviewsPage() {
     finally { setBusy(false); }
   }
   useEffect(() => {
-    if (!schedules.some((item) => item.delivery_status === "pending" || item.delivery_in_flight)) return;
+    if (!needsRefresh) return;
     let active = true;
     let fetching = false;
     const timer = window.setInterval(() => { if (fetching) return; fetching = true; void refresh().catch((failure) => { if (active) setError(failure instanceof Error ? failure.message : "Could not refresh interviews."); }).finally(() => { fetching = false; }); }, 2500);
     return () => { active = false; window.clearInterval(timer); };
-  }, [schedules]);
+  }, [needsRefresh]);
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold">Interviews</h1>
@@ -44,17 +52,17 @@ export function InterviewsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 text-slate-500">
-                <tr>{["Select", "Candidate / job", "Schedule", "Delivery"].map((title) => <th key={title} className="p-2">{title}</th>)}</tr>
+                <tr>{["Candidate / job", "Schedule", "Delivery"].map((title) => <th key={title} className="p-2">{title}</th>)}</tr>
               </thead>
               <tbody>{schedules.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100">
+                <tr key={item.id} className={`border-b border-slate-100 ${isCompleted(item) ? "bg-emerald-50/50" : ""}`}>
                   <td className="p-2">
-                    <input type="checkbox" aria-label={`Reschedule ${item.candidate_name}`}
-                      disabled={!["scheduled", "rescheduled"].includes(item.status)} checked={selectedIds.includes(item.id)}
-                      onChange={() => setSelectedIds((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} />
-                  </td>
-                  <td className="p-2">
-                    <p className="font-semibold">{item.candidate_name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{item.candidate_name}</p>
+                      {isCompleted(item) ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true">✓ </span>Interview completed</span> : null}
+                    </div>
+                    <Link className="mt-2 inline-block font-medium text-blue-700" to={`/interviews/${item.id}/console`}>{isCompleted(item) ? "View interview details" : "Open interview console"}</Link>
+                    {canReschedule(item) ? <button type="button" className="ml-3 text-xs font-semibold text-blue-700" aria-label={`Reschedule ${item.candidate_name}`} onClick={() => setRescheduleId(item.id)}>Reschedule</button> : null}
                     <p className="mt-1 text-xs text-slate-500">{item.job_title} · {item.stage} · Interview #{item.id}</p>
                     {item.history.length ? (
                       <details className="mt-2">
@@ -78,7 +86,10 @@ export function InterviewsPage() {
           </div>
         )}
       </section>
-      {!sameJob ? <p className="mt-3 text-sm text-amber-800">Select interviews for one job at a time.</p> : selectedIds.length ? <InterviewSchedulingPanel scheduleIds={selectedIds} onUpdated={() => void refresh()} /> : null}
+      {rescheduleId !== undefined ? <div className="mt-4">
+        <button type="button" className="text-sm font-medium text-slate-600" onClick={() => setRescheduleId(undefined)}>Close rescheduling</button>
+        <InterviewSchedulingPanel key={rescheduleId} scheduleIds={[rescheduleId]} onUpdated={() => void refresh()} />
+      </div> : null}
     </section>
   );
 }

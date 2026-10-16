@@ -18,7 +18,7 @@ from app.models.job import (
 )
 from app.models.supervisor import SupervisorSession
 from app.rag.service import KnowledgeBaseService
-from app.schemas.job import JobDescriptionDraft, JobDescriptionUpdateRequest
+from app.schemas.job import JobDescriptionUpdateRequest
 from app.services.candidate_application_service import CandidateApplicationService
 
 

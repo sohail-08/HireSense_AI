@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.candidate import Candidate, CandidateApplication, CVDocument
 from app.models.job import JobPosting
 from app.models.scoring import CandidateScore, ScoringConfiguration, ScoringRequestKey, ScoringRun
-from app.models.screening import RequirementMatch, ScreeningRun, ScreeningRunStatus
+from app.models.screening import RequirementMatch, ScreeningRun
 from app.schemas.scoring import ScoreRunRequest, ScoringApproval
 from app.scoring.workflow import CandidateScoringWorkflow
 from app.services.scoring_calculation import CATEGORIES, DEFAULT_CATEGORY_WEIGHTS, FORMULA_VERSION, SNAPSHOT_VERSION, STATUS_VALUES, display_score

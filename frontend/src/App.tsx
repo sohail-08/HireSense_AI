@@ -3,6 +3,7 @@ import {
   Route,
   Routes,
 } from "react-router-dom";
+import { lazy, Suspense } from "react";
 
 import {
   dashboardPath,
@@ -19,6 +20,8 @@ import { CandidateDashboard } from "./pages/CandidateDashboard";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewerDashboard } from "./pages/InterviewerDashboard";
 import { InterviewsPage } from "./pages/InterviewsPage";
+const CandidateInterviewPage = lazy(() => import("./pages/CandidateInterviewPage").then((module) => ({ default: module.CandidateInterviewPage })));
+const InterviewerConsolePage = lazy(() => import("./pages/InterviewerConsolePage").then((module) => ({ default: module.InterviewerConsolePage })));
 import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -43,7 +46,9 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<LoadingSpinner />}><Routes>
+      <Route path="/interview/join/:token" element={<CandidateInterviewPage />} />
+      <Route path="/interview/join" element={<CandidateInterviewPage />} />
       <Route
         path="/"
         element={<HomeRedirect />}
@@ -64,6 +69,7 @@ export default function App() {
           <ProtectedRoute allowedRole="interviewer" />
         }
       >
+        <Route path="/interviews/:interviewId/console" element={<InterviewerConsolePage />} />
         <Route
           path="/interviewer"
           element={<InterviewerLayout />}
@@ -136,6 +142,6 @@ export default function App() {
         path="*"
         element={<NotFoundPage />}
       />
-    </Routes>
+    </Routes></Suspense>
   );
 }

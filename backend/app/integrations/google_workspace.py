@@ -6,6 +6,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
+from google_auth_httplib2 import AuthorizedHttp
+from httplib2 import Http
 
 
 GOOGLE_SCOPES = (
@@ -45,7 +47,7 @@ class GoogleWorkspaceReader(Protocol):
 
 
 class GoogleServiceAccountReader:
-    def __init__(self, credential_file: str | Path):
+    def __init__(self, credential_file: str | Path, *, sheet_timeout_seconds: int | None = None):
         path = Path(credential_file).expanduser()
         if not path.is_file():
             raise RuntimeError(
@@ -61,10 +63,12 @@ class GoogleServiceAccountReader:
                 "Google service-account credentials could not be loaded"
             ) from exc
 
+        sheet_transport = ({"http": AuthorizedHttp(credentials, http=Http(timeout=sheet_timeout_seconds))}
+            if sheet_timeout_seconds is not None else {"credentials": credentials})
         self._sheets = build(
             "sheets",
             "v4",
-            credentials=credentials,
+            **sheet_transport,
             cache_discovery=False,
         )
         self._drive = build(
