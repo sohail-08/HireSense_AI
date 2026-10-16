@@ -117,6 +117,8 @@ class CandidateApplicationService:
         from copy import deepcopy
         from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery, CandidateInterviewSession
         schedule_ids = list(db.scalars(select(InterviewSchedule.id).where(InterviewSchedule.application_id == application.id)))
+        from app.services.transcription_service import TranscriptionService
+        TranscriptionService.delete_for_interviews(db, schedule_ids)
         db.execute(delete(CandidateInterviewSession).where(CandidateInterviewSession.application_id == application.id))
         db.execute(delete(InterviewDelivery).where(InterviewDelivery.application_id == application.id))
         db.execute(delete(InterviewSchedule).where(InterviewSchedule.application_id == application.id))

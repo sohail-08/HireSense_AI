@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libportaudio2 \
+    && rm -rf /var/lib/apt/lists/* && useradd --create-home worker
+COPY requirements-transcription.txt .
+RUN pip install --no-cache-dir -r requirements-transcription.txt
+COPY --chown=worker:worker transcription_worker ./transcription_worker
+COPY --chown=worker:worker tests/transcription_worker ./tests/transcription_worker
+USER worker
+CMD ["python", "-m", "transcription_worker.main", "start"]

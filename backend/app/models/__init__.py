@@ -36,8 +36,10 @@ from app.models.supervisor import SupervisorSession
 from app.models.scoring import CandidateScore, ScoringConfiguration, ScoringRequestKey, ScoringRun
 from app.models.user import User, UserRole
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery, CandidateInterviewSession
+from app.models.transcription import TranscriptionSession, TranscriptionConsent, TranscriptionStream, TranscriptSegment
 
 __all__ = [
+    "TranscriptionSession", "TranscriptionConsent", "TranscriptionStream", "TranscriptSegment",
     "InterviewBatch", "InterviewSchedule", "InterviewDelivery",
     "CandidateInterviewSession",
     "CandidateScore",

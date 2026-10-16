@@ -125,6 +125,18 @@ class LiveKitMedia:
     def ensure_room(self, room_name):
         return self._call("ensure", room_name)
 
+    def dispatch_transcriber(self, room_name, session_id, agent_name):
+        self.configured()
+        async def invoke():
+            async with api.LiveKitAPI(self.api_url, self.api_key, self.api_secret,
+                    timeout=ClientTimeout(total=self.settings.livekit_api_timeout_seconds)) as client:
+                await client.agent_dispatch.create_dispatch(api.CreateAgentDispatchRequest(
+                    room=room_name, agent_name=agent_name, metadata=json.dumps({"session_id": session_id})))
+        try:
+            asyncio.run(invoke())
+        except Exception:
+            raise MediaUnavailable("Transcription worker dispatch unavailable") from None
+
     def close_room(self, room_name):
         return self._call("close", room_name)
 

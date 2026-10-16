@@ -45,6 +45,18 @@ class Settings(BaseSettings):
     candidate_public_rate_limit: int = Field(default=20, ge=1, le=1000)
     candidate_waiting_heartbeat_seconds: int = Field(default=45, ge=10, le=300)
 
+    transcription_enabled: bool = False
+    transcription_worker_secret: SecretStr = SecretStr("")
+    transcription_agent_name: str = "hiresense-transcriber"
+    transcription_interim_results: bool = True
+    transcription_retention_days: int = Field(default=30, ge=1, le=3650)
+    transcription_start_timeout_seconds: int = Field(default=45, ge=10, le=180)
+    transcription_lease_seconds: int = Field(default=20, ge=10, le=120)
+    deepgram_model: Literal["nova-3"] = "nova-3"
+    deepgram_language: str = Field(default="en-US", pattern=r"^en(?:-[A-Za-z]{2})?$")
+    deepgram_endpointing_ms: int = Field(default=300, ge=10, le=3000)
+    deepgram_utterance_end_ms: int = Field(default=1000, ge=1000, le=5000)
+
     storage_root: str = "storage"
     cv_max_file_size_mb: int = Field(default=10, ge=1, le=100)
     cv_max_pages: int = Field(default=40, ge=1, le=500)

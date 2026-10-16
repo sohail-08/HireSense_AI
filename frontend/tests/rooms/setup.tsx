@@ -51,6 +51,7 @@ vi.mock("@livekit/components-react", async () => {
     useConnectionState: () => sdk.connection,
     useTracks: () => sdk.tracks,
     useLocalParticipant: () => ({ isMicrophoneEnabled: sdk.microphone, isCameraEnabled: sdk.camera }),
+    useRoomContext: () => ({ registerTextStreamHandler: vi.fn(), unregisterTextStreamHandler: vi.fn(), on: vi.fn(), off: vi.fn() }),
   };
 });
 
