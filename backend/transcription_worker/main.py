@@ -8,6 +8,7 @@ from .config import WorkerSettings
 from .provider import DeepgramProvider
 from .transport import Backend, BackendUnavailable
 from .runner import Runner
+from caption_protocol import CaptionSigner
 
 
 class SafeLogFilter(logging.Filter):
@@ -50,13 +51,14 @@ async def entrypoint(ctx):
     runner = None
     finished = asyncio.Event()
     try:
-        context = await backend.post("claim")
+        signer = CaptionSigner()
+        context = await backend.post("claim", {"caption_public_key": signer.public_key})
         if context["room_name"] != ctx.room.name or context["worker_identity"] != "hs-transcriber-" + context["session_id"]:
             return
         if not settings.deepgram_api_key.get_secret_value().strip():
             await backend.post("update", {"state": "failed", "connection_status": "failed", "failure_code": "missing_deepgram_key"})
             return
-        runner = Runner(ctx.room, backend, context, DeepgramProvider(settings.deepgram_api_key.get_secret_value()), settings)
+        runner = Runner(ctx.room, backend, context, DeepgramProvider(settings.deepgram_api_key.get_secret_value()), settings, signer=signer)
         ctx.room.on("track_published", runner.published)
         ctx.room.on("track_subscribed", runner.subscribed)
         ctx.room.on("track_unpublished", runner.unpublished)

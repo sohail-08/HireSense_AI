@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libportaudio2 \
 COPY requirements-transcription.txt .
 RUN pip install --no-cache-dir -r requirements-transcription.txt
 COPY --chown=worker:worker transcription_worker ./transcription_worker
+COPY --chown=worker:worker caption_protocol.py ./caption_protocol.py
 COPY --chown=worker:worker tests/transcription_worker ./tests/transcription_worker
 USER worker
 CMD ["python", "-m", "transcription_worker.main", "start"]

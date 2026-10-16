@@ -196,3 +196,57 @@ def test_offline_benchmark_reports_only_measured_observations():
     assert result["word_error_rate"] == 0
     assert result["timestamp_alignment_error_ms"]["median"] == 20
     assert result["interim_latency_ms"]["count"] == 1
+
+
+def test_caption_signatures_are_session_source_proofs_not_payload_role_claims():
+    import base64
+    import json
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+    from caption_protocol import CaptionSigner, validate_public_key
+    signer = CaptionSigner()
+    assert validate_public_key(signer.public_key) == signer.public_key
+    envelope = signer.envelope({"session_id": "one", "speaker": "CANDIDATE", "text": "Synthetic"})
+    def decode(value): return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    key = ec.EllipticCurvePublicNumbers(int.from_bytes(decode(signer.public_key["x"]), "big"),
+        int.from_bytes(decode(signer.public_key["y"]), "big"), ec.SECP256R1()).public_key()
+    signature = decode(envelope["signature"])
+    der = encode_dss_signature(int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big"))
+    key.verify(der, decode(envelope["payload"]), ec.ECDSA(hashes.SHA256()))
+    with pytest.raises(InvalidSignature):
+        key.verify(der, json.dumps({"speaker": "INTERVIEWER"}).encode(), ec.ECDSA(hashes.SHA256()))
+    assert "d" not in signer.public_key
+    with pytest.raises(ValueError): validate_public_key({**signer.public_key, "x": "invalid"})
+
+
+def test_publisher_sends_signed_interim_before_stopping_and_counts_failures():
+    import json
+    import base64
+    from caption_protocol import CaptionSigner
+    async def scenario():
+        sent = []
+        async def send_text(text, **options):
+            sent.append((json.loads(text), options))
+        metrics = {}
+        publisher = Publisher(SimpleNamespace(local_participant=SimpleNamespace(send_text=send_text)), "session", CaptionSigner(), metrics)
+        task = asyncio.create_task(publisher.run())
+        publisher.put({"kind": "interim", "speaker": "CANDIDATE", "text": "During speech", "stream_id": "stream"})
+        for _ in range(100):
+            if sent: break
+            await asyncio.sleep(.001)
+        assert len(sent) == 1 and not task.done()
+        envelope, options = sent[0]
+        payload = json.loads(base64.urlsafe_b64decode(envelope["payload"] + "=" * (-len(envelope["payload"]) % 4)))
+        assert payload["kind"] == "interim" and payload["event_index"] == 1
+        assert options["compress"] is False
+        assert metrics["caption_messages_sent"] == 1
+        async def failure(*args, **kwargs): raise RuntimeError("private diagnostics")
+        publisher.room.local_participant.send_text = failure
+        await publisher.send({"kind": "interim"}, 1)
+        assert metrics["caption_publish_failures"] == 1
+        assert not publisher.delivery_healthy
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    asyncio.run(scenario())

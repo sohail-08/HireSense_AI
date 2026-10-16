@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRoomContext } from "@livekit/components-react";
 import { RoomEvent } from "livekit-client";
-import { transcriptionApi, transcriptTime, mergeFinals, trustedTranscriptEvent, type TranscriptionStatus, type TranscriptLine } from "./transcriptionApi";
+import { transcriptionApi, transcriptTime, mergeFinals, verifyCaptionMessage, type TranscriptionStatus, type TranscriptLine } from "./transcriptionApi";
 
 type Context = {
   status?: TranscriptionStatus; finals: TranscriptLine[]; interim: Record<string, TranscriptLine>;
   error?: string; busy: boolean; consent: (yes: boolean) => Promise<void>;
-  control: (action: "start" | "stop") => Promise<void>; receive: (sender: string, value: unknown) => void;
+  control: (action: "start" | "stop") => Promise<void>; receive: (sender: string, value: unknown) => Promise<void>;
   restore: () => Promise<void>; interviewer: boolean;
 };
 const TranscriptionContext = createContext<Context | undefined>(undefined);
@@ -22,6 +22,8 @@ export function TranscriptionProvider({ interviewId, closed = false, children }:
   const restoring = useRef(false);
   const restoreAgain = useRef(false);
   const actionLock = useRef(false);
+  const lastInterimIndex = useRef(new Map<string, number>());
+  const finalizedEnd = useRef(new Map<string, number>());
   statusRef.current = status;
   const apply = useCallback((next: TranscriptionStatus) => {
     if (!alive.current) return;
@@ -73,11 +75,23 @@ export function TranscriptionProvider({ interviewId, closed = false, children }:
     catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : "Transcription action failed."); }
     finally { actionLock.current = false; if (alive.current) setBusy(false); }
   }
-  const receive = useCallback((sender: string, value: unknown) => {
-    if (!trustedTranscriptEvent(value, sender, statusRef.current)) return;
+  const receive = useCallback(async (sender: string, envelope: unknown) => {
+    let value: Awaited<ReturnType<typeof verifyCaptionMessage>>;
+    try { value = await verifyCaptionMessage(envelope, sender, statusRef.current); }
+    catch { if (alive.current) setError("Live caption verification is unavailable. Use HTTPS or localhost in a supported browser. Saved text can still be loaded."); return; }
+    // Consent/session can change while WebCrypto verifies a message.
+    if (!alive.current || !value || !statusRef.current?.consented || !statusRef.current?.both_consented
+      || value.session_id !== statusRef.current.session_id) return;
+    const key = `${value.session_id}:${value.stream_id}`;
     if (value.kind === "interim") {
+      const index = value.event_index || 0;
+      if (index < (lastInterimIndex.current.get(key) || 0) || value.end_offset_ms <= (finalizedEnd.current.get(key) || -1)) return;
+      if (lastInterimIndex.current.size > 512) lastInterimIndex.current.clear();
+      lastInterimIndex.current.set(key, index);
       if (statusRef.current?.status === "active") setInterim(previous => ({ ...previous, [value.speaker]: value }));
     } else {
+      if (finalizedEnd.current.size > 512) finalizedEnd.current.clear();
+      finalizedEnd.current.set(key, Math.max(finalizedEnd.current.get(key) || 0, value.end_offset_ms));
       setFinals(previous => mergeFinals(previous, [value], interviewId === undefined ? 80 : 10000));
       setInterim(previous => {
         const next = { ...previous };
@@ -108,7 +122,7 @@ export function TranscriptReceiver() {
           text += chunk;
           if (text.length > 200000) return;
         }
-        if (active) context.receive(sender.identity, JSON.parse(text));
+        if (active) await context.receive(sender.identity, JSON.parse(text));
       } catch { /* Malformed/untrusted captions are ignored, never rendered as HTML. */ }
     });
     const reconnect = () => { void context.restore(); };

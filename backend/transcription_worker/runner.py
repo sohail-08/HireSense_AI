@@ -20,13 +20,21 @@ def trusted_microphone(participant_identity, source, participants):
 
 class Publisher:
     """Coalesce interim revisions, bound final notifications, and never block STT."""
-    def __init__(self, room, session_id):
+    def __init__(self, room, session_id, signer=None, metrics=None):
         self.room, self.session_id = room, session_id
+        self.signer = signer
+        self.metrics = metrics if metrics is not None else {}
         self.interim, self.finals = {}, asyncio.Queue(maxsize=128)
         self.wake = asyncio.Event()
+        self.event_index = 0
+        self.delivery_healthy = True
 
     def put(self, event):
-        event = {"session_id": self.session_id, **event}
+        fields = {"kind", "id", "session_id", "stream_id", "speaker", "sequence", "text", "start_offset_ms",
+                  "end_offset_ms", "start_at", "end_at", "saved"}
+        self.event_index += 1
+        event = {"session_id": self.session_id, **{key: value for key, value in event.items() if key in fields},
+                 "event_index": self.event_index}
         if event["kind"] == "interim":
             self.interim[event["speaker"]] = event
         else:
@@ -40,6 +48,17 @@ class Publisher:
                 self.finals.put_nowait(event)
         self.wake.set()
 
+    async def send(self, event, timeout):
+        try:
+            envelope = self.signer.envelope(event) if self.signer else event
+            # Small caption messages do not benefit from compression negotiation.
+            await asyncio.wait_for(self.room.local_participant.send_text(json.dumps(envelope), topic=TOPIC, compress=False), timeout)
+            self.metrics["caption_messages_sent"] = self.metrics.get("caption_messages_sent", 0) + 1
+            self.delivery_healthy = True
+        except Exception:
+            self.metrics["caption_publish_failures"] = self.metrics.get("caption_publish_failures", 0) + 1
+            self.delivery_healthy = False
+
     async def run(self):
         while True:
             await self.wake.wait()
@@ -47,26 +66,21 @@ class Publisher:
             while not self.finals.empty():
                 event = self.finals.get_nowait()
                 try:
-                    await asyncio.wait_for(self.room.local_participant.send_text(json.dumps(event, default=str), topic=TOPIC), 2)
-                except Exception:
-                    pass  # Persistence and media are independent of text transport.
+                    await self.send(event, 2)
                 finally:
                     self.finals.task_done()
             events, self.interim = list(self.interim.values()), {}
             for event in events:
-                try:
-                    await asyncio.wait_for(self.room.local_participant.send_text(json.dumps(event), topic=TOPIC), 1)
-                except Exception:
-                    pass
+                await self.send(event, 1)
 
 
 class Runner:
-    def __init__(self, room, backend, context, provider, settings):
+    def __init__(self, room, backend, context, provider, settings, signer=None):
         self.room, self.backend, self.context, self.provider, self.settings = room, backend, context, provider, settings
         self.stop = asyncio.Event()
         self.metrics = {"reconnections": 0, "empty_results": 0, "low_confidence": 0, "audio_frames": 0}
         self.connection_status, self.failure = "connecting", None
-        self.publisher = Publisher(room, context["session_id"])
+        self.publisher = Publisher(room, context["session_id"], signer, self.metrics)
         self.persistence = PersistenceQueue(backend, self.publisher.put, settings.transcription_queue_size, self.metrics)
         self.tracks, self.role_tracks = {}, {}
         self.resumes = {}
@@ -241,7 +255,7 @@ class Runner:
             try:
                 while not self.stop.is_set():
                     slow_storage = self.persistence.writing_since is not None and time.monotonic() - self.persistence.writing_since > 1
-                    state = "degraded" if slow_storage else self.connection_status
+                    state = "degraded" if slow_storage or not self.publisher.delivery_healthy else self.connection_status
                     result = await self.backend.post("update", {"connection_status": state, "metrics": self.metrics})
                     if result["stop"]:
                         self.stop.set()

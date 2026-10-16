@@ -12,6 +12,7 @@ from app.models.interview import InterviewSchedule
 from app.models.job import JobDescription, JobPosting, RequirementProfile
 from app.models.transcription import TranscriptionConsent, TranscriptionSession, TranscriptionStream, TranscriptSegment
 from app.services.interview_content import utc
+from caption_protocol import validate_public_key
 
 NOTICE_VERSION = "transcription-v1"
 NOTICE = ("With your consent, microphone audio is sent to Deepgram for live English transcription. "
@@ -86,6 +87,7 @@ class TranscriptionService:
             "consented": role in consents, "both_consented": len(consents) == 2,
             "status": session.status if session else "not_started", "session_id": session.id if session else None,
             "worker_identity": session.worker_identity if session else None,
+            "caption_public_key": (session.configuration or {}).get("caption_public_key") if session else None,
             "connection_status": session.connection_status if session else "stopped",
             "failure_code": session.failure_code if session else None,
             "started_at": session.started_at if session else None,
@@ -179,11 +181,20 @@ class TranscriptionService:
             raise TranscriptionConflict("Transcription session is closed")
         return session
 
-    def claim(self, db, sid, claim):
+    def claim(self, db, sid, claim, caption_public_key=None):
         session = self.worker_session(db, sid)
         digest = hashlib.sha256(claim.encode()).hexdigest()
         if session.claim_hash and not hmac.compare_digest(session.claim_hash, digest):
             raise TranscriptionConflict("Session already claimed")
+        if caption_public_key is not None:
+            try:
+                caption_public_key = validate_public_key(caption_public_key)
+            except ValueError:
+                raise TranscriptionConflict("Invalid caption verification key") from None
+            previous = session.configuration.get("caption_public_key")
+            if previous and previous != caption_public_key:
+                raise TranscriptionConflict("Caption verification key cannot change during a session")
+            session.configuration = {**session.configuration, "caption_public_key": caption_public_key}
         row = db.get(InterviewSchedule, session.interview_id)
         if row.room_status != "active" or len(self.consents(db, row)) != 2 or session.status == "stopping":
             raise TranscriptionConflict("Interview is not available for transcription")
@@ -208,7 +219,7 @@ class TranscriptionService:
                                      "keyterm_fallback": "provider_rejected_options"}
         allowed = {"reconnections", "empty_results", "low_confidence", "final_segments", "dropped_audio_frames",
                    "interim_latency_ms", "final_latency_ms", "persistence_latency_ms", "connection_duration_ms",
-                   "persistence_failures", "audio_frames"}
+                   "persistence_failures", "audio_frames", "caption_messages_sent", "caption_publish_failures"}
         session.metrics = {k: v for k, v in data.metrics.items() if k in allowed}
         if data.state == "failed":
             session.status, session.failure_code, session.ended_at = "failed", data.failure_code or "provider_unavailable", self.now()

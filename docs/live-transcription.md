@@ -121,8 +121,13 @@ without ending the call. Provider retries have backoff/jitter and a fixed budget
 New provider connections get new IDs and server-issued timeline anchors. Only
 trusted exact identities (`<room>-i`, `<room>-c`) supply speaker mapping, never display
 names or client-provided roles. Normal users cannot publish LiveKit data streams;
-React additionally accepts caption events only from the backend-specified worker
-identity and current session. React renders plain text, not provider HTML.
+LiveKit omits the wire sender identity for a hidden participant. Each worker therefore
+generates an ephemeral P-256 signing key and binds its public JWK to its exclusive
+session claim through the authenticated worker API. React verifies every current-worker
+caption with WebCrypto against that backend-provided public key, then checks consent,
+session, role, timing and stable final ID. The private key never leaves worker memory.
+Unsigned empty-sender messages, altered captions, another session's signatures and
+unexpected nonempty sender identities are rejected. React renders plain text, not HTML.
 
 ## Persistence, privacy, retention and deletion
 
@@ -278,6 +283,7 @@ hiresense/
     .dockerignore
     + Dockerfile.transcription
     + requirements-transcription.txt
+    + caption_protocol.py
     alembic/versions/
       + 0020_interview_transcription.py
     app/
@@ -304,6 +310,7 @@ hiresense/
         runner.py
         transport.py
         benchmark.py
+        check_caption_transport.py
     tests/
       test_mcp_config.py
       + test_transcription.py
@@ -351,3 +358,50 @@ benchmark. Docker Desktop's Linux engine was unavailable during this verificatio
 no service was restarted and no live email, room or transcription was created.
 Deepgram credentials and an explicit real-provider test are still needed for actual
 accuracy/latency measurements. The root private `.env` was not edited.
+
+## Live-caption delivery fix
+
+The initial sender-identity check rejected legitimate messages from the hidden
+worker because their LiveKit wire sender is an empty string. Text was already
+recognized/persisted, but appeared only when Stop caused history restoration.
+This was reproduced in an isolated Cloud room using synthetic text, not interview
+audio or Deepgram. Both compressed/uncompressed messages arrived without an identity.
+
+The fix keeps the worker hidden and binds signed caption envelopes to its session.
+`caption_protocol.py` uses the maintained `cryptography` library's P-256/SHA-256
+implementation and IEEE-P1363 signatures compatible with browser WebCrypto. No
+signing secret is returned to clients or added to a LiveKit token. Public-key binding
+uses the existing JSONB configuration snapshot, so no extra migration is required.
+Small caption messages explicitly disable compression. Interim revisions appear
+during speech; final notifications remain separate from persistence. Sequence/timing
+guards prevent late interim verification from resurrecting finalized text.
+
+Numeric `caption_messages_sent` and `caption_publish_failures` metrics replace silent
+publisher failures. Neither includes caption text, signatures or credentials.
+Browser verification requires HTTPS (Cloudflare) or localhost. After applying the
+fix, refresh both participants' pages and start a new transcription session; an
+already-running older worker cannot acquire a new key midway through its session.
+
+An optional text-only Cloud probe is available with
+`python -m transcription_worker.check_caption_transport --run-cloud-probe` in the
+worker environment. It creates and deletes only its own fresh `hs-caption-check-*`
+room, verifies hidden-sender signatures, and never calls Deepgram or reads candidate
+data. It is never run automatically in CI.
+
+Fix verification and activation (16 October 2026):
+
+- Backend: 269 passed, 9 skipped locally and in the built Linux image.
+- Worker: 13 passed locally and in the final built Linux image.
+- Frontend: 41 room/UI tests, 7 scoring tests and 2 scheduling tests passed.
+- Regression coverage includes unsigned/forged hidden-sender rejection, session-key
+  binding, captions before Stop, late-interim suppression, and a real Python-signed
+  envelope verified by the frontend's WebCrypto implementation.
+- TypeScript/Vite build, Python lint checks and all three Docker image builds passed.
+- After the user ended the active interview, backend/frontend/worker were updated.
+  Backend and worker are healthy; public website health returns 200 and the existing
+  Cloudflare address is preserved. PostgreSQL remains at revision 0020 (no extra migration).
+- A fresh, disposable LiveKit Cloud text room confirmed signed messages arrive from
+  a hidden sender and their signatures verify, with and without compression. The
+  room was deleted by the probe. No Deepgram request or interview audio was used.
+- A new live two-person speech test is still a manual check; no accuracy/latency
+  benchmark or end-to-end browser speech result is claimed by these checks.

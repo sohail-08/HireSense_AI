@@ -11,7 +11,7 @@ from app.models.transcription import TranscriptSegment, TranscriptionSession
 from app.security import require_interviewer
 from app.services.transcription_service import TranscriptionService, TranscriptionConflict, segment_payload
 from app.routes.interview_rooms import COOKIE_NAME, candidate_origin, get_rooms, sensitive, run
-from app.schemas.transcription import ConsentInput, WorkerClaim, WorkerUpdate, StreamInput, SegmentInput
+from app.schemas.transcription import ConsentInput, ClaimInput, WorkerUpdate, StreamInput, SegmentInput
 
 router = APIRouter(tags=["Transcription"])
 
@@ -133,8 +133,8 @@ def worker_invoke(db, response, operation):
 
 
 @internal.post("/{sid}/claim")
-def claim(sid: str, data: WorkerClaim, response: Response, db: Session = Depends(get_db), service=Depends(get_transcription)):
-    return worker_invoke(db, response, lambda: service.claim(db, sid, data.claim))
+def claim(sid: str, data: ClaimInput, response: Response, db: Session = Depends(get_db), service=Depends(get_transcription)):
+    return worker_invoke(db, response, lambda: service.claim(db, sid, data.claim, data.caption_public_key.model_dump()))
 
 
 @internal.post("/{sid}/update")

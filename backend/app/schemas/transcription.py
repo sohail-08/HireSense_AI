@@ -15,6 +15,17 @@ class WorkerClaim(StrictInput):
     claim: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class CaptionPublicKey(StrictInput):
+    kty: Literal["EC"]
+    crv: Literal["P-256"]
+    x: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+    y: str = Field(pattern=r"^[A-Za-z0-9_-]{43}$")
+
+
+class ClaimInput(WorkerClaim):
+    caption_public_key: CaptionPublicKey
+
+
 class WorkerUpdate(WorkerClaim):
     state: Literal["heartbeat", "completed", "failed"] = "heartbeat"
     connection_status: Literal["connecting", "transcribing", "reconnecting", "degraded", "stopped", "failed"] = "transcribing"

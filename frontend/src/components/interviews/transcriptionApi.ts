@@ -6,11 +6,13 @@ export type TranscriptionStatus = {
   consented: boolean; both_consented: boolean; status: "not_started" | "starting" | "active" | "stopping" | "completed" | "failed";
   session_id: string | null; worker_identity: string | null; connection_status: string; failure_code: string | null;
   started_at: string | null; can_start: boolean;
+  caption_public_key?: JsonWebKey | null;
 };
 export type TranscriptLine = {
   id?: string; session_id: string; stream_id?: string; speaker: "INTERVIEWER" | "CANDIDATE";
   sequence?: number; text: string; start_offset_ms: number; end_offset_ms: number;
   start_at?: string; end_at?: string; kind?: "final" | "interim"; saved?: boolean;
+  event_index?: number;
 };
 export const transcriptionApi = {
   status: (id?: number) => id === undefined ? candidateRequest<TranscriptionStatus>("transcription/status")
@@ -48,4 +50,36 @@ export function trustedTranscriptEvent(value: unknown, sender: string, status?: 
     && Number.isSafeInteger(line.start_offset_ms) && Number.isSafeInteger(line.end_offset_ms)
     && line.start_offset_ms! >= 0 && line.end_offset_ms! >= line.start_offset_ms!
     && (line.kind !== "final" || (line.saved === true && typeof line.id === "string" && /^[a-f0-9]{64}$/.test(line.id)));
+}
+
+function decodeCaptionBytes(value: string): Uint8Array<ArrayBuffer> {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error("Invalid caption envelope");
+  const raw = atob(value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
+  return Uint8Array.from(raw, character => character.charCodeAt(0));
+}
+
+/** Hidden LiveKit senders can have an empty wire identity. Never trust that alone. */
+export async function verifyCaptionMessage(value: unknown, sender: string, status?: TranscriptionStatus): Promise<(TranscriptLine & { kind: "final" | "interim" }) | undefined> {
+  if (!status?.consented || !status.both_consented) return;
+  if (!status.caption_public_key) {
+    // Compatibility with an older, explicitly identified worker only. Empty
+    // identities are NEVER accepted without a valid session signature.
+    return trustedTranscriptEvent(value, sender, status) ? value : undefined;
+  }
+  if (sender && sender !== status.worker_identity) return;
+  if (typeof value !== "object" || value === null) return;
+  const envelope = value as { v?: unknown; payload?: unknown; signature?: unknown };
+  if (envelope.v !== 1 || typeof envelope.payload !== "string" || envelope.payload.length > 100000
+    || typeof envelope.signature !== "string" || envelope.signature.length !== 86) return;
+  if (!globalThis.crypto?.subtle) throw new Error("Secure caption verification is unavailable");
+  let payload: Uint8Array<ArrayBuffer>, signature: Uint8Array<ArrayBuffer>;
+  try { payload = decodeCaptionBytes(envelope.payload); signature = decodeCaptionBytes(envelope.signature); }
+  catch { return; }
+  const key = await crypto.subtle.importKey("jwk", status.caption_public_key, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+  if (!await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, signature, payload)) return;
+  try {
+    const event: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(payload));
+    if (trustedTranscriptEvent(event, status.worker_identity || "", status)
+      && Number.isSafeInteger(event.event_index) && event.event_index! > 0) return event;
+  } catch { /* Reject malformed signed data as well as forged data. */ }
 }

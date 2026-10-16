@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home appuser
 
 COPY --chown=appuser:appuser app ./app
+COPY --chown=appuser:appuser caption_protocol.py ./caption_protocol.py
 COPY --chown=appuser:appuser tests ./tests
 COPY --chown=appuser:appuser alembic.ini ./alembic.ini
 COPY --chown=appuser:appuser alembic ./alembic

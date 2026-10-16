@@ -14,6 +14,7 @@ from app.services.transcription_service import TranscriptionService, Transcripti
 from app.routes import transcription as routes
 from app.routes.interview_rooms import get_rooms, COOKIE_NAME
 from app.security import create_access_token
+from caption_protocol import CaptionSigner
 from test_interview_rooms import room_setup  # noqa: F401 - pytest fixture registration
 from test_interviews import setup, records  # noqa: F401 - transitive pytest fixtures
 
@@ -164,7 +165,8 @@ def test_api_authorization_candidate_restrictions_and_refresh(transcription, mon
         assert client.get(f"/api/interview-rooms/{t.row.id}/transcript").json()["segments"] == []
         assert client.post(f"/api/internal/transcription/{sid}/claim", json={"claim": claim}).status_code == 401
         client.headers["Authorization"] = "Bearer " + t.config.transcription_worker_secret.get_secret_value()
-        assert client.post(f"/api/internal/transcription/{sid}/claim", json={"claim": claim}).status_code == 200
+        assert client.post(f"/api/internal/transcription/{sid}/claim", json={"claim": claim,
+            "caption_public_key": CaptionSigner().public_key}).status_code == 200
         client.headers.pop("Authorization")
         session, _, _ = t.rooms.exchange(t.db, t.token)
         client.cookies.set(COOKIE_NAME, session)
@@ -251,3 +253,21 @@ def test_postgresql_migration_sql_contains_jsonb_and_utc_types():
     sql = output.getvalue()
     assert "JSONB" in sql and "TIMESTAMP WITH TIME ZONE" in sql
     assert "uq_transcript_provider_segment" in sql
+
+
+def test_caption_key_is_bound_to_worker_claim_and_public_status(transcription):
+    t = transcription
+    consent(t)
+    sid = t.service.start(t.db, t.row)["session_id"]
+    claim = secrets.token_hex(32)
+    signer = CaptionSigner()
+    t.service.claim(t.db, sid, claim, signer.public_key)
+    t.service.claim(t.db, sid, claim, signer.public_key)  # idempotent retry
+    status = t.service.status(t.db, t.row, "CANDIDATE")
+    assert status["caption_public_key"] == signer.public_key
+    assert set(status["caption_public_key"]) == {"kty", "crv", "x", "y"}
+    with pytest.raises(TranscriptionConflict): t.service.claim(t.db, sid, claim, CaptionSigner().public_key)
+    t.db.rollback()
+    with pytest.raises(TranscriptionConflict): t.service.claim(t.db, sid, claim, {**signer.public_key, "d": "private"})
+    t.db.rollback()
+    assert t.service.status(t.db, t.row, "CANDIDATE")["caption_public_key"] == signer.public_key
