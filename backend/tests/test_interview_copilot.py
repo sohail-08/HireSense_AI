@@ -66,7 +66,7 @@ def test_context_and_rag_history_are_private_persistent_and_cited(room_setup):
     assert service.context(db, owner.id, row.id)["messages"] == result["messages"]
     assert result["messages"][1]["tool_name"] == "suggest_interview_questions"
     assert service.supervisor_model.calls == 1
-    assert set(service.supervisor_model.bindings[0]["names"]) == {"suggest_interview_questions", "help"}
+    assert set(service.supervisor_model.bindings[0]["names"]) == {"suggest_interview_questions", "help", "interview_analysis"}
     assert "candidate" not in service.supervisor_model.context
     assert apps[0].candidate.email not in json.dumps(service.supervisor_model.context)
     with pytest.raises(RoomConflict):

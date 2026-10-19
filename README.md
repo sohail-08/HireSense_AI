@@ -1,5 +1,8 @@
 # HireSense
 
+Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
+and interviewer correction/version history are documented in [Feature 5](docs/interview-analysis.md).
+
 ## Current milestone
 
 Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
