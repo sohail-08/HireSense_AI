@@ -51,6 +51,15 @@ services:
       LIVEKIT_CLOUD_API_SECRET: ${LIVEKIT_CLOUD_API_SECRET:-}
       LIVEKIT_TOKEN_TTL_SECONDS: ${LIVEKIT_TOKEN_TTL_SECONDS:-120}
       LIVEKIT_API_TIMEOUT_SECONDS: ${LIVEKIT_API_TIMEOUT_SECONDS:-5}
+      TRANSCRIPTION_ENABLED: ${TRANSCRIPTION_ENABLED:-false}
+      TRANSCRIPTION_WORKER_SECRET: ${TRANSCRIPTION_WORKER_SECRET:-}
+      TRANSCRIPTION_AGENT_NAME: ${TRANSCRIPTION_AGENT_NAME:-hiresense-transcriber}
+      TRANSCRIPTION_INTERIM_RESULTS: ${TRANSCRIPTION_INTERIM_RESULTS:-true}
+      TRANSCRIPTION_RETENTION_DAYS: ${TRANSCRIPTION_RETENTION_DAYS:-30}
+      DEEPGRAM_MODEL: ${DEEPGRAM_MODEL:-nova-3}
+      DEEPGRAM_LANGUAGE: ${DEEPGRAM_LANGUAGE:-en-US}
+      DEEPGRAM_ENDPOINTING_MS: ${DEEPGRAM_ENDPOINTING_MS:-300}
+      DEEPGRAM_UTTERANCE_END_MS: ${DEEPGRAM_UTTERANCE_END_MS:-1000}
       INTERVIEW_JOIN_BASE_URL: ${INTERVIEW_JOIN_BASE_URL:-http://localhost:5173}
       INTERVIEW_LINK_SECRET: ${INTERVIEW_LINK_SECRET:?Set INTERVIEW_LINK_SECRET in root .env}
       INTERVIEW_LINK_MAX_DAYS: ${INTERVIEW_LINK_MAX_DAYS:-30}
@@ -185,6 +194,35 @@ services:
         condition: service_healthy
 
     restart: unless-stopped
+
+  # Opt in only after adding the private key and explicitly enabling transcription.
+  transcription-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.transcription
+    profiles: ["transcription"]
+    environment:
+      LIVEKIT_CLOUD_URL: ${LIVEKIT_CLOUD_URL:-}
+      LIVEKIT_CLOUD_API_KEY: ${LIVEKIT_CLOUD_API_KEY:-}
+      LIVEKIT_CLOUD_API_SECRET: ${LIVEKIT_CLOUD_API_SECRET:-}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      TRANSCRIPTION_WORKER_SECRET: ${TRANSCRIPTION_WORKER_SECRET:-}
+      TRANSCRIPTION_BACKEND_URL: http://backend:8000
+      TRANSCRIPTION_AGENT_NAME: ${TRANSCRIPTION_AGENT_NAME:-hiresense-transcriber}
+      TRANSCRIPTION_QUEUE_SIZE: ${TRANSCRIPTION_QUEUE_SIZE:-128}
+      TRANSCRIPTION_MAX_RETRIES: ${TRANSCRIPTION_MAX_RETRIES:-3}
+      TRANSCRIPTION_FLUSH_SECONDS: ${TRANSCRIPTION_FLUSH_SECONDS:-4}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    restart: unless-stopped
+    stop_grace_period: 20s
 
   # Opt-in website-only demo. No app credentials are passed to this service.
   cloudflared:

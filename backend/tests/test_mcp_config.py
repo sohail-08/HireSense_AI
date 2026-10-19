@@ -89,7 +89,8 @@ def test_invalid_or_secret_bearing_entries_fail_without_echoing_values(config, f
     assert "private-secret" not in str(error.value)
 
 
-@pytest.mark.parametrize("content", ["not-json", "{}", '{"mcpServers":{},"mcpServers":{}}', "x" * 65537])
+@pytest.mark.parametrize("content", ["not-json", "{}", '{"mcpServers":{},"mcpServers":{}}', "x" * 65537],
+                         ids=["invalid-json", "missing-registry", "duplicate-key", "oversized"])
 def test_missing_malformed_duplicate_or_oversized_registry_fails_closed(config, content):
     path, _ = config
     path.write_text(content, encoding="utf-8")

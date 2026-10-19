@@ -450,3 +450,9 @@ Do not use `docker compose down -v` unless you intend to delete the database.
 - Before public deployment, add HTTPS, rate limiting, password reset
   and a reviewed session/token-revocation design.
 - Copilot and recruitment features are deferred.
+## Live interview transcription
+
+Optional consent-based Deepgram Nova-3 captions are documented in
+[docs/live-transcription.md](docs/live-transcription.md), including the worker
+profile, private environment settings, tests, retention and benchmark procedure.
+The feature is disabled by default and does not record audio or video.

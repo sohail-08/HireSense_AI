@@ -6,6 +6,7 @@ import { InterviewMediaRoom } from "../components/interviews/InterviewMediaRoom"
 import { InterviewCopilotPanel } from "../components/interviews/InterviewCopilotPanel";
 import { roomApi, type InterviewerRoomInfo, type DeviceChoices, type MediaAccess } from "../components/interviews/roomApi";
 import { formatRoomTime } from "../components/interviews/roomState";
+import { TranscriptionProvider, TranscriptionPanel } from "../components/interviews/TranscriptionPanel";
 
 export function InterviewerConsolePage() {
   const id = Number(useParams().interviewId);
@@ -75,6 +76,7 @@ export function InterviewerConsolePage() {
             <button className="text-sm text-blue-700" disabled={busy} onClick={() => setConfirmLink("rotate")}>Replace link</button>
             <button className="text-sm text-red-700" disabled={busy || !info.has_join_link || info.link_revoked} onClick={() => setConfirmLink("revoke")}>Revoke link</button>
           </section> : <section className="mt-5 rounded-xl bg-white p-5"><h2 className="text-lg font-semibold">{info.room_status === "ending" ? "Room access is closed; finishing room shutdown" : info.room_status === "cancelled" ? "Interview cancelled" : "Interview ended"}</h2><p className="mt-2 text-slate-600">No new participant access can be issued.</p></section>}
+          <TranscriptionProvider key={id} interviewId={id} closed={Boolean(closed)}>
           <div className="mt-6 grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,400px)]">
           <div className="min-w-0">
           {!closed && !access ? <div><DeviceCheck role="interviewer" onReady={setDevices} />{devices ? <button className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white" disabled={busy || Boolean(info.media_notice)} onClick={() => void connect()}>Join interview room</button> : null}</div> : null}
@@ -84,9 +86,11 @@ export function InterviewerConsolePage() {
             onEnded={() => { setAccess(undefined); void roomApi.status(id).then(setInfo).catch(() => setFatal("This interview is no longer available.")); }}
             onEnd={() => setConfirmEnd(true)} /></div> : null}
           {info.room_status !== "ended" && info.room_status !== "cancelled" && !access ? <button className="mt-6 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white" disabled={busy} onClick={() => setConfirmEnd(true)}>{info.room_status === "ending" ? "Retry ending interview" : "End interview for everyone"}</button> : null}
+          <TranscriptionPanel closed={Boolean(closed)} />
           </div>
           <InterviewCopilotPanel key={id} interviewId={id} />
           </div>
+          </TranscriptionProvider>
           {confirmEnd ? <div role="dialog" aria-modal="true" aria-labelledby="end-room-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section className="w-full max-w-md rounded-2xl bg-white p-6"><h2 id="end-room-title" className="text-xl font-bold">End this interview?</h2><p className="mt-3 text-slate-600">Everyone will be disconnected and the candidate will no longer be able to rejoin.</p><div className="mt-5 flex justify-end gap-3"><button className="rounded-lg border px-4 py-2" onClick={() => setConfirmEnd(false)}>Keep interview open</button><button className="rounded-lg bg-red-600 px-4 py-2 text-white" disabled={busy} onClick={() => void end()}>Confirm end interview</button></div></section></div> : null}
           {confirmLink ? <div role="dialog" aria-modal="true" aria-label="Change candidate link" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><section className="max-w-md rounded-2xl bg-white p-6"><h2 className="text-xl font-bold">{confirmLink === "rotate" ? "Replace candidate link?" : "Revoke candidate access?"}</h2><p className="mt-3 text-slate-600">Old candidate access and sessions will stop working. No replacement email is sent automatically.</p><div className="mt-5 flex justify-end gap-3"><button onClick={() => setConfirmLink(undefined)}>Cancel</button><button className="rounded-lg bg-red-600 px-4 py-2 text-white" onClick={() => { const operation = confirmLink; setConfirmLink(undefined); if (operation === "rotate") void copyLink("/rotate"); else void action(async () => setInfo(await roomApi.revoke(id))); }}>Confirm</button></div></section></div> : null}
         </>}

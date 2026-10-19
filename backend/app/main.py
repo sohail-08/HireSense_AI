@@ -24,6 +24,7 @@ from app.routes.screening import router as screening_router
 from app.routes.scoring import router as scoring_router
 from app.routes.interviews import router as interviews_router
 from app.routes.interview_rooms import router as interview_rooms_router
+from app.routes.transcription import router as transcription_router, internal as transcription_internal_router
 from app.routes.supervisor import router as supervisor_router
 from app.seed_interviewer import seed_interviewer
 from app.services.screening_service import ScreeningService
@@ -94,13 +95,15 @@ app.include_router(requirements_router)
 app.include_router(screening_router)
 app.include_router(scoring_router)
 app.include_router(interviews_router)
+app.include_router(transcription_router)
+app.include_router(transcription_internal_router)
 app.include_router(interview_rooms_router)
 app.include_router(supervisor_router)
 
 
 @app.exception_handler(RequestValidationError)
 async def safe_candidate_validation(request, exc):
-    if request.url.path.startswith("/api/interview-rooms/candidate/"):
+    if request.url.path.startswith(("/api/interview-rooms/candidate/", "/api/internal/transcription/")):
         return JSONResponse({"detail": "This interview access is not available.", "code": "invalid_link"},
             422, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
     return await request_validation_exception_handler(request, exc)

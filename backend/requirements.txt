@@ -23,3 +23,4 @@ mcp==2.3.0
 icalendar==6.3.2
 tzdata>=2025.1
 livekit-api==1.2.1
+cryptography>=44,<51

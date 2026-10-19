@@ -5,6 +5,7 @@ import { Track, LogLevel, setLogLevel, DisconnectReason } from "livekit-client";
 import "@livekit/components-styles";
 import type { MediaAccess, DeviceChoices } from "./roomApi";
 import { deviceMessage } from "./roomState";
+import { TranscriptReceiver } from "./TranscriptionPanel";
 
 // Never let browser diagnostics accidentally print a media JWT or signaling URL.
 setLogLevel(LogLevel.silent);
@@ -57,6 +58,7 @@ export function InterviewMediaRoom({ access, devices, onConnected, onLeave, onEn
         onMediaDeviceFailure={() => setError("A camera or microphone failed. Check permissions or choose another input when you rejoin.")}
         onDisconnected={(reason) => reason === DisconnectReason.ROOM_DELETED ? onEnded() : onLeave()}>
         <Controls onEnd={onEnd} onDeviceError={showError} />
+        <TranscriptReceiver />
       </LiveKitRoom>
     </section>
   );

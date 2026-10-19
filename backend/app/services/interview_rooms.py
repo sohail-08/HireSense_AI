@@ -251,7 +251,8 @@ class InterviewRooms:
             row.interviewer_joined_at = row.interviewer_joined_at or self.now()
         if row.candidate_admitted_at and self.media.identity(row.room_name, "candidate") in present:
             row.candidate_joined_at = row.candidate_joined_at or self.now()
-        if len(present) == 2 and row.candidate_admitted_at:
+        expected = {self.media.identity(row.room_name, role) for role in ("interviewer", "candidate")}
+        if expected.issubset(set(present)) and row.candidate_admitted_at:
             row.interview_started_at, row.room_status = row.interview_started_at or self.now(), "active"
         self.commit(db)
         return self.info(db, row, interviewer=role == "interviewer")
@@ -275,6 +276,8 @@ class InterviewRooms:
         if row.room_status not in {"scheduled", "waiting", "ready", "active", "ending"}:
             raise RoomConflict("Invalid interview-room transition")
         if row.room_status != "ending":
+            from app.services.transcription_service import TranscriptionService
+            TranscriptionService(self.settings).request_stop(db, row)
             row.room_status, row.end_requested_at = "ending", self.now()
             row.ended_by_user_id = user_id
             row.join_token_revoked_at = row.join_token_revoked_at or self.now()
@@ -282,6 +285,24 @@ class InterviewRooms:
             row.version += 1
             self.revoke_sessions(db, row)
             self.commit(db)  # A durable barrier: no more credentials can be issued.
+        # Give the worker a bounded chance to drain buffered finals before deleting
+        # the media room. A failed STT worker must never block ending the interview.
+        from app.models.transcription import TranscriptionSession
+        import time
+        deadline = time.monotonic() + 12
+        while time.monotonic() < deadline:
+            pending = db.scalar(select(TranscriptionSession).where(TranscriptionSession.interview_id == row.id,
+                TranscriptionSession.status.in_(["starting", "active", "stopping"]))
+                .execution_options(populate_existing=True))
+            db.commit()
+            if not pending:
+                break
+            time.sleep(0.2)
+        for unfinished in db.scalars(select(TranscriptionSession).where(TranscriptionSession.interview_id == row.id,
+                TranscriptionSession.status.in_(["starting", "active", "stopping"]))):
+            unfinished.status, unfinished.connection_status = "failed", "failed"
+            unfinished.failure_code, unfinished.ended_at = "shutdown_timeout", self.now()
+        db.commit()
         # Serialize external deletion and finalization. A failed close leaves a
         # durable ending state so End can be safely retried, including after restart.
         row = self.owned(db, user_id, interview_id, lock=True)
