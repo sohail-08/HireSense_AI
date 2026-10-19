@@ -44,6 +44,18 @@ async def request(job):
         await job.reject()
 
 
+def register_track_handlers(room, runner):
+    """Wire SDK events separately so microphone lifecycle contracts are testable."""
+    room.on("track_published", runner.published)
+    room.on("track_subscribed", runner.subscribed)
+    room.on("track_unpublished", runner.unpublished)
+    room.on("track_unsubscribed", lambda track, publication, participant: runner.unpublished(publication, participant))
+    # Unlike publish/subscribe events, the RTC SDK emits mute events as
+    # (participant, publication). Runner methods expect the reverse order.
+    room.on("track_muted", lambda participant, publication: runner.unpublished(publication, participant))
+    room.on("track_unmuted", lambda participant, publication: runner.resume(publication, participant))
+
+
 async def entrypoint(ctx):
     configure_safe_logs()  # Applies inside the spawned job process as well.
     settings = WorkerSettings()
@@ -59,14 +71,9 @@ async def entrypoint(ctx):
             await backend.post("update", {"state": "failed", "connection_status": "failed", "failure_code": "missing_deepgram_key"})
             return
         runner = Runner(ctx.room, backend, context, DeepgramProvider(settings.deepgram_api_key.get_secret_value()), settings, signer=signer)
-        ctx.room.on("track_published", runner.published)
-        ctx.room.on("track_subscribed", runner.subscribed)
-        ctx.room.on("track_unpublished", runner.unpublished)
-        ctx.room.on("track_unsubscribed", lambda track, publication, participant: runner.unpublished(publication, participant))
         # A muted track can stop delivering PCM. Restart its provider clock on
         # unmute rather than compressing a long silent gap out of the timeline.
-        ctx.room.on("track_muted", runner.unpublished)
-        ctx.room.on("track_unmuted", runner.resume)
+        register_track_handlers(ctx.room, runner)
         ctx.room.on("reconnecting", runner.pause_tracks)
         def reconnected():
             for participant in ctx.room.remote_participants.values():
