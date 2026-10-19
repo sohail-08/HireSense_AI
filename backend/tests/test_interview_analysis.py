@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.orm import Session
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from app.agents.interview_analysis import InterviewAnalysisGraph, canonical_quote, digest, pair_turns
+from app.agents.interview_analysis import InterviewAnalysisGraph, canonical_quote, digest, pair_turns, present_result
 from app.models.interview_analysis import InterviewAnalysisRun, InterviewAnalysisReview, InterviewAnalysisControl
 from app.models.transcription import TranscriptionSession
 from app.schemas.interview_analysis import StartAnalysis, CorrectPairs, ReferenceUpdate, ReviewInput
@@ -104,7 +104,7 @@ def test_candidate_clarification_interruption_overlap_and_low_confidence_are_vis
              segment(3, "CANDIDATE", "I commit changes atomically.", start=4500, end=7000, confidence=.5),
              segment(4, "INTERVIEWER", "And rollback?"), segment(5, "CANDIDATE", "Rollback undoes them.", session="session-2")]
     pairs, _ = pair_turns(items, classify(items, ["question", "clarification", "answer", "question_continuation", "answer"]), complete=True)
-    assert len(pairs) == 1 and pairs[0]["state"] == "needs_review"
+    assert len(pairs) == 1 and pairs[0]["state"] == "ready_for_analysis"
     assert {"candidate_clarification", "overlapping_speech", "low_transcription_confidence", "transcription_session_gap", "interruption_or_question_extension"}.issubset(pairs[0]["flags"])
 
 
@@ -134,14 +134,16 @@ def test_no_reference_accuracy_unverified_provisional_rubric_and_unassessed_requ
     assert assessment["accuracy"]["label"] == "unable_to_verify"
     assert assessment["expected_elements_basis"] == "provisional"
     assert result["coverage"][1]["statuses"] == ["not_assessed"]
-    assert "unmet" not in json.dumps(result)
+    assert "unmet" not in json.dumps(result["coverage"])
+    assert result["pairs"][0]["score"]["breakdown"]["accuracy"]["value"] == 0
 
 
 @pytest.mark.parametrize("bad_quote,supported", [(True, True), (False, False)])
 def test_fabricated_quotes_and_valid_quotes_with_unsupported_conclusions(bad_quote, supported):
     result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I use transactions.")]), Model(bad_quote=bad_quote, supported=supported))
     pair = result["pairs"][0]
-    assert pair["state"] == "needs_review"
+    assert pair["state"] == "analyzed"
+    assert pair["score"]["percentage"] == 0
     assert pair["assessment"]["relevance"]["label"] == "not_assessed"
     assert pair["mappings"][0]["status"] == "insufficient_evidence"
     if bad_quote: assert pair["assessment"]["relevance"]["citations"] == []
@@ -180,6 +182,65 @@ def test_prompt_injection_remains_source_data_no_tools_or_rankings():
     assert result["pairs"][0]["assessment"]["relevance"]["citations"][0]["quote"] == text
     assert all("UNTRUSTED DATA" in system and text not in system for _, _, system in model.calls)
     assert not hasattr(InterviewAnalysisGraph, "tools")
+
+
+@pytest.mark.parametrize("partial,expected", [(False, 100), (True, 50)])
+def test_deterministic_answer_scores_use_validated_labels_and_guide_evidence(partial, expected):
+    class GuidedModel(Model):
+        def generate_json(self, **kwargs):
+            result = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "Assessment":
+                if partial:
+                    for name, value in zip(("relevance", "accuracy", "completeness", "quality"),
+                                           ("partial", "partially_supported", "partial", "mixed")):
+                        result[name]["label"] = value
+                for name in ("accuracy", "completeness"):
+                    result[name]["references"] = [{"reference_id": "guide", "quote": "Transactions are atomic."}]
+            return result
+    data = snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")])
+    data["references"] = [{"id": "guide", "kind": "answer_guide", "title": "Transactions", "content": "Transactions are atomic.", "version": "v1"}]
+    pair = execute(data, GuidedModel())["pairs"][0]
+    assert pair["score"]["percentage"] == expected
+    assert sum(item["value"] * item["weight"] for item in pair["score"]["breakdown"].values()) == expected
+    assert {item["value"] for item in pair["score"]["breakdown"].values()} == ({.5} if partial else {1})
+    assert pair["state"] == "analyzed" and "needs_review" not in json.dumps(pair)
+
+
+def test_unanswered_is_zero_procedural_excluded_and_in_progress_are_not_scored():
+    data = snapshot([segment(1, "INTERVIEWER", "Explain transactions")])
+    pair = execute(data)["pairs"][0]
+    assert pair["state"] == "unanswered" and pair["score"]["percentage"] == 0
+    data["complete"] = False
+    assert "score" not in execute(data)["pairs"][0]
+    excluded = {**pair, "state": "excluded"}
+    excluded.pop("score")
+    assert "score" not in present_result({"pairs": [excluded]})["pairs"][0]
+
+
+def test_legacy_review_results_receive_scores_without_mutating_saved_results():
+    result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I commit atomically.")]))
+    result["pairs"][0]["state"] = "needs_review"
+    result["pairs"][0]["assessment"]["accuracy"]["support_status"] = "needs_review"
+    shown = present_result(result)
+    assert shown["pairs"][0]["state"] == "analyzed"
+    assert shown["pairs"][0]["score"]["percentage"] == 50
+    assert "needs_review" not in json.dumps(shown)
+    assert result["pairs"][0]["state"] == "needs_review"
+
+
+@pytest.mark.parametrize("failed_stage", ["Assessment", "FollowUps"])
+def test_provider_failures_are_errors_and_do_not_create_a_review_gate(failed_stage):
+    class FailingStage(Model):
+        def generate_json(self, **kwargs):
+            if kwargs["schema"]["title"] == failed_stage:
+                raise RuntimeError("Synthetic failure")
+            return super().generate_json(**kwargs)
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I commit atomically.")]), FailingStage())["pairs"][0]
+    assert "analysis_error" in pair and "needs_review" not in json.dumps(pair)
+    if failed_stage == "Assessment":
+        assert pair["state"] == "analysis_failed" and "score" not in pair
+    else:
+        assert pair["state"] == "analyzed" and pair["score"]["percentage"] == 50
 
 
 @pytest.fixture
@@ -235,6 +296,40 @@ def test_reference_change_cancels_obsolete_run_and_creates_new_snapshot(saved):
     second = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
     assert second.id != first.id and second.snapshot["references"][0]["version"]
     assert t.db.get(InterviewAnalysisRun, first.id).snapshot["references"] == []
+
+
+def test_question_bank_guides_are_snapshotted_and_retrieved_without_per_interview_approval(saved):
+    from app.rag.service import KnowledgeBaseService
+    from app.seed_interview_questions import seed_interview_questions
+    class TopicEmbedding:
+        model = "test-transaction-topic"
+        def embed(self, content):
+            return [1., 0.] if "transaction" in content.lower() else [0., 1.]
+    t = saved
+    seed_interview_questions(t.db, TopicEmbedding())
+    t.analysis.knowledge = KnowledgeBaseService(TopicEmbedding())
+    queued = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
+    refs = queued.snapshot["references"]
+    assert len(refs) == 24 and all(r["source"] == "knowledge_base" for r in refs)
+    assert t.db.get(InterviewAnalysisControl, t.row.id).references == []
+    retrieved = t.analysis.retrieve_guides("SQL PostgreSQL database transactions")
+    assert any(r["id"] in retrieved and "database transactions" in r["title"] for r in refs)
+    t.analysis.process(queued.id)
+    t.db.expire_all()
+    shown = t.analysis.read(t.db, t.owner.id, t.row.id)["run"]
+    assert shown["status"] == "completed" and shown["result"]["pairs"][0]["score"]
+    calls = [data for title, data, _ in t.analysis.model.calls if title == "Assessment"]
+    assert calls[0]["approved_references"] and all(r["document_id"] for r in calls[0]["approved_references"])
+
+
+def test_semantic_guide_retrieval_accepts_paraphrases_and_excludes_unretrieved_documents():
+    data = snapshot([segment(1, "INTERVIEWER", "Explain database transactions"), segment(2, "CANDIDATE", "I commit atomically.")])
+    data["references"] = [{"id": f"knowledge:{i}", "source": "knowledge_base", "kind": "answer_guide", "title": title,
+                           "content": "Atomicity", "version": "v1"} for i, title in ((1, "Consistency"), (2, "Database transactions"))]
+    model = Model()
+    InterviewAnalysisGraph(model, retrieve=lambda question: ["knowledge:1"]).graph.invoke({"snapshot": data})
+    context = next(context for title, context, _ in model.calls if title == "Assessment")
+    assert [ref["id"] for ref in context["approved_references"]] == ["knowledge:1"]
 
 
 def test_failure_and_restart_recovery_do_not_change_interview(saved):

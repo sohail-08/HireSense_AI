@@ -83,7 +83,7 @@ def run():
                 "assessment_available": bool(assessment), "labels": {k: assessment.get(k, {}).get("label") for k in ("relevance", "accuracy", "completeness", "quality")},
                 "support_checks_passed": sum(c["supported"] for c in pair.get("validation", [])),
                 "support_checks_total": len(pair.get("validation", [])), "follow_ups": len(pair.get("suggestions", [])),
-                "review_required": pair.get("state") == "needs_review", "partial_error": bool(pair.get("analysis_error"))})
+                "answer_score_percent": pair.get("score", {}).get("percentage"), "partial_error": bool(pair.get("analysis_error"))})
         except Exception:
             results.append({"case": name, "elapsed_seconds": round(time.perf_counter() - started, 2), "status": "failed", "failure": client.failure or "Workflow validation failed", "provider_calls": client.calls})
         print(json.dumps(results[-1]), flush=True)

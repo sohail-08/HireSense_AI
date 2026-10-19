@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, func
 from app.database import get_db
-from app.models.knowledge import KnowledgeDocument, KnowledgeSourceType
+from app.models.knowledge import KnowledgeDocument, KnowledgeChunk, KnowledgeSourceType
 from app.rag.embeddings import HashEmbeddingProvider
 from app.rag.service import KnowledgeBaseService
 from app.routes import interview_rooms as routes
@@ -48,6 +48,28 @@ def test_question_seed_is_idempotent_and_not_used_as_previous_jds(room_setup):
     assert knowledge.list_documents(db) == []
     assert knowledge.search(db, "Frontend Engineer React") == []
     assert knowledge.search(db, "Frontend Engineer React", source_type=KnowledgeSourceType.INTERVIEW_QUESTION)
+    docs = knowledge.list_documents(db, KnowledgeSourceType.INTERVIEW_QUESTION)
+    assert all(d.metadata_json.get("answer_guide") and d.metadata_json.get("expected_elements") for d in docs)
+    assert all("Answer guide:" in " ".join(c.content for c in d.chunks) for d in docs)
+
+
+def test_question_seed_upgrades_existing_synthetic_guides_without_duplicates(room_setup):
+    db = room_setup[0][0]
+    knowledge = KnowledgeBaseService(HashEmbeddingProvider())
+    old = knowledge.ingest_document(db, title="Old React question", content="Synthetic interview question about React state",
+        source_type=KnowledgeSourceType.INTERVIEW_QUESTION, source_uri="synthetic://interview-questions/react-state-management",
+        metadata={"synthetic": True, "dataset": "interview-questions-v1"})
+    old_id, old_hash = old.id, old.content_hash
+    untouched = knowledge.ingest_document(db, title="Company JD", content="Original company document",
+        source_type=KnowledgeSourceType.PREVIOUS_JOB_DESCRIPTION)
+    assert seed_interview_questions(db, HashEmbeddingProvider()) == 23
+    db.refresh(old)
+    assert old.id == old_id and old.content_hash != old_hash and old.metadata_json["answer_guide"]
+    assert len(list(db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.source_uri == old.source_uri)))) == 1
+    chunks = list(db.scalars(select(KnowledgeChunk).where(KnowledgeChunk.document_id == old_id)))
+    assert "Answer guide:" in " ".join(c.content for c in chunks)
+    assert db.get(KnowledgeDocument, untouched.id).content_hash == untouched.content_hash
+    assert seed_interview_questions(db, HashEmbeddingProvider()) == 0
 
 
 def test_context_and_rag_history_are_private_persistent_and_cited(room_setup):

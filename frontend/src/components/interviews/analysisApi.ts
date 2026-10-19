@@ -9,7 +9,10 @@ export type Mapping = { requirement_id: string; requirement_version: string; pai
 export type Suggestion = { id: string; question: string; reason: string; requirement_ids: string[]; citations: Citation[];
   expected_clarification: string; priority: string; priority_reason: string };
 export type PairEdit = { id: string; question_ids: string[]; answer_ids: string[]; context_ids: string[]; subparts: string[]; excluded: boolean; unanswered: boolean };
+export type AnswerScore = { percentage: number; earned: number; possible: number; rubric_version: string;
+  breakdown: Record<"relevance" | "accuracy" | "completeness" | "quality", { value: number; weight: number; status: "met" | "partially_met" | "unmet"; reason: string }> };
 export type Pair = PairEdit & { state: string; flags: string[]; pairing_confidence: string; pairing_reasons: string[];
+  score?: AnswerScore;
   analysis_error?: string; assessment?: Record<"relevance" | "accuracy" | "completeness" | "quality", Dimension> & { expected_elements: string[]; expected_elements_basis: string };
   mappings?: Mapping[]; suggestions?: Suggestion[] };
 export type Reference = { id: string; title: string; kind: "answer_guide" | "technical_reference"; content: string; requirement_ids: string[]; version?: string };
@@ -27,8 +30,6 @@ export const analysisApi = {
     method: "POST", body: JSON.stringify({ automatic, finalize_last: finalizeLast, reanalyze }) }),
   correct: (id: number, runId: number, pairs: PairEdit[], reason: string) => apiRequest(base(id) + "/pairing", {
     method: "POST", body: JSON.stringify({ run_id: runId, pairs, reason }) }),
-  references: (id: number, revision: number, references: Reference[]) => apiRequest(base(id) + "/references", {
-    method: "PUT", body: JSON.stringify({ revision, approved: true, references: references.map(({ id, title, kind, content, requirement_ids }) => ({ id, title, kind, content, requirement_ids })) }) }),
   review: (id: number, runId: number, kind: string, targetId: string, note = "", segmentIds: string[] = []) => apiRequest(base(id) + `/${runId}/reviews`, {
     method: "POST", body: JSON.stringify({ kind, target_id: targetId, note, segment_ids: segmentIds }) }),
 };

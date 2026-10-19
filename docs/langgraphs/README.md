@@ -1,7 +1,7 @@
 # HireSense LangGraph diagrams
 
 These editable draw.io diagrams cover the five graphs present before Feature 5.
-The sixth graph, `InterviewAnalysisGraph`, and its nine actual nodes/ten edges are
+The sixth graph, `InterviewAnalysisGraph`, and its ten actual nodes/eleven edges are
 documented in [interview analysis](../interview-analysis.md); it is not yet included
 in these older draw.io bundles. Node identifiers and directed edges below were checked against
 `workflow._compiled.get_graph()`; START and END display LangGraph's

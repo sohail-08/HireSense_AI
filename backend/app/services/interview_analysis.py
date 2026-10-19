@@ -4,13 +4,17 @@ import copy
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from sqlalchemy import delete, select, update
-from app.agents.interview_analysis import InterviewAnalysisGraph, digest, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
+from sqlalchemy.orm import selectinload
+from app.agents.interview_analysis import InterviewAnalysisGraph, digest, present_result, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
 from app.config import get_settings
 from app.database import SessionLocal
 from app.llm.gemini import GeminiStructuredClient
 from app.models.interview import InterviewSchedule, InterviewBatch
 from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
 from app.models.scoring import ScoringRun, ScoringConfiguration
+from app.models.knowledge import KnowledgeDocument, KnowledgeSourceType
+from app.rag.embeddings import OllamaEmbeddingProvider
+from app.rag.service import KnowledgeBaseService
 from app.models.transcription import TranscriptionSession, TranscriptSegment
 from app.services.interview_rooms import InterviewRooms, RoomConflict
 from app.services.interview_content import utc
@@ -27,9 +31,29 @@ def now():
 
 
 class InterviewAnalysisService:
-    def __init__(self, model=None, session_factory=None):
+    def __init__(self, model=None, session_factory=None, knowledge=None):
         self.factory = session_factory or SessionLocal
         self.model = model
+        self.knowledge = knowledge
+
+    @staticmethod
+    def knowledge_references(db):
+        documents = db.scalars(select(KnowledgeDocument).where(
+            KnowledgeDocument.source_type == KnowledgeSourceType.INTERVIEW_QUESTION)
+            .options(selectinload(KnowledgeDocument.chunks)).order_by(KnowledgeDocument.id))
+        return [{"id": f"knowledge:{d.id}", "title": d.title, "kind": "answer_guide",
+                 "content": "\n\n".join(c.content for c in d.chunks), "version": d.content_hash,
+                 "source": "knowledge_base", "document_id": d.id, "source_uri": d.source_uri,
+                 "chunk_ids": [c.id for c in d.chunks], "question": d.metadata_json.get("question", ""),
+                 "requirement_ids": []}
+                for d in documents if d.metadata_json.get("answer_guide") and d.chunks]
+
+    def retrieve_guides(self, question):
+        knowledge = self.knowledge or KnowledgeBaseService(OllamaEmbeddingProvider())
+        with self.factory() as db:
+            chunks = knowledge.search(db, question[:5000], top_k=8, min_score=.25,
+                                      source_type=KnowledgeSourceType.INTERVIEW_QUESTION)
+            return [f"knowledge:{chunk.document_id}" for chunk in chunks]
 
     @staticmethod
     def latest(db, interview_id):
@@ -88,7 +112,7 @@ class InterviewAnalysisService:
         hashes = {s["id"]: s["hash"] for s in segments}
         return {"interview_id": row.id, "application_id": row.application_id, "segments": segments,
                 "requirements": requirements, "requirement_version": version,
-                "references": copy.deepcopy(control.references), "reference_revision": control.revision,
+                "references": self.knowledge_references(db) + copy.deepcopy(control.references), "reference_revision": control.revision,
                 "complete": complete, "gaps": gaps, "watermark": hashes,
                 "expires_at": min((utc(s.expires_at) for s in sessions), default=now()).isoformat(),
                 "provider": "gemini", "model": get_settings().gemini_chat_model, "prompt_version": PROMPT_VERSION,
@@ -164,7 +188,7 @@ class InterviewAnalysisService:
             response["run"] = {"id": run.id, "version": run.version, "status": run.status, "stage": run.stage,
                 "error": run.error, "created_at": run.created_at.isoformat(), "stale": run.snapshot["input_key"] != self.input_key(current),
                 "snapshot": {k: v for k, v in run.snapshot.items() if k not in {"previous_pairs", "previous_turns", "past_suggestions"}},
-                "result": run.result, "reviews": reviews}
+                "result": present_result(run.result), "reviews": reviews}
         return response
 
     def references(self, db, user_id, interview_id, request):
@@ -258,7 +282,8 @@ class InterviewAnalysisService:
                     run.result, run.status, run.stage, run.completed_at = result, "completed", "completed", now()
                 db.commit()
         try:
-            InterviewAnalysisGraph(self.model or GeminiStructuredClient(timeout_seconds=45), checkpoint, persist).graph.invoke(
+            InterviewAnalysisGraph(self.model or GeminiStructuredClient(timeout_seconds=45), checkpoint, persist,
+                                   retrieve=self.retrieve_guides).graph.invoke(
                 {"snapshot": snapshot}, config={"recursion_limit": 15})
         except ObsoleteRun:
             with self.factory() as db:

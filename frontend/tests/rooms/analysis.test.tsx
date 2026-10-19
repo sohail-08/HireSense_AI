@@ -5,7 +5,7 @@ import { InterviewAnalysisPanel } from "../../src/components/interviews/Intervie
 import { TranscriptCitation } from "../../src/components/interviews/TranscriptCitation";
 import { analysisApi, type AnalysisState, type Citation } from "../../src/components/interviews/analysisApi";
 
-vi.mock("../../src/components/interviews/analysisApi", () => ({ analysisApi: { read: vi.fn(), start: vi.fn(), correct: vi.fn(), references: vi.fn(), review: vi.fn() } }));
+vi.mock("../../src/components/interviews/analysisApi", () => ({ analysisApi: { read: vi.fn(), start: vi.fn(), correct: vi.fn(), review: vi.fn() } }));
 const citation: Citation = { interview_id: 1, segment_id: "a", session_id: "s", revision: "hash-a", quote: "commit changes", char_start: 13, char_end: 27,
   speaker: "CANDIDATE", start_at: "2026-10-19T00:00:03Z", end_at: "2026-10-19T00:00:05Z", start_offset_ms: 3000, end_offset_ms: 5000 };
 function fixture(): AnalysisState {
@@ -17,6 +17,11 @@ function fixture(): AnalysisState {
       references: [], requirements: { requirements: [{ key: "skill:0", name: "Transactions" }] }, requirement_version: "v1" },
     result: { pairs: [{ id: "pair", question_ids: ["q"], answer_ids: ["a"], context_ids: [], subparts: [], excluded: false, unanswered: false,
       state: "analyzed", flags: [], pairing_confidence: "supported", pairing_reasons: ["The candidate responds after the question."],
+      score: { percentage: 75, earned: 3, possible: 4, rubric_version: "v2", breakdown: {
+        relevance: { value: 1, weight: 25, status: "met", reason: dimension.justification },
+        accuracy: { value: 0, weight: 25, status: "unmet", reason: "Accuracy is not established by the answer guide." },
+        completeness: { value: 1, weight: 25, status: "met", reason: "The expected elements are addressed." },
+        quality: { value: 1, weight: 25, status: "met", reason: "The answer includes clear technical reasoning." } } },
       assessment: { relevance: dimension, accuracy: { ...dimension, label: "unable_to_verify" }, completeness: { ...dimension, label: "complete" }, quality: { ...dimension, label: "clear" }, expected_elements: ["Atomicity"], expected_elements_basis: "provisional" },
       suggestions: [{ id: "follow", question: "How would you test rollback?", reason: "Explore testing", requirement_ids: [], citations: [citation], expected_clarification: "A test example", priority: "normal", priority_reason: "Useful clarification" }] }],
       coverage: [{ requirement_id: "skill:1", name: "Testing", statuses: ["not_assessed"], evidence: [] }], gaps: [], unpaired: [] },
@@ -28,7 +33,8 @@ describe("interviewer answer analysis", () => {
   it("restores saved assessments without generating analysis on page load", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
     expect(await screen.findByText("Question–answer timeline")).toBeTruthy();
-    expect(screen.getByText(/accuracy · unable to verify/i)).toBeTruthy();
+    expect(screen.getByText(/accuracy · unmet \(0\)/i)).toBeTruthy();
+    expect(screen.getByLabelText("Answer score 75%")).toBeTruthy();
     expect(analysisApi.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Analyze saved answers" }));
     await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true));
@@ -71,15 +77,14 @@ describe("interviewer answer analysis", () => {
     fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Separate the follow-up." } });
     expect((screen.getByRole("button", { name: "Save correction & reanalyze" }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it("requires explicit approval before saving reference material", async () => {
+  it("shows scored evidence without an interview reference-entry or needs-review section", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
     await screen.findByText("Question–answer timeline");
-    fireEvent.click(screen.getByText("Approved answer guides & technical references"));
-    fireEvent.change(screen.getByLabelText("Reference title"), { target: { value: "Atomicity" } });
-    fireEvent.change(screen.getByLabelText("Reference text"), { target: { value: "All changes commit or none do." } });
-    expect((screen.getByRole("button", { name: "Save approved reference" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText("I approve this material for assessing this interview."));
-    fireEvent.click(screen.getByRole("button", { name: "Save approved reference" }));
-    await waitFor(() => expect(analysisApi.references).toHaveBeenCalled());
+    expect(screen.queryByText("Approved answer guides & technical references")).toBeNull();
+    expect(screen.queryByLabelText("Reference title")).toBeNull();
+    expect(screen.queryByText(/needs review/i)).toBeNull();
+    expect(screen.getByText(/Answer score: 75%/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Candidate · 00:03/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Accuracy is not established by the answer guide/)).toBeTruthy();
   });
 });

@@ -8,10 +8,10 @@ candidate captions. Interim text never enters the analysis workflow.
 
 1. Open the interview console. Obtain both participants' transcription consent and
    start transcription as usual. Existing saved transcripts can also be analyzed.
-2. In **Interview answers & evidence**, optionally open **Approved answer guides &
-   technical references**, paste relevant material, and explicitly approve it.
-   References belong to this interview. A question bank, JD, or CV is not automatically
-   treated as an approved correctness reference.
+2. The question bank stores each suggested question with its answer guide and
+   expected elements. Run `python -m app.seed_interview_questions` to index or upgrade
+   the 24 synthetic question/guide records. There is no per-interview guide-entry
+   or approval section. Previous JDs and CVs are not correctness references.
 3. Click **Analyze saved answers**. The HTTP request saves a queued run and returns
    immediately. **Continue as new answers arrive** enables updates at most once per
    20-second inspection interval when inputs change. Stop automatic updates from the
@@ -21,10 +21,16 @@ candidate captions. Interim text never enters the analysis workflow.
    context. A new substantive question closes the prior exchange. A pause or final
    STT event does not. Use **The answer is finished — analyze it** for an explicit
    boundary, or correct the pairing. Overlap, uncertain turns, low confidence and
-   session gaps remain visible. Unanswered/procedural exchanges are not graded.
-5. Inspect relevance, accuracy, completeness and quality separately. These are
-   descriptive labels, not numeric scores. Generated expected elements are provisional.
-   Accuracy without an applicable approved reference is **unable to verify**.
+   session gaps remain visible as transcript notes. Unanswered questions receive 0;
+   procedural/excluded conversation and unfinished answers are not scored.
+5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
+   accuracy, completeness and quality each weigh 25%. Met earns 1, partially met 0.5,
+   and unmet 0. The percentage is `25 × (relevance + accuracy + completeness + quality)`.
+   Python calculates scores after quote and logical-support validation. Unsupported
+   evidence earns 0; accuracy and completeness additionally require a cited reference
+   (an answer guide for completeness). A missing reference does not prove a personal
+   claim false; the explanation records the missing support. No result is placed in
+   a "needs review" queue. Provider failures remain retryable errors, not candidate scores.
 6. Click a transcript quote to open the exact saved source version with the quoted
    characters highlighted. Technical reference quotes are shown separately. There
    is no audio playback because this application does not record audio.
@@ -55,7 +61,8 @@ flowchart TD
     reference_retrieval --> answer_analysis
     answer_analysis --> requirement_mapping
     requirement_mapping --> citation_support_validation
-    citation_support_validation --> follow_up_generation
+    citation_support_validation --> answer_scoring
+    answer_scoring --> follow_up_generation
     follow_up_generation --> persistence
     persistence --> END
 ```
@@ -99,11 +106,16 @@ interviewer corrections remain necessary for ambiguous or interrupted exchanges.
 Additional speech overlapping a manually fixed exchange is listed as unpaired for
 review instead of silently changing the correction.
 
-Approved references are stored as interview-scoped versioned snapshots. Retrieval
-prioritizes answer guides, ranks lexical overlap, and includes at most six documents
-per exchange. This feature does not automatically trust the existing global question
-bank, browse the web, or ingest CV text as a correctness reference. Future integration
-with an approved global reference collection can replace this small retrieval stage.
+Question-bank records marked with `metadata.answer_guide` are snapshotted with their
+document ID, chunk IDs, question, content hash and guide content. The background worker
+uses existing Ollama embeddings and pgvector question-bank search for each spoken
+question; at most six matching snapshots reach assessment. Semantic matches need no
+literal word overlap. GET/page refresh reads database snapshots without calling
+embeddings or a model. Changed guides make earlier analyses stale. Seed upgrades retain
+document IDs and replace only synthetic dataset chunks after new embeddings succeed;
+the JD collection is unaffected. Legacy interview-scoped references remain readable
+for existing versions/API clients; there is no entry UI. Historical results receive
+the current deterministic scoring projection on read, without rewriting saved sources.
 
 Every retained quote must exist exactly within a permitted source segment. The backend
 adds interview/session IDs, a content-hash revision, speaker, authoritative segment
@@ -113,7 +125,7 @@ segments. Technical citations must exist in the approved reference snapshot.
 
 A separate structured model call checks whether the validated quotations logically
 support the proposed assessment/mapping. Invalid or unsupported claims are downgraded
-to review-required descriptive results and generic explanations; they are not presented
+to zero-credit criteria and evidence-gap explanations; they are not presented
 as established facts. This additional model check is fallible and is not external fact
 verification. Model confidence is never represented as verified truth. Candidate
 project claims without reference support remain unverified rather than false.
@@ -129,7 +141,7 @@ provider check. The graph now removes length/count bounds and defaults from the 
 sent to Gemini while retaining all limits in local Pydantic validation. Google documents
 that large/deep schemas may be rejected in its [structured-output documentation](https://ai.google.dev/gemini-api/docs/generate-content/structured-output?hl=en).
 The prompt size is bounded at 200,000 characters and long transcripts are classified
-in batches of 60 new segments. Oversized exchanges fail visibly for review rather than
+in batches of 60 new segments. Oversized exchanges fail visibly with a retryable error rather than
 being silently truncated into a misleading assessment.
 
 ## Persistence, access, and retention
@@ -162,7 +174,7 @@ Endpoints under `/api/interview-rooms/{id}/analysis`:
 | --- | --- |
 | `GET /analysis?run_id=...` | Progress, timeline, assessments/citations, coverage, suggestions, source snapshot, versions and reviews. |
 | `POST /analysis` | Start/update automatic analysis, explicitly finalize the last exchange, or request reanalysis. Returns 202 and durable run identity. |
-| `PUT /analysis/references` | Explicitly approve/version the reference set with optimistic revision checking. |
+| `PUT /analysis/references` | Legacy compatibility API for interview-scoped references; new guides live in the question knowledge base. |
 | `POST /analysis/pairing` | Correct the latest completed pairing and enqueue a new version. |
 | `POST /analysis/{run_id}/reviews` | Save assessment notes or suggestion used/dismissed/linked annotations. |
 
@@ -282,8 +294,8 @@ Deployment/check record, 19 October 2026:
   Use the following manual steps for the live UI/media boundary.
 
 Manual acceptance: analyze a consented synthetic conversation, inspect each source,
-refresh, change a pairing and confirm both versions remain, approve a reference and
-reanalyze, mark/link/dismiss follow-ups, ask the central chatbot for evidence, and confirm
+refresh, change a pairing and confirm both versions remain, update a knowledge-base guide
+and reanalyze, check percentage breakdowns, mark/link/dismiss follow-ups, ask the chatbot for evidence, and confirm
 the candidate interface contains none of these private controls. Stop transcription,
 wait for the final flush and confirm the last exchange reconciles. These actions can
 use provider credits; automated tests do not.
@@ -296,3 +308,20 @@ Suggested commit boundaries:
 4. `feat: expose owned interview analysis APIs and supervisor tool`
 5. `feat: add interviewer answer review and pairing correction panels`
 6. `test: verify interview analysis and document synthetic provider results`
+
+## Question-bank scoring update verification — 19 October 2026
+
+- Full backend suite: **304 passed, 9 skipped**. Linux analysis/copilot suite:
+  **46 passed**; final historical-result/supervisor checks: **3 passed**.
+- Frontend room suite: **47 passed**. TypeScript/Vite and Docker backend/frontend
+  builds passed. Python syntax and `git diff --check` passed.
+- Upgraded the existing **24** synthetic question documents in place: **24 guides**
+  and **24 embedded chunks**, with no duplicate documents. PostgreSQL semantic
+  retrieval found the transaction guide for a transaction-consistency query.
+- Backend/frontend were refreshed after checking no active interviews or pending
+  deliveries. Public `/api/health` returned **200** using the existing tunnel origin.
+- Existing automatic analysis picked up the knowledge-base update. The latest run
+  completed with **8 pairs and 8 scored answers**, without a run error.
+- No schema migration, new environment setting or media-worker update is required.
+  Unit tests mock the model/provider; the running automatic analysis uses the
+  interview's existing saved transcript and configured Gemini client.

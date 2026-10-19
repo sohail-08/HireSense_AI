@@ -150,9 +150,13 @@ class InterviewCopilot:
         else:
             pair = next((p for p in reversed(content["pairs"]) if p.get("assessment")), None)
             if pair:
+                if pair.get("score"):
+                    lines.append(f"Answer score: {pair['score']['percentage']:g}% ({pair['score']['earned']:g}/4).")
                 for dimension in ("relevance", "accuracy", "completeness", "quality"):
                     item = pair["assessment"][dimension]
-                    lines.append(f"{dimension.capitalize()}: {item['label'].replace('_', ' ')}. {item['justification']}")
+                    points = pair.get("score", {}).get("breakdown", {}).get(dimension)
+                    grade = f"{points['status'].replace('_', ' ')} ({points['value']:g})" if points else item['label'].replace('_', ' ')
+                    lines.append(f"{dimension.capitalize()}: {grade}. {item['justification']}")
                     citations.extend(item["citations"])
         if len(lines) == 1: lines.append("No completed evidence is available for this request. The latest exchange may still be in progress; review its pairing in the analysis panel.")
         result.update(assistant_message="\n\n".join(lines)[:2000], analysis_citations=list({(c["segment_id"], c["char_start"]): c for c in citations}.values())[:8])

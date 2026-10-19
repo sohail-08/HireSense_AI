@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { analysisApi, type AnalysisState, type PairEdit, type Reference, type Segment, type Citation } from "./analysisApi";
+import { analysisApi, type AnalysisState, type PairEdit, type Segment, type Citation } from "./analysisApi";
 import { TranscriptCitation } from "./TranscriptCitation";
 import { transcriptTime } from "./transcriptionApi";
 
@@ -17,10 +17,6 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [linked, setLinked] = useState<Record<string, string>>({});
-  const [refTitle, setRefTitle] = useState("");
-  const [refText, setRefText] = useState("");
-  const [refKind, setRefKind] = useState<Reference["kind"]>("answer_guide");
-  const [approved, setApproved] = useState(false);
   const lock = useRef(false);
   const generation = useRef(0);
   const refresh = useCallback(async () => {
@@ -54,7 +50,8 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   return <section id="interview-analysis" aria-label="Private interview analysis" className="mt-5 min-w-0 rounded-2xl bg-white p-5 shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold">Interview answers & evidence</h2>
       {run ? <span role="status" className="rounded-full bg-slate-100 px-3 py-1 text-sm">Version {run.version} · {label(run.status)}{run.status === "processing" ? ` · ${label(run.stage)}` : ""}</span> : null}</div>
-    <p className="mt-2 text-sm text-slate-600">Review how answers address the job requirements. Assessments support your judgment and do not change CV scores or candidate rankings.</p>
+    <p className="mt-2 text-sm text-slate-600">Answers are scored using the question bank’s answer guides and transcript evidence.</p>
+    <p className="mt-1 text-xs text-slate-500">Relevance, accuracy, completeness and quality each contribute 25%. Met = 1, partially met = 0.5, unmet = 0.</p>
     <div className="mt-4 flex flex-wrap items-center gap-3">
       <button className={`${button} bg-blue-600 text-white`} disabled={busy} onClick={() => { setVersion(undefined); void action(() => analysisApi.start(interviewId, automatic), "Analysis requested. Progress will update here."); }}>Analyze saved answers</button>
       <label className="text-sm"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} /> Continue as new answers arrive</label>
@@ -69,37 +66,27 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
     {run?.stale ? <p className="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-900">This version uses earlier transcript or reference material. Analyze saved answers to update it.</p> : null}
     {run?.result.gaps?.map(gap => <p key={gap} className="mt-2 text-sm text-amber-900">{gap}</p>)}
     {!run ? <p className="mt-4 text-sm text-slate-500">Start with saved final transcript text. Results will remain available after refresh.</p> : null}
-    <details className="mt-4 rounded-xl border p-3"><summary className="cursor-pointer font-semibold">Approved answer guides & technical references</summary>
-      <p className="mt-2 text-sm text-slate-600">Approve reference material you trust. Without a relevant reference, technical accuracy is marked unable to verify.</p>
-      {state?.references.map(ref => <details key={ref.id} className="mt-3 border-b pb-2"><summary>{ref.title} · {label(ref.kind)}</summary><p className="mt-2 whitespace-pre-wrap text-sm">{ref.content}</p>
-        <button className={`${button} mt-2`} disabled={busy} onClick={() => void action(() => analysisApi.references(interviewId, state.reference_revision, state.references.filter(r => r.id !== ref.id)), "Reference removed from future analysis. Historical versions are preserved.")}>Remove from future analysis</button></details>)}
-      <label className="mt-3 block text-sm">Reference title<input className="mt-1 w-full rounded border p-2" value={refTitle} maxLength={200} onChange={e => setRefTitle(e.target.value)} /></label>
-      <label className="mt-2 block text-sm">Reference type<select className="ml-2 rounded border p-2" value={refKind} onChange={e => setRefKind(e.target.value as Reference["kind"])}><option value="answer_guide">Answer guide / rubric</option><option value="technical_reference">Technical reference</option></select></label>
-      <label className="mt-2 block text-sm">Reference text<textarea rows={5} maxLength={16000} className="mt-1 w-full rounded border p-2" value={refText} onChange={e => setRefText(e.target.value)} /></label>
-      <label className="mt-2 block text-sm"><input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} /> I approve this material for assessing this interview.</label>
-      <button className={`${button} mt-2`} disabled={busy || !state || !approved || !refTitle.trim() || !refText.trim()} onClick={() => void action(async () => {
-        await analysisApi.references(interviewId, state!.reference_revision, [...state!.references, { id: crypto.randomUUID(), title: refTitle, kind: refKind, content: refText, requirement_ids: [] }]);
-        setRefTitle(""); setRefText(""); setApproved(false);
-      }, "Approved reference saved. New analysis will use it.")}>Save approved reference</button>
-    </details>
     {run?.result.pairs ? <>
       <div className="mt-5 flex flex-wrap justify-between gap-2"><h3 className="font-bold">Question–answer timeline</h3><button className={button} disabled={busy || !current || run.status !== "completed"} onClick={edit}>Correct pairing / merge / split</button></div>
       {!run.result.pairs.length ? <p className="mt-3 text-sm">No substantive interviewer questions were detected. Review the unpaired transcript below.</p> : null}
       {run.result.pairs.map((pair, index) => <details key={pair.id} className="mt-3 rounded-xl border p-4" open={index === run.result.pairs!.length - 1}>
-        <summary className="cursor-pointer font-semibold">{index + 1}. {source(pair.question_ids).slice(0, 150)} <span className="ml-2 text-xs font-normal text-slate-500">{label(pair.state)}</span></summary>
+        <summary className="cursor-pointer font-semibold">{index + 1}. {source(pair.question_ids).slice(0, 150)} <span className="ml-2 text-xs font-normal text-slate-500">{label(pair.state)}</span>
+          {pair.score ? <span className="ml-3 inline-block rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-800" aria-label={`Answer score ${pair.score.percentage}%`}>{pair.score.percentage}%</span> : null}</summary>
         <p className="mt-3 whitespace-pre-wrap text-sm"><strong>Question:</strong> {source(pair.question_ids)}</p>
         <p className="mt-3 whitespace-pre-wrap text-sm"><strong>Answer:</strong> {source(pair.answer_ids) || "No answer associated yet."}</p>
         {pair.subparts.length ? <p className="mt-2 text-sm">Question parts: {pair.subparts.join("; ")}</p> : null}
-        {pair.flags.length ? <p className="mt-2 text-sm text-amber-900">Review flags: {pair.flags.map(label).join(", ")}</p> : null}
+        {pair.flags.length ? <p className="mt-2 text-sm text-slate-600">Transcript notes: {pair.flags.map(label).join(", ")}</p> : null}
         <p className="mt-2 text-xs text-slate-500">Pairing: {label(pair.pairing_confidence)}. {pair.pairing_reasons.join(" ")}</p>
         {pair.analysis_error ? <p className="mt-2 text-sm text-amber-900">{pair.analysis_error}</p> : null}
         {["answer_in_progress", "awaiting_answer"].includes(pair.state) && current ? <button className={`${button} mt-3`} disabled={busy} onClick={() => void action(() => analysisApi.start(interviewId, automatic, true), "The current exchange will be analyzed as complete.")}>The answer is finished — analyze it</button> : null}
+        {pair.score ? <p className="mt-3 text-sm font-medium">Answer score: {pair.score.percentage}% · {pair.score.earned}/{pair.score.possible} points</p> : null}
         {pair.assessment ? <div className="mt-4 grid gap-3 md:grid-cols-2">{(["relevance", "accuracy", "completeness", "quality"] as const).map(dimension => {
           const item = pair.assessment![dimension];
-          return <section key={dimension} className="min-w-0 rounded-lg bg-slate-50 p-3"><h4 className="font-semibold capitalize">{dimension} · {label(item.label)}</h4><p className="mt-2 text-sm">{item.justification}</p>
+          const points = pair.score?.breakdown[dimension];
+          return <section key={dimension} className="min-w-0 rounded-lg bg-slate-50 p-3"><h4 className="font-semibold capitalize">{dimension} · {points ? `${label(points.status)} (${points.value})` : label(item.label)}</h4><p className="mt-2 text-sm">{points?.reason || item.justification}</p>
             {citations(item.citations)}{item.evidence_gaps.map((gap, i) => <p key={i} className="mt-1 text-sm text-amber-900">{gap}</p>)}
             {item.flags.length ? <p className="mt-2 text-xs text-amber-900">{item.flags.map(label).join(", ")}</p> : null}
-            {item.references.map((ref, i) => <blockquote key={i} className="mt-2 border-l-2 pl-2 text-xs"><strong>Technical reference: {ref.title}</strong><p>{ref.quote}</p><p>Version {ref.version.slice(0, 12)}</p></blockquote>)}
+            {item.references.map((ref, i) => <blockquote key={i} className="mt-2 border-l-2 pl-2 text-xs"><strong>Answer guide: {ref.title}</strong><p>{ref.quote}</p><p>Version {ref.version.slice(0, 12)}</p></blockquote>)}
           </section>;
         })}</div> : null}
         {pair.assessment?.expected_elements.length ? <p className="mt-3 text-sm">Expected elements ({label(pair.assessment.expected_elements_basis)}): {pair.assessment.expected_elements.join("; ")}</p> : null}

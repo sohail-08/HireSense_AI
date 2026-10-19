@@ -8,7 +8,7 @@ The authenticated, assigned interviewer sees the application's candidate name, e
 
 ## Question knowledge and RAG
 
-`backend/app/data/interview_questions.json` contains 24 explicitly synthetic question-bank entries covering frontend/backend engineering, QA, DevOps, full-stack, data/AI, HR, design and project management. They are examples for demonstration, not actual company interview records.
+`backend/app/data/interview_questions.json` contains 24 explicitly synthetic question-bank entries covering frontend/backend engineering, QA, DevOps, full-stack, data/AI, HR, design and project management. Each question includes an answer guide and expected elements, retrieved automatically for answer scoring. They are examples for demonstration, not actual company interview records.
 
 After migrating, index the question bank with the existing embedding model:
 
@@ -17,6 +17,15 @@ docker compose exec backend python -m app.seed_interview_questions
 ```
 
 The command is idempotent for the bundled dataset. Ollama must be reachable and its configured `nomic-embed-text` model available. The questions and 768-dimensional embeddings are saved in the existing knowledge tables/pgvector index with source type `interview_question`. JD discovery/generation and the previous-JD document list exclude these entries. Interview questions can be listed using `GET /api/knowledge/documents?source_type=interview_question`; authorized knowledge-document APIs accept this source type for curated additions. The existing PDF upload remains for previous JDs.
+
+The v2 seed upgrades the bundled question records in place, retaining document IDs
+and adding guides and expected elements. Each indexed document contains both the
+question and guide. For curated additions, include the guide in `content` and set
+`metadata.question`, `metadata.answer_guide` and `metadata.expected_elements` on
+the `interview_question` document. Analysis snapshots these guides and retrieves them
+with the existing pgvector search, without asking for approval inside an interview.
+Answer scores and exact transcript/guide evidence appear in the analysis panel and
+can also be retrieved through the central assistant.
 
 For each message, the backend authorizes interview ownership and calls the central `SupervisorService.chat_interview` entry point. It uses the same `HireSenseSupervisorGraph`, `bind_tools()` and native `ToolNode` as recruitment chat, with a server-enforced interview-only tool set. The supervisor LLM chooses between `suggest_interview_questions`, `interview_analysis`, and `help`. These are native `@tool` definitions; recruitment mutation tools are not registered or bound in this scope. The analysis tool reads saved assessments, requirement coverage and transcript citations, or queues a background update when unavailable/stale. Unsupported requests are explained, not redirected into another workflow or executed. Even a fabricated mutation tool call is rejected before execution.
 

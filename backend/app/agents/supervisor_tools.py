@@ -36,7 +36,7 @@ def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_me
 
     @tool("interview_analysis")
     def interview_analysis(message: str) -> str:
-        """Read saved answer assessments, requirement coverage, transcript evidence and contextual next questions.
+        """Score interview answers or read saved answer scores, assessments, requirement coverage and transcript evidence.
 
         Queue incremental analysis if missing or stale. Does not change rankings or contact candidates.
         """
