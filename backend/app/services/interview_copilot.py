@@ -43,6 +43,18 @@ class InterviewCopilot:
             ScreeningRun.status == ScreeningRunStatus.COMPLETED,
         ).order_by(ScreeningRun.id.desc()).limit(1))
         cv = (run.extracted_profile or {}) if run else {}
+        from app.models.interview_analysis import InterviewAnalysisRun
+        from app.services.interview_analysis import now
+        from datetime import datetime
+        messages = []
+        for message in row.copilot_messages or []:
+            if message.get("tool_name") == "interview_analysis":
+                analysis = db.get(InterviewAnalysisRun, message.get("analysis_run_id")) if message.get("analysis_run_id") else None
+                if analysis and datetime.fromisoformat(analysis.snapshot["expires_at"]) <= now():
+                    continue
+                if message.get("analysis_run_id") and not analysis:
+                    continue
+            messages.append(message)
         payload = {
             "candidate": {"name": candidate.name or "Candidate", "email": candidate.email,
                 "phone": candidate.phone, "location": candidate.location,
@@ -54,7 +66,7 @@ class InterviewCopilot:
             "job_title": jd.title, "required_skills": names(profile.required_skills),
             "preferred_skills": names(profile.preferred_skills), "qualifications": names(profile.qualifications),
             "minimum_experience": profile.min_years_experience, "selection_criteria": names(profile.selection_criteria),
-            "messages": row.copilot_messages or [], "version": row.copilot_version,
+            "messages": messages, "version": row.copilot_version,
         }
         return InterviewCopilotContext.model_validate(payload).model_dump()
 
@@ -73,6 +85,7 @@ class InterviewCopilot:
         db.rollback()
         callbacks = InterviewRoomToolCallbacks(
             suggest_questions=lambda text: self._suggest_questions(db, context, interview_id, text),
+            analysis=lambda text: self._analysis(db, user_id, interview_id, text),
             help=lambda _: {"phase": "interview_room", "outcome": "info", "refresh_required": False,
                 "assistant_message": "I am the HireSense central assistant. In the interview room I can suggest job-relevant questions and follow-ups using the knowledge base. For posting, email, scheduling, screening or JD changes, return to the relevant recruitment page. No business action was performed.",
                 "questions": [], "sources": []},
@@ -84,7 +97,8 @@ class InterviewCopilot:
             {"role": "user", "content": request.message, "questions": [], "sources": []},
             {"role": "assistant", "content": answer.message,
                 "questions": [item.model_dump() for item in answer.questions],
-                "sources": result["sources"], "tool_name": result["tool_name"]},
+                "sources": result["sources"], "tool_name": result["tool_name"],
+                "analysis_citations": result.get("analysis_citations", []), "analysis_run_id": result.get("analysis_run_id")},
         ]
         InterviewRooms().owned(db, user_id, interview_id)
         result = db.execute(update(InterviewSchedule).where(InterviewSchedule.id == interview_id,
@@ -95,6 +109,54 @@ class InterviewCopilot:
             raise RoomConflict("This conversation changed. Reload it before sending again.")
         db.commit()
         return self.context(db, user_id, interview_id)
+
+    @staticmethod
+    def _analysis(db, user_id, interview_id, message):
+        from app.services.interview_analysis import InterviewAnalysisService
+        from app.schemas.interview_analysis import StartAnalysis
+        service = InterviewAnalysisService()
+        state = service.read(db, user_id, interview_id)
+        run = state["run"]
+        result = {"phase": "interview_room", "outcome": "info", "refresh_required": True,
+                  "questions": [], "sources": [], "analysis_citations": [], "analysis_run_id": run["id"] if run else None}
+        retry = bool(run and run["status"] in {"failed", "cancelled"})
+        explicit_retry = any(word in message.casefold() for word in ("reanalyze", "reanalyse", "retry analysis"))
+        if not run or run["stale"] or retry or explicit_retry:
+            try:
+                queued = service.enqueue(db, user_id, interview_id, StartAnalysis(reanalyze=retry or explicit_retry))
+                result.update(assistant_message="Interview analysis is queued. The analysis panel will update when it finishes. No assessment is available for the latest transcript yet.", analysis_run_id=queued.id)
+            except RoomConflict:
+                result["assistant_message"] = "There is no saved final transcript to analyze yet. Start transcription with both participants' consent, then ask again."
+            return result
+        if run["status"] != "completed":
+            result["assistant_message"] = f"Interview analysis is {run['status']}. Check the analysis panel for progress or retry a failed run."
+            return result
+        content, query = run["result"], message.casefold()
+        lines = [f"Saved interview analysis · version {run['version']}."]
+        citations = []
+        if any(word in query for word in ("not assessed", "requirements", "coverage", "unexplored")):
+            for item in content["coverage"]:
+                lines.append(f"{item['name']}: {', '.join(s.replace('_', ' ') for s in item['statuses'])}.")
+                citations.extend(c for m in item["evidence"] for c in m["citations"])
+        elif any(word in query for word in ("next", "follow", "suggest", "ask")):
+            reviewed = {r["target_id"] for r in run["reviews"] if r["kind"] in {"suggestion_used", "suggestion_dismissed", "suggestion_linked"}}
+            for pair in content["pairs"]:
+                for item in pair.get("suggestions", []):
+                    if item["id"] not in reviewed:
+                        lines.append(f"{item['question']} Reason: {item['reason']}")
+                        citations.extend(item["citations"])
+                        if len(lines) >= 4: break
+                if len(lines) >= 4: break
+        else:
+            pair = next((p for p in reversed(content["pairs"]) if p.get("assessment")), None)
+            if pair:
+                for dimension in ("relevance", "accuracy", "completeness", "quality"):
+                    item = pair["assessment"][dimension]
+                    lines.append(f"{dimension.capitalize()}: {item['label'].replace('_', ' ')}. {item['justification']}")
+                    citations.extend(item["citations"])
+        if len(lines) == 1: lines.append("No completed evidence is available for this request. The latest exchange may still be in progress; review its pairing in the analysis panel.")
+        result.update(assistant_message="\n\n".join(lines)[:2000], analysis_citations=list({(c["segment_id"], c["char_start"]): c for c in citations}.values())[:8])
+        return result
 
     def _suggest_questions(self, db, context, interview_id, message):
         query = " ".join([context["job_title"], *context["required_skills"], message])[:5000]

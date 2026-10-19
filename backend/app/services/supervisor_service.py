@@ -55,7 +55,7 @@ class SupervisorService:
         state = HireSenseSupervisorGraph(model or GeminiSupervisorModel(), tools,
             capability_scope="interview_room").invoke(message=message, context=context)
         result = state.get("tool_result") or {}
-        if result.get("outcome") == "failure" or state.get("tool_name") not in {"suggest_interview_questions", "help"}:
+        if result.get("outcome") == "failure" or state.get("tool_name") not in {"suggest_interview_questions", "help", "interview_analysis"}:
             raise RuntimeError("The supervisor could not complete this interview request. Please retry.")
         return {**result, "tool_name": state["tool_name"]}
 
