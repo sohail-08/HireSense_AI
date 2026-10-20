@@ -1,5 +1,9 @@
 # Deterministic candidate scoring
 
+Current screening reliability changes are documented in [robust CV screening](robust-cv-screening.md).
+Failed or unfinished CV processing is now excluded from new numerical rankings,
+not represented by a zero score. Historical version-4 results are preserved.
+
 This feature consumes persisted, evidence-validated `RequirementMatch` records.
 It makes no AI calls and does not duplicate CV parsing or requirement matching.
 Existing unweighted screening coverage remains available in the API. The interviewer
@@ -22,8 +26,9 @@ page shows only the deterministic weighted ranking to avoid competing score view
    progress. The backend automatically scores after saving matches using the approved
    configuration for the exact requirement version. Otherwise saved matching results
    are scored immediately. Errors are shown without replacing the last saved ranking.
-7. Read one ranking table (rank, candidate, score). Every application is included,
-   with no review queue or unranked candidates. Select **Inspect evidence** for
+7. Read one ranking table (rank, candidate, score). Successfully processed CVs are
+   ranked; file/service failures have a retry message, never a fabricated zero.
+   There is no requirement review queue. Select **Inspect evidence** for
    scored requirement outcomes, category scores, required gaps and CV quotations/locators.
    Evidence-only selection criteria and their quotations are hidden from this view
    and its Unmet requirements banner, without deleting saved outcomes or changing scores.
@@ -43,13 +48,15 @@ not part of this simplified flow. No business records are removed by this UI cha
 
 ## Formula and arithmetic
 
-Formula version: `category-weighted-coverage-v4`.
-Snapshot version: `scoring-snapshot-v4`.
+Formula version: `category-weighted-coverage-v5`.
+Snapshot version: `scoring-snapshot-v5`.
 Version 2 added evidence-only selection criteria. Version 3 converts ambiguous or
 missing saved requirement matches to Unmet (zero credit), without a manual requirement
 verification step. Version 4 removes review-based ranking exclusion: all applications
 receive a rank, and rejected positive evidence receives zero credit at requirement level.
-Partially met evidence retains partial credit. Version 1/2/3 snapshots,
+Version 5 preserves the numeric formula but excludes failed/unfinished CV processing
+from new rankings, rather than ranking a service or parsing failure as zero.
+Partially met evidence retains partial credit. Version 1/2/3/4 snapshots,
 justifications and ranks are preserved without recalculation. Select **Save weights &
 rank candidates** to create a result using the new policy from existing saved matches.
 

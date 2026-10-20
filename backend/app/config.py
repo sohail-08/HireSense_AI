@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     cv_max_characters: int = Field(default=150_000, ge=1_000, le=2_000_000)
     cv_min_extract_characters: int = Field(default=80, ge=1, le=10_000)
     screening_batch_max_applications: int = Field(default=50, ge=1, le=500)
+    screening_evidence_top_k: int = Field(default=6, ge=2, le=12)
+    screening_engine_revision: str = "semantic-evidence-v1"
+    screening_request_interval_seconds: float = Field(default=4.1, ge=0, le=10)
     knowledge_pdf_max_file_size_mb: int = Field(default=15, ge=1, le=100)
     knowledge_pdf_max_pages: int = Field(default=100, ge=1, le=500)
 

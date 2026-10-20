@@ -124,6 +124,8 @@ class ScreeningRun(Base):
         default=ScreeningRunStatus.QUEUED,
     )
     cv_sha256: Mapped[str] = mapped_column(String(64))
+    input_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    processing_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     requirement_snapshot_hash: Mapped[str] = mapped_column(String(64))
     requirement_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
     extracted_profile: Mapped[dict[str, Any] | None] = mapped_column(

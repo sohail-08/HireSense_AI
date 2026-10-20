@@ -55,12 +55,12 @@ class CVParser:
         if len(normalized) < self.settings.cv_min_extract_characters:
             raise CVReviewRequired(
                 "The CV contains too little extractable text. It may be scanned, "
-                "encrypted, empty, or corrupt; review it manually."
+                "encrypted, empty, or corrupt; upload a readable text-based replacement."
             )
         if len(normalized) > self.settings.cv_max_characters:
             raise CVReviewRequired(
                 "The CV exceeds the configured extraction complexity limit; "
-                "review it manually instead of silently truncating it."
+                "upload a shorter CV instead of silently truncating it."
             )
         return parsed
 
@@ -106,7 +106,7 @@ class CVParser:
         try:
             reader = PdfReader(str(path))
             if reader.is_encrypted:
-                raise CVReviewRequired("Encrypted PDFs require manual review")
+                raise CVReviewRequired("Encrypted PDFs cannot be processed; upload an unencrypted replacement")
             if len(reader.pages) > self.settings.cv_max_pages:
                 raise CVReviewRequired(
                     f"The PDF exceeds the {self.settings.cv_max_pages}-page limit"
@@ -124,6 +124,8 @@ class CVParser:
                         )
                     )
                 else:
+                    if list(page.images):
+                        raise CVReviewRequired("A CV page is image-only and needs OCR or a text-based replacement. No candidate score was assigned.")
                     warnings.append(f"No text was extracted from PDF page {page_number}")
         except CVReviewRequired:
             raise

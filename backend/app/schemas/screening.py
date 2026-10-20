@@ -104,6 +104,7 @@ class RequirementMatchResponse(BaseModel):
 
 
 class ScreeningRunDetailResponse(BaseModel):
+    processing_metadata: dict = Field(default_factory=dict)
     id: int
     application_id: int
     status: str

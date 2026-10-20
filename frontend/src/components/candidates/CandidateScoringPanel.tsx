@@ -247,6 +247,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         {run ? <span className="text-xs text-slate-500">{new Date(run.created_at).toLocaleString()}</span> : null}
       </div>
       <p className="mt-1 text-sm text-slate-500">Scores show job-requirement coverage, not hiring-success probability.</p>
+      {run && pendingCount > 0 && !processing ? <p className="mt-2 text-sm text-amber-800">Some CVs need screening. Select “Save weights & rank candidates” to update these saved results.</p> : null}
       {run ? <p className="mt-2 text-xs text-slate-500">{"Saved ranking weights: " + categories.map((category) => categoryLabels[category] + " " + run.configuration.category_weights[category] + "%").join(" · ")}</p> : null}
       {draftChanged.current && run ? <p className="mt-2 text-sm text-amber-800">Update the ranking to apply your changed weights.</p> : null}
       {run && proposal && run.requirement_version !== proposal.requirement_version ? <p className="mt-2 text-sm text-amber-800">This is an earlier ranking. Update it for the current job requirements.</p> : null}

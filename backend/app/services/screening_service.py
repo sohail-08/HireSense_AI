@@ -1,7 +1,10 @@
 import hashlib
 import json
 import math
+import copy
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from importlib.metadata import version
 from typing import Any
 
 from sqlalchemy import select
@@ -37,16 +40,27 @@ from app.models.screening import (
 from app.screening.ai import GeminiScreeningAI, ScreeningAI
 from app.screening.parsing import CVParser, CVReviewRequired
 from app.screening.workflow import ScreeningWorkflow
+from app.screening.retrieval import CVSemanticRetriever, PASSAGE_VERSION, RETRIEVAL_VERSION, digest, passages
+from app.screening.evidence import PARSER_VERSION, RUBRIC_VERSION
 
 
-PROMPT_VERSION = "three-outcome-v2"
-CALCULATION_VERSION = "three-outcome-coverage-v2"
+PROMPT_VERSION = "semantic-source-evidence-v3"
+CALCULATION_VERSION = "three-outcome-coverage-v3"
 STATUS_FACTORS = {
     RequirementMatchStatus.MET: 1.0,
     RequirementMatchStatus.PARTIALLY_MET: 0.5,
     RequirementMatchStatus.UNMET: 0.0,
     RequirementMatchStatus.UNABLE_TO_DETERMINE: 0.0,
 }
+
+
+def safe_screening_error(exc):
+    message = str(exc)
+    prefixes = ("CV ", "The CV ", "The saved CV ", "The locally stored CV ", "The embedding model ",
+        "The AI model ", "Gemini API ", "Gemini returned ", "Gemini JSON ", "Cached CV ", "Cached evidence ",
+        "An identical CV ", "Only PDF ", "The PDF ", "Encrypted PDFs ", "No stored CV ", "The document ",
+        "The selected ", "The saved ", "The batch ", "Ollama embedding ", "GEMINI_API_KEY is not configured")
+    return message[:500] if message.startswith(prefixes) else "CV screening could not finish. Retry screening; no candidate score was assigned."
 
 
 class ScreeningService:
@@ -56,10 +70,26 @@ class ScreeningService:
         *,
         ai: ScreeningAI | None = None,
         parser: CVParser | None = None,
+        retriever=None,
     ):
         self.settings = settings
         self.ai = ai or GeminiScreeningAI()
         self.parser = parser or CVParser(settings)
+        self.retriever = retriever or (CVSemanticRetriever(settings) if isinstance(self.ai, GeminiScreeningAI) else None)
+        self._engine_identity = None
+
+    def _engine(self, resolve=False):
+        month = datetime.now(ZoneInfo("Asia/Dhaka")).strftime("%Y-%m-01")
+        base = {"model": self.ai.model_name, "revision": self.settings.screening_engine_revision,
+            "model_contract": self.ai.identity() if hasattr(self.ai, "identity") else {"model": self.ai.model_name},
+            "parser_libraries": {package: version(package) for package in ("pypdf", "python-docx")},
+            "parser": PARSER_VERSION, "rubric": RUBRIC_VERSION, "passages": PASSAGE_VERSION,
+            "retrieval": RETRIEVAL_VERSION, "embedding_model": self.settings.ollama_embedding_model if self.retriever else "injected-test-provider",
+            "top_k": self.settings.screening_evidence_top_k, "as_of": month,
+            "parser_limits": [self.settings.cv_max_pages, self.settings.cv_min_extract_characters, self.settings.cv_max_characters]}
+        if resolve and self._engine_identity is None:
+            self._engine_identity = {**base, "semantic_identity": self.retriever.identity() if self.retriever else None}
+        return self._engine_identity or base
 
     def create_batch(
         self,
@@ -75,6 +105,10 @@ class ScreeningService:
             job_posting_id=job_posting_id,
         )
         _, snapshot_hash = self._requirement_snapshot(profile)
+        try:
+            self._engine(resolve=True)
+        except RuntimeError as exc:
+            raise ValueError(str(exc)) from None
         if application_ids == []:
             raise ValueError("Select at least one application to screen")
         query = select(CandidateApplication).where(
@@ -231,6 +265,7 @@ class ScreeningService:
                 and same_document
                 and run.prompt_version == PROMPT_VERSION
                 and run.calculation_version == CALCULATION_VERSION
+                and all((run.processing_metadata or {}).get("engine", {}).get(k) == v for k,v in self._engine().items())
             )
             application_items.append(
                 {
@@ -352,6 +387,7 @@ class ScreeningService:
             "model_name": run.model_name,
             "prompt_version": run.prompt_version,
             "calculation_version": run.calculation_version,
+            "processing_metadata": run.processing_metadata,
             "requirement_snapshot": run.requirement_snapshot,
             "matches": [
                 {
@@ -371,6 +407,7 @@ class ScreeningService:
         }
 
     def process_batch(self, db: Session, *, batch_id: int) -> None:
+        self._halt_batch_error = None
         batch = db.get(ScreeningBatch, batch_id)
         if batch is None:
             return
@@ -385,6 +422,7 @@ class ScreeningService:
                 job_posting_id=batch.job_posting_id,
             )
             snapshot, snapshot_hash = self._requirement_snapshot(profile)
+            self._engine(resolve=True)
             items = list(
                 db.scalars(
                     select(ScreeningBatchItem)
@@ -401,6 +439,8 @@ class ScreeningService:
                     snapshot=snapshot,
                     snapshot_hash=snapshot_hash,
                 )
+                if getattr(self, "_halt_batch_error", None):
+                    raise RuntimeError(self._halt_batch_error)
             self._create_ranking_snapshot(
                 db,
                 posting_id=batch.job_posting_id,
@@ -431,8 +471,23 @@ class ScreeningService:
             batch = db.get(ScreeningBatch, batch_id)
             if batch is not None:
                 batch.status = ScreeningBatchStatus.FAILED
-                batch.error_message = str(exc)[:2000]
+                batch.error_message = safe_screening_error(exc)
                 batch.completed_at = datetime.now(timezone.utc)
+                # Stop remaining work explicitly; a failed batch must not leave
+                # queued items or in-flight cache claims that can never finish.
+                for item in db.scalars(select(ScreeningBatchItem).where(
+                    ScreeningBatchItem.batch_id == batch_id,
+                    ScreeningBatchItem.status.in_([ScreeningRunStatus.QUEUED, ScreeningRunStatus.PROCESSING]),
+                )):
+                    item.status = ScreeningRunStatus.FAILED
+                    item.error_message = batch.error_message
+                    if item.screening_run_id:
+                        run = db.get(ScreeningRun, item.screening_run_id)
+                        if run and run.status == ScreeningRunStatus.PROCESSING:
+                            run.status = ScreeningRunStatus.FAILED
+                            run.error_message = batch.error_message
+                            run.completed_at = batch.completed_at
+                    self._advance_batch(batch, ScreeningRunStatus.FAILED)
                 db.commit()
 
     def _process_item(
@@ -452,16 +507,36 @@ class ScreeningService:
             .where(CVDocument.application_id == item.application_id)
             .order_by(CVDocument.created_at.desc(), CVDocument.id.desc())
         )
-        compatible = self._compatible_run(
-            db,
-            application_id=item.application_id,
-            cv_sha256=document.sha256 if document else "",
-            requirement_snapshot_hash=snapshot_hash,
-        )
-        if compatible is not None:
-            item.screening_run_id = compatible.id
-            item.status = ScreeningRunStatus.COMPLETED
-            self._advance_batch(batch, ScreeningRunStatus.COMPLETED)
+        engine = self._engine(resolve=True)
+        parsed, parse_error = None, None
+        if document:
+            try: parsed = self.parser.parse(document)
+            except Exception as exc: parse_error = safe_screening_error(exc)
+        original_blocks = [b.as_dict() for b in parsed.blocks] if parsed else []
+        content_hash = digest(original_blocks) if parsed else None
+        fingerprint = digest([content_hash or (document.sha256 if document else ""), snapshot_hash, engine, PROMPT_VERSION, CALCULATION_VERSION])
+        # The lock covers the short cache-claim transaction, never provider calls.
+        db.scalar(select(JobPosting.id).where(JobPosting.id == batch.job_posting_id).with_for_update())
+        compatible = self._compatible_run(db, application_id=item.application_id,
+            cv_sha256=document.sha256 if document else "", requirement_snapshot_hash=snapshot_hash)
+        if compatible is not None and compatible.input_fingerprint == fingerprint:
+            try:
+                self.parser._validate_file(self.parser._trusted_path(document.storage_path), document)
+                item.screening_run_id, item.status = compatible.id, ScreeningRunStatus.COMPLETED
+                self._advance_batch(batch, ScreeningRunStatus.COMPLETED)
+                db.commit()
+                return
+            except CVReviewRequired:
+                pass  # Persist a failed processing result below, not a cached score.
+        shared = db.scalar(select(ScreeningRun).where(ScreeningRun.job_posting_id == batch.job_posting_id,
+            ScreeningRun.input_fingerprint == fingerprint, ScreeningRun.status == ScreeningRunStatus.COMPLETED)
+            .order_by(ScreeningRun.id).limit(1))
+        pending = db.scalar(select(ScreeningRun.id).where(ScreeningRun.job_posting_id == batch.job_posting_id,
+            ScreeningRun.input_fingerprint == fingerprint, ScreeningRun.status == ScreeningRunStatus.PROCESSING).limit(1))
+        if pending and not shared:
+            item.status = ScreeningRunStatus.FAILED
+            item.error_message = "An identical CV evaluation for this job is already running. Retry after that batch finishes; no zero score was assigned."
+            self._advance_batch(batch, ScreeningRunStatus.FAILED)
             db.commit()
             return
 
@@ -472,6 +547,8 @@ class ScreeningService:
             requirement_profile_id=profile.id,
             status=ScreeningRunStatus.PROCESSING,
             cv_sha256=document.sha256 if document else "",
+            input_fingerprint=fingerprint,
+            processing_metadata={"engine": engine, "as_of": engine["as_of"], "content_hash": content_hash},
             requirement_snapshot_hash=snapshot_hash,
             requirement_snapshot=snapshot,
             model_name=self.ai.model_name,
@@ -490,17 +567,33 @@ class ScreeningService:
                 raise CVReviewRequired(
                     "No stored CV is associated with this application"
                 )
+            if parse_error: raise CVReviewRequired(parse_error)
+            self.parser._validate_file(self.parser._trusted_path(document.storage_path), document)
             document.status = CVProcessingStatus.PROCESSING
             if application is not None:
                 application.status = ApplicationStatus.SCREENING
             db.commit()
-            ScreeningWorkflow(
-                db=db,
-                parser=self.parser,
-                ai=self.ai,
-                validate_result=self._validate_assessment,
-                persist_result=lambda **values: self._persist_result(db, **values),
-            ).invoke(run_id=run.id, document_id=document.id)
+            if shared:
+                source = db.get(CVDocument, shared.cv_document_id)
+                if not source or not source.extraction_data: raise RuntimeError("Cached CV evidence is unavailable. Retry screening.")
+                expected_blocks = passages(original_blocks) if self.retriever else original_blocks
+                identity = lambda values: [(b["id"], b["text"], b["locator"]) for b in values]
+                if identity(source.extraction_data["source_blocks"]) != identity(expected_blocks):
+                    raise RuntimeError("Cached evidence does not match this CV's source passages. Retry screening.")
+                old_matches = list(db.scalars(select(RequirementMatch).where(RequirementMatch.screening_run_id == shared.id)))
+                result = {"matches": [{"requirement_key": m.requirement_key, "category": m.category, "name": m.name,
+                    "details": m.details, "weight": m.weight, "status": m.status.value, "explanation": m.explanation,
+                    "evidence": copy.deepcopy(m.evidence), "evidence_gaps": copy.deepcopy(m.evidence_gaps), "review_flags": copy.deepcopy(m.review_flags)} for m in old_matches],
+                    "suitability_summary": shared.suitability_summary, "strengths": copy.deepcopy(shared.strengths), "gaps": copy.deepcopy(shared.gaps),
+                    "points_to_verify": [], "requirement_coverage": shared.requirement_coverage, "review_flags": copy.deepcopy(shared.review_flags),
+                    "counts": {"met": shared.met_count, "partially_met": shared.partially_met_count, "unmet": shared.unmet_count}}
+                run.reused_from_run_id = shared.id
+                self._persist_result(db, run_id=run.id, text=parsed.text, blocks=copy.deepcopy(source.extraction_data["source_blocks"]),
+                    parser_metadata=copy.deepcopy(source.extraction_data["parser"]), profile=copy.deepcopy(shared.extracted_profile), result=result)
+            else:
+                ScreeningWorkflow(db=db, parser=self.parser, ai=self.ai, retriever=self.retriever, parsed=parsed,
+                    validate_result=self._validate_assessment,
+                    persist_result=lambda **values: self._persist_result(db, **values)).invoke(run_id=run.id, document_id=document.id)
             item = db.get(ScreeningBatchItem, item.id)
             item.status = ScreeningRunStatus.COMPLETED
             application = db.get(CandidateApplication, item.application_id)
@@ -512,15 +605,15 @@ class ScreeningService:
             item = db.get(ScreeningBatchItem, item.id)
             application = db.get(CandidateApplication, item.application_id)
             run.status = ScreeningRunStatus.FAILED
-            run.error_message = str(exc)
-            run.review_flags = [str(exc)]
+            run.error_message = safe_screening_error(exc)
+            run.review_flags = [run.error_message]
             run.completed_at = datetime.now(timezone.utc)
             item.status = ScreeningRunStatus.FAILED
-            item.error_message = str(exc)
+            item.error_message = run.error_message
             if document is not None:
                 saved_document = db.get(CVDocument, document.id)
                 saved_document.status = CVProcessingStatus.FAILED
-                saved_document.error_message = str(exc)
+                saved_document.error_message = run.error_message
             if application is not None:
                 application.status = ApplicationStatus.RECEIVED
         except Exception as exc:
@@ -528,7 +621,9 @@ class ScreeningService:
             run = db.get(ScreeningRun, run.id)
             item = db.get(ScreeningBatchItem, item.id)
             application = db.get(CandidateApplication, item.application_id)
-            safe_error = str(exc)[:2000] or "Screening failed"
+            safe_error = safe_screening_error(exc)
+            if safe_error.startswith(("Gemini API quota", "Gemini API authentication", "GEMINI_API_KEY is not configured")):
+                self._halt_batch_error = safe_error
             run.status = ScreeningRunStatus.FAILED
             run.error_message = safe_error
             run.completed_at = datetime.now(timezone.utc)
@@ -603,6 +698,7 @@ class ScreeningService:
                 )
             )
         run.extracted_profile = profile
+        run.processing_metadata = {**(run.processing_metadata or {}), "evidence": parser_metadata}
         run.suitability_summary = result["suitability_summary"]
         run.strengths = result["strengths"]
         run.gaps = result["gaps"]
@@ -669,6 +765,8 @@ class ScreeningService:
                             "block_id": block["id"],
                             "locator": block["locator"],
                             "quote": quote,
+                            "char_start": block["text"].find(quote),
+                            "char_end": block["text"].find(quote) + len(quote),
                         }
                     )
                 if status in {
@@ -785,7 +883,7 @@ class ScreeningService:
             (
                 run
                 for run in latest_by_application.values()
-                if run.status in {ScreeningRunStatus.COMPLETED, ScreeningRunStatus.FAILED, ScreeningRunStatus.REVIEW_REQUIRED}
+                if run.status == ScreeningRunStatus.COMPLETED
             ),
             key=lambda run: (-(run.requirement_coverage or 0), run.application_id),
         )
@@ -980,7 +1078,9 @@ class ScreeningService:
         append_items("required_skill", profile.required_skills or [])
         append_items("preferred_skill", profile.preferred_skills or [])
         append_items("qualification", profile.qualifications or [])
-        if profile.min_years_experience is not None:
+        # "No minimum" is not evidence to earn or lose points for. This also
+        # avoids asking a graduate CV to prove zero employment years.
+        if profile.min_years_experience is not None and profile.min_years_experience > 0:
             requirements.append(
                 {
                     "key": "experience:0",
@@ -1011,8 +1111,8 @@ class ScreeningService:
         encoded = json.dumps(snapshot, sort_keys=True, ensure_ascii=False)
         return snapshot, hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
-    @staticmethod
     def _compatible_run(
+        self,
         db: Session,
         *,
         application_id: int,
@@ -1021,7 +1121,7 @@ class ScreeningService:
     ) -> ScreeningRun | None:
         if not cv_sha256:
             return None
-        return db.scalar(
+        rows = db.scalars(
             select(ScreeningRun)
             .where(
                 ScreeningRun.application_id == application_id,
@@ -1031,9 +1131,12 @@ class ScreeningService:
                 ScreeningRun.status == ScreeningRunStatus.COMPLETED,
                 ScreeningRun.prompt_version == PROMPT_VERSION,
                 ScreeningRun.calculation_version == CALCULATION_VERSION,
+                ScreeningRun.model_name == self.ai.model_name,
             )
             .order_by(ScreeningRun.created_at.desc(), ScreeningRun.id.desc())
         )
+        expected = self._engine()
+        return next((r for r in rows if all((r.processing_metadata or {}).get("engine", {}).get(k) == v for k,v in expected.items())), None)
 
     @staticmethod
     def _latest_cv_sha(db: Session, application_id: int) -> str:

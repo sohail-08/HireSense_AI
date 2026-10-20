@@ -198,7 +198,7 @@ def test_legacy_ambiguous_match_is_persisted_as_unmet_without_changing_history(r
     assert outcome["status"] == "unmet"
     assert outcome["match_value"] == "0"
     assert result["rank"] == 1
-    assert current["formula_version"] == "category-weighted-coverage-v4"
+    assert current["formula_version"] == "category-weighted-coverage-v5"
     assert current["id"] != previous["id"]
     db.expire_all()
     assert service.detail(db, user_id=owner.id, run_id=current["id"]) == current
@@ -271,7 +271,7 @@ def test_approved_scoring_runs_after_screening_and_review_isolation(records):
     assert "excluded from" not in result["results"][0]["written_justification"].lower()
 
 
-def test_every_application_is_ranked_when_cv_processing_fails(records):
+def test_failed_cv_processing_is_not_ranked_as_zero(records):
     db, owner, _, posting, app, document, _ = records
     screening = db.scalar(select(ScreeningRun).where(ScreeningRun.application_id == app.id))
     screening.status = ScreeningRunStatus.FAILED
@@ -279,14 +279,10 @@ def test_every_application_is_ranked_when_cv_processing_fails(records):
     db.commit()
     service = ScoringService()
     configuration = service.approve(db, user_id=owner.id, job_id=posting.id, data=approval(db, owner, posting))
-    result = service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"]))
-    saved = result["results"][0]
-    assert saved["rank"] == 1
-    assert saved["display_score"] == "0.00"
-    assert saved["review_state"] == "ranked"
-    assert all(item["status"] == "unmet" for item in saved["breakdown"]["requirements"])
-    assert "The CV could not be parsed." in saved["breakdown"]["review_flags"]
-    assert db.get(ScoringRun, result["id"]).snapshot["status_values"] == {"met": "1", "partially_met": "0.5", "unmet": "0"}
+    with pytest.raises(ValueError, match="No completed CV screenings"):
+        service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"]))
+    with pytest.raises(ScoringConflict, match="not finished screening"):
+        service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"], application_ids=[app.id]))
 
 
 def test_stale_idempotency_request_and_equivalent_numeric_weights(records):

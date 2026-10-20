@@ -322,9 +322,9 @@ def test_batch_parses_existing_docx_ranks_ties_and_isolates_missing_cv(tmp_path)
         )
         ranked = [entry for entry in entries if entry.disposition.value == "ranked"]
         review = [entry for entry in entries if entry.disposition.value == "review"]
-        assert [entry.rank for entry in ranked] == [1, 1, 3]
+        assert [entry.rank for entry in ranked] == [1, 1]
         assert len(review) == 0
-        assert ranked[-1].requirement_coverage == 0
+        assert all(entry.requirement_coverage > 0 for entry in ranked)
 
         retry_batch = service.create_batch(
             db,

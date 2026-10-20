@@ -39,8 +39,10 @@ from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDel
 from app.models.transcription import TranscriptionSession, TranscriptionConsent, TranscriptionStream, TranscriptSegment
 from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
 from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
+from app.models.cv_evidence import CVPassage
 
 __all__ = [
+    "CVPassage",
     "AssessmentRun", "AssessmentReview", "AssessmentComparison", "ReportArtifact",
     "InterviewAnalysisControl", "InterviewAnalysisRun", "InterviewAnalysisReview",
     "TranscriptionSession", "TranscriptionConsent", "TranscriptionStream", "TranscriptSegment",

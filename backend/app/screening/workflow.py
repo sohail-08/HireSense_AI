@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.candidate import CVDocument
 from app.models.screening import ScreeningRun
-from app.screening.ai import ScreeningAI, experience_years
+from app.screening.ai import ScreeningAI, experience_years, ScreeningAssessment
+from datetime import date
 from app.screening.parsing import CVParser
 
 
@@ -19,6 +20,7 @@ class ScreeningGraphState(TypedDict, total=False):
     assessment: dict[str, Any]
     evidence_validation: dict[str, Any]
     validated_result: dict[str, Any]
+    requirements: list[dict]
 
 
 class ScreeningWorkflow:
@@ -32,12 +34,16 @@ class ScreeningWorkflow:
         ai: ScreeningAI,
         validate_result,
         persist_result,
+        retriever=None,
+        parsed=None,
     ):
         self.db = db
         self.parser = parser
         self.ai = ai
         self.validate_result = validate_result
         self.persist_result = persist_result
+        self.retriever = retriever
+        self.parsed = parsed
 
         graph = StateGraph(ScreeningGraphState)
         graph.add_node("retrieve_validate_extract_text", self._parse)
@@ -63,23 +69,34 @@ class ScreeningWorkflow:
         document = self.db.get(CVDocument, state["document_id"])
         if document is None:
             raise ValueError("The CV record no longer exists")
-        parsed = self.parser.parse(document)
+        parsed = self.parsed or self.parser.parse(document)
+        blocks = [block.as_dict() for block in parsed.blocks]
+        run = self.db.get(ScreeningRun, state["run_id"])
+        requirements = run.requirement_snapshot["requirements"]
+        retrieval = {}
+        if self.retriever:
+            blocks, requirements, retrieval = self.retriever.prepare(self.db, document, blocks, requirements)
         return {
             "text": parsed.text,
-            "blocks": [block.as_dict() for block in parsed.blocks],
+            "blocks": blocks,
+            "requirements": requirements,
             "parser_metadata": {
                 "parser": parsed.parser,
                 "page_count": parsed.page_count,
                 "warnings": parsed.warnings,
+                "semantic_retrieval": retrieval,
             },
         }
 
     def _extract_profile(self, state: ScreeningGraphState) -> dict[str, Any]:
         profile = self.ai.extract_profile(blocks=state["blocks"])
-        years, warnings = experience_years(profile)
+        run = self.db.get(ScreeningRun, state["run_id"])
+        as_of = (run.processing_metadata or {}).get("as_of", date.today().isoformat())
+        years, warnings = experience_years(profile, date.fromisoformat(as_of))
         data = profile.model_dump(mode="json")
         data["calculated_total_experience_years"] = years
         data["experience_calculation_warnings"] = warnings
+        data["evaluation_as_of"] = as_of
         return {"profile": data}
 
     def _match(self, state: ScreeningGraphState) -> dict[str, Any]:
@@ -88,7 +105,7 @@ class ScreeningWorkflow:
             raise ValueError("The screening run no longer exists")
         assessment = self.ai.assess_requirements(
             profile=state["profile"],
-            requirements=run.requirement_snapshot["requirements"],
+            requirements=state["requirements"],
             blocks=state["blocks"],
         )
         return {"assessment": assessment.model_dump(mode="json")}
@@ -97,17 +114,24 @@ class ScreeningWorkflow:
         run = self.db.get(ScreeningRun, state["run_id"])
         if run is None:
             raise ValueError("The screening run no longer exists")
-        evidence_validation = self.ai.validate_evidence(
-            requirements=run.requirement_snapshot["requirements"],
-            proposed_assessment=state["assessment"],
-            blocks=state["blocks"],
-        )
+        assessment = ScreeningAssessment.model_validate(state["assessment"])
+        metadata = state["parser_metadata"]
+        if hasattr(self.ai, "audit_and_recover"):
+            assessment, evidence_validation, recovery = self.ai.audit_and_recover(profile=state["profile"],
+                requirements=state["requirements"], blocks=state["blocks"], assessment=assessment)
+            metadata = {**metadata, "evidence_recovery": recovery, "experience_calculations": {
+                m.requirement_key: m.experience_calculation for m in assessment.matches if m.experience_calculation},
+                "decision_rules": {m.requirement_key: m.decision_rule for m in assessment.matches if m.decision_rule}}
+        else:
+            evidence_validation = self.ai.validate_evidence(
+                requirements=state["requirements"], proposed_assessment=state["assessment"], blocks=state["blocks"])
         return {
+            "parser_metadata": metadata,
             "evidence_validation": evidence_validation.model_dump(mode="json"),
             "validated_result": self.validate_result(
                 requirements=run.requirement_snapshot["requirements"],
                 blocks=state["blocks"],
-                assessment=state["assessment"],
+                assessment=assessment.model_dump(mode="json"),
                 evidence_validation=evidence_validation.model_dump(mode="json"),
             )
         }

@@ -132,8 +132,12 @@ class ScoringService:
         if configuration.requirement_version != proposal["requirement_version"]:
             raise ScoringConflict("The approved weights belong to an older requirement version")
         applications = self._inputs(db, job_id, configuration.requirement_version, ids)
+        unavailable = [a for a in applications if a["screening_status"] != "completed" or not a["source_blocks"]]
+        if unavailable and ids is not None:
+            raise ScoringConflict("Some selected CVs have not finished screening. Retry failed screening before calculating their scores.")
+        applications = [a for a in applications if a not in unavailable]
         if not applications:
-            raise ValueError("This job has no applications to score")
+            raise ValueError("No completed CV screenings are available to score. Finish screening first.")
         payload = {"snapshot_version": SNAPSHOT_VERSION, "job_posting_id": job_id,
                    "configuration": configuration.snapshot, "applications": applications,
                    "application_ids": [app["application_id"] for app in applications], "formula_version": FORMULA_VERSION,
