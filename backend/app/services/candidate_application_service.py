@@ -83,6 +83,8 @@ class CandidateApplicationService:
         interviewer_user_id: int,
         remember_import: bool,
     ) -> tuple[list[Path], int | None]:
+        from app.services.assessment_service import AssessmentService
+        AssessmentService.delete_sources(db, application_ids=[application.id])
         documents = list(
             db.scalars(
                 select(CVDocument).where(

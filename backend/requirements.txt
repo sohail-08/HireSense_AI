@@ -24,3 +24,5 @@ icalendar==6.3.2
 tzdata>=2025.1
 livekit-api==1.2.1
 cryptography>=44,<51
+Jinja2==3.1.6
+playwright==1.64.0

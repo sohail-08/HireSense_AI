@@ -24,3 +24,4 @@ service-account-key*.json
 .DS_Store
 backend/secrets/
 backend/storage/
+output/

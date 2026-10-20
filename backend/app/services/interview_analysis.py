@@ -323,6 +323,8 @@ class InterviewAnalysisService:
 
     @staticmethod
     def delete_for_interviews(db, ids):
+        from app.services.assessment_service import AssessmentService
+        AssessmentService.delete_sources(db, interview_ids=ids)
         for interview in db.scalars(select(InterviewSchedule).where(InterviewSchedule.id.in_(ids))):
             messages = [m for m in (interview.copilot_messages or []) if m.get("tool_name") != "interview_analysis"]
             if messages != interview.copilot_messages:
@@ -338,6 +340,8 @@ async def analysis_worker(stop):
     while not stop.is_set():
         try:
             await asyncio.to_thread(service.tick)
+            from app.services.assessment_service import AssessmentService
+            await asyncio.to_thread(AssessmentService().tick)
         except Exception:
             pass  # Safe retry for DB availability; failures never affect media or disclose source text.
         try:
