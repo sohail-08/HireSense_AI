@@ -115,6 +115,22 @@ def test_unanswered_and_procedural_conversation_are_not_incorrect_answers():
     assert "assessment" not in pairs[0]
 
 
+def test_question_requirement_coverage_distinguishes_unanswered_from_unexplored():
+    items = [segment(1, "INTERVIEWER", "Explain transactions")]
+    class QuestionModel(Model):
+        def generate_json(self, **kwargs):
+            value = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "Detection":
+                for turn in value["turns"]: turn["requirement_ids"] = ["required_skill:0", "invented:99"]
+            return value
+    result = execute(snapshot(items), QuestionModel())
+    coverage = {r["requirement_id"]: r for r in result["coverage"]}
+    assert coverage["required_skill:0"]["coverage_status"] == "asked_unanswered"
+    assert coverage["required_skill:0"]["question_pair_ids"]
+    assert coverage["required_skill:1"]["coverage_status"] == "not_explored"
+    assert all(r["statuses"] == ["not_assessed"] for r in coverage.values())
+
+
 @pytest.mark.parametrize("change", ["segment", "quote", "role"])
 def test_quote_provenance_rejects_cross_interview_and_wrong_answer_association(change):
     item = segment(1, "CANDIDATE", "I use transactions.")

@@ -26,6 +26,8 @@ import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ScreeningPage } from "./pages/ScreeningPage";
+import { ReportPageBoundary } from "./components/assessments/ReportPageBoundary";
+const ConsolidatedAssessmentsPage = lazy(() => import("./pages/ConsolidatedAssessmentsPage").then(module => ({ default: module.ConsolidatedAssessmentsPage })));
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
@@ -105,6 +107,7 @@ export default function App() {
             path="assessments"
             element={<ScreeningPage />}
           />
+          <Route path="reports" element={<ReportPageBoundary><ConsolidatedAssessmentsPage /></ReportPageBoundary>} />
         </Route>
       </Route>
 

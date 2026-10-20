@@ -1,0 +1,85 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { assessmentApi, type Assessment, type Artifact, type Comparison } from "./assessmentApi";
+import { displayPercent } from "../candidates/scoringDisplay";
+
+export const text = (value: string) => value.replaceAll("_", " ");
+export const score = (value: string | number | null | undefined) => value === null || value === undefined ? "—" : displayPercent(String(value));
+export const reportButton = "rounded-lg border px-3 py-2 text-sm disabled:opacity-50";
+
+export function ReportExports({ id, comparison = false }: { id: number; comparison?: boolean }) {
+  const [artifact, setArtifact] = useState<Artifact>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!artifact || !["queued", "processing"].includes(artifact.status)) return;
+    let alive = true;
+    const timer = window.setInterval(() => { void assessmentApi.artifact(artifact.id).then(a => { if (alive) setArtifact(a); })
+      .catch(() => { if (alive) setError("The download status is unavailable. Try again."); }); }, 1500);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [artifact?.id, artifact?.status]);
+  async function request(format: "html" | "pdf") {
+    setBusy(true); setError("");
+    try { setArtifact(await assessmentApi.export(id, format, comparison)); }
+    catch (e) { setError(e instanceof Error ? e.message : "The download could not be prepared."); }
+    finally { setBusy(false); }
+  }
+  async function download(print = false) {
+    if (!artifact) return;
+    const popup = print ? window.open("", "_blank") : null;
+    try {
+      const blob = await assessmentApi.blob(artifact.id);
+      const url = URL.createObjectURL(blob);
+      if (popup) { popup.opener = null; popup.onload = () => { popup.print(); }; popup.location.href = url; }
+      else { const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hiresense-report-${id}.${artifact.format}`; anchor.click(); }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { popup?.close(); setError(e instanceof Error ? e.message : "Download failed."); }
+  }
+  return <section aria-label="Report exports" className="my-4 flex flex-wrap items-center gap-2">
+    <button className={reportButton} disabled={busy} onClick={() => void request("html")}>Prepare HTML / print</button>
+    <button className={reportButton} disabled={busy} onClick={() => void request("pdf")}>Prepare PDF</button>
+    {artifact ? <span role="status" className="text-sm">{artifact.format.toUpperCase()}: {text(artifact.status)}</span> : null}
+    {artifact?.status === "completed" ? <><button className={`${reportButton} text-blue-700`} onClick={() => void download()}>Download {artifact.format.toUpperCase()}</button>
+      {artifact.format === "html" ? <button className={reportButton} onClick={() => void download(true)}>Print report</button> : null}</> : null}
+    {error || artifact?.error ? <p role="alert" className="w-full text-sm text-red-700">{error || artifact?.error} You can try HTML if PDF fails.</p> : null}
+  </section>;
+}
+
+const dimensions: Record<string, string> = { relevance: "Answered the question", accuracy: "Correctness", completeness: "Complete answer", quality: "Clear explanation" };
+export function AssessmentView({ report }: { report: Assessment; onReviewed?: (report: Assessment) => void }) {
+  if (report.status !== "completed") return <section className="mt-4 rounded-xl bg-white p-5"><p role="status">{report.status === "failed" ? "The candidate's scores could not be calculated. Calculate the ranking again." : "Preparing candidate details…"}</p></section>;
+  const r = report.result, totals = r.score_summary;
+  function refs(ids: string[]) {
+    return [...new Set(ids)].map(id => {
+      const evidence = r.evidence[id];
+      return evidence ? <figure key={id} className="mt-3 rounded-lg bg-slate-50 p-3"><blockquote className="whitespace-pre-wrap border-l-2 border-blue-400 pl-3">{evidence.quote}</blockquote><figcaption className="mt-2 text-xs text-slate-500">{evidence.locator}</figcaption></figure> : null;
+    });
+  }
+  return <article aria-label="Consolidated candidate assessment" className="mt-4 rounded-2xl border bg-white p-5">
+    <h2 className="text-2xl font-bold">{r.identification.candidate_name}</h2><p className="text-sm text-slate-500">{r.identification.job_title}</p>
+    {report.stale ? <p role="status" className="mt-3 rounded bg-amber-50 p-3 text-sm">These are saved results. Calculate the final ranking again to include recent changes.</p> : null}
+    <div className="my-5 grid gap-3 sm:grid-cols-3">{[["CV score", totals?.cv_score ?? r.cv?.final_score], ["Interview score", totals?.interview_score], ["Final score", totals?.final_score]].map(([name,value]) => <div key={name} className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-600">{name}</p><p className="mt-1 text-2xl font-bold text-blue-700">{score(value)}</p></div>)}</div>
+    <p className="text-sm">{totals?.reason ?? "Calculate the final ranking to add interview and final scores to this older report."}</p>
+    {totals?.ready ? <p className="mt-2 text-sm text-slate-500">CV 50% + interview 50%. Interview score: average of {totals.question_count} {totals.question_count === 1 ? "question" : "questions"}{totals.unanswered_count ? `, including ${totals.unanswered_count} unanswered (zero)` : ""}.</p> : null}
+    {r.simple_summary ? <div className="mt-5 grid gap-4 sm:grid-cols-2">{(["strengths", "improvements"] as const).map(key => <section className="rounded-xl border p-4" key={key}><h3 className="font-semibold">{key === "strengths" ? "Strengths" : "Areas to improve"}</h3>{r.simple_summary![key].length ? <ul className="mt-2 list-disc space-y-2 pl-5 text-sm">{r.simple_summary![key].map((fact, i) => <li key={i}>{fact.text}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No additional points recorded.</p>}</section>)}</div> : null}
+    <h3 className="mt-6 text-lg font-bold">Interview questions and scores</h3>
+    {!r.interviews.length ? <p className="mt-2 text-sm text-slate-500">Interview not scored yet.</p> : null}
+    {r.interviews.map(interview => <section key={interview.id} className="mt-3">
+      {interview.pairs.filter(pair => pair.state !== "excluded").map(pair => <details key={pair.id} className="mt-3 rounded-xl border p-4"><summary className="flex cursor-pointer items-start justify-between gap-4"><span className="font-medium">{pair.question}</span><span className="shrink-0 font-bold text-blue-700">{score(pair.score?.percentage)}</span></summary>
+        <p className="mt-3 whitespace-pre-wrap text-sm"><strong>Answer: </strong>{pair.answer || "No answer recorded. This question scores zero."}</p>
+        <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Why this score? View evidence</summary>{Object.entries(pair.dimensions).map(([name, dimension]) => <section key={name} className="mt-4 text-sm"><h4 className="font-semibold">{dimensions[name] ?? text(name)}</h4><p className="mt-1">{dimension.simple_reason ?? dimension.finding}</p>{refs(dimension.evidence_ids)}</section>)}</details>
+      </details>)}
+    </section>)}
+    <details className="mt-5 rounded-xl border p-4"><summary className="cursor-pointer text-sm text-blue-700">CV evidence</summary>{r.matrix.map(row => <section key={row.requirement_id} className="mt-4 text-sm"><p className="font-semibold">{row.name} · {text(row.cv_status)}</p>{refs(row.cv_evidence_ids)}</section>)}</details>
+    <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Download this report</summary><ReportExports id={report.id} /></details>
+    <p className="mt-5 text-xs text-slate-500">Scores show evidence against the job requirements, not a guarantee of job performance. The interviewer makes the hiring decision.</p>
+  </article>;
+}
+
+export function ComparisonView({ value }: { value: Comparison }) {
+  return <section aria-label="Candidate comparison" className="mt-5 rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Saved comparison</h2>
+    <p className="mt-2 text-sm">{value.snapshot.policy}</p>
+    <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-3">Candidate</th><th>CV score</th><th>Interview score</th><th>Final score</th><th /></tr></thead><tbody>{value.snapshot.assessments.map(run => <tr key={run.id} className="border-t"><td className="p-3">{run.result.identification.candidate_name}</td><td>{score(run.result.cv?.final_score)}</td><td>{score(run.result.score_summary?.interview_score)}</td><td>{score(run.result.score_summary?.final_score)}</td><td><Link className="text-blue-700" to={`/interviewer/reports?application=${run.application_id}&run=${run.id}`}>View details</Link></td></tr>)}</tbody></table></div>
+    <details className="mt-4"><summary>Download comparison</summary><ReportExports id={value.id} comparison /></details>
+  </section>;
+}

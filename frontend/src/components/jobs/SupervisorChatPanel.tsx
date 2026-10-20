@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import type { JobDescriptionEvidence } from "../../types";
+import { Link } from "react-router-dom";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -23,6 +24,7 @@ type SupervisorChatPanelProps = {
   requirementContextVisible: boolean;
   requirementSources: JobDescriptionEvidence[];
   missingFields: string[];
+  assessmentLinks?: { label: string; path: string }[];
   onOpen: () => void;
   onClose: () => void;
   onInputChange: (value: string) => void;
@@ -40,6 +42,7 @@ export function SupervisorChatPanel({
   requirementContextVisible,
   requirementSources,
   missingFields,
+  assessmentLinks = [],
   onOpen,
   onClose,
   onInputChange,
@@ -240,6 +243,7 @@ export function SupervisorChatPanel({
               </div>
             </div>
           ))}
+          {assessmentLinks.map(link => <Link key={link.path} to={link.path} className="block rounded-xl border border-blue-200 bg-white p-3 text-sm font-semibold text-blue-700">{link.label}</Link>)}
 
           {loading ? (
             <div className="flex justify-start" role="status">

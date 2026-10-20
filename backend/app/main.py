@@ -32,6 +32,8 @@ from app.services.interview_service import InterviewService
 from app.services.interview_rooms import InterviewRooms
 from app.routes.interview_analysis import router as interview_analysis_router
 from app.services.interview_analysis import InterviewAnalysisService, analysis_worker
+from app.services.assessment_service import AssessmentService
+from app.routes.assessments import router as assessments_router
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -58,6 +60,7 @@ async def lifespan(app: FastAPI):
         ScreeningService.recover_interrupted(db)
         pending_invites = InterviewService.recover_interrupted(db)
         InterviewAnalysisService.recover(db)
+        AssessmentService.recover(db)
 
     # Resume only previously confirmed, never-attempted deliveries. Uncertain
     # attempts remain uncertain; no automatic retry is performed for them.
@@ -107,6 +110,7 @@ app.include_router(transcription_internal_router)
 app.include_router(interview_analysis_router)
 app.include_router(interview_rooms_router)
 app.include_router(supervisor_router)
+app.include_router(assessments_router)
 
 
 @app.exception_handler(RequestValidationError)

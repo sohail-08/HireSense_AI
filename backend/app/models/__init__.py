@@ -38,8 +38,10 @@ from app.models.user import User, UserRole
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery, CandidateInterviewSession
 from app.models.transcription import TranscriptionSession, TranscriptionConsent, TranscriptionStream, TranscriptSegment
 from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
+from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
 
 __all__ = [
+    "AssessmentRun", "AssessmentReview", "AssessmentComparison", "ReportArtifact",
     "InterviewAnalysisControl", "InterviewAnalysisRun", "InterviewAnalysisReview",
     "TranscriptionSession", "TranscriptionConsent", "TranscriptionStream", "TranscriptSegment",
     "InterviewBatch", "InterviewSchedule", "InterviewDelivery",

@@ -325,3 +325,12 @@ Suggested commit boundaries:
 - No schema migration, new environment setting or media-worker update is required.
   Unit tests mock the model/provider; the running automatic analysis uses the
   interview's existing saved transcript and configured Gemini client.
+## Question-side coverage update (Feature 6 integration)
+
+Question detection now attaches approved requirement IDs to spoken questions.
+Coverage distinguishes asked-but-unanswered, answer-pending, answered and never
+explored requirements. No question-side coverage is treated as proof of capability.
+Pairing version `question-coverage-turn-pairing-v2` prevents reuse of stale detection
+output. Older stored analyses remain unchanged; explicitly reanalyze them to obtain
+this additional coverage. See [Feature 6](consolidated-assessments.md) for report
+source selection, provenance, exports, comparison and retention integration.

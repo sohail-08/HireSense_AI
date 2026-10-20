@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>HireSense candidate scores</title><style>
+@page{size:A4;margin:18mm 16mm}body{font:11pt Arial,sans-serif;color:#17243b;line-height:1.5;overflow-wrap:anywhere;max-width:1050px;margin:auto;padding:24px}
+h1{font-size:24pt;margin:6px 0}h2{font-size:15pt;margin:24px 0 10px}h3{font-size:11pt;margin:12px 0 5px}h1,h2,h3{break-after:avoid}.brand{color:#2057cc;font-weight:bold;letter-spacing:1px}.muted{font-size:9pt;color:#59677a}.cards{display:flex;gap:14px;margin:20px 0}.card{background:#eff4fb;border-radius:9px;padding:12px 18px;flex:1}.card strong{font-size:22pt;display:block;color:#2057cc}.card span{font-size:10pt}table{border-collapse:collapse;width:100%;font-size:10pt}th,td{padding:12px 8px;text-align:left;border-bottom:1px solid #dce3ec;vertical-align:top}thead{display:table-header-group}th{background:#eff4fb}.pair{border:1px solid #dce3ec;border-radius:8px;padding:14px;margin:14px 0}.literal{white-space:pre-wrap}blockquote{background:#f5f8fc;border-left:3px solid #528bf0;margin:8px 0;padding:9px 13px;font-size:10pt}.notice{padding:12px;background:#fff8e8}.page{break-before:page}.score{font-weight:bold;color:#2057cc}p,blockquote{orphans:3;widows:3}.meta{font-size:8pt;color:#59677a;margin-top:25px}summary{cursor:pointer}
+@media print{body{padding:0;font-size:9.5pt;line-height:1.4}.cards{margin:16px 0}.card{padding:10px 15px}.cards,.card{break-inside:avoid}.pair{break-inside:auto;padding:11px}h2{margin-top:18px}details>summary{list-style:none}details>*{display:block}a{color:inherit;text-decoration:none}}
+</style></head><body>
+{% macro percent(value) %}{{value|score}}{% if value is not none %}%{% endif %}{% endmacro %}
+{% if payload.kind == 'comparison' %}
+<p class="brand">HireSense</p><h1>{{'Final candidate ranking' if payload.comparison.snapshot.get('combined_ranking_available') else 'Saved candidate comparison'}}</h1><p>{{payload.comparison.snapshot.policy}}</p>
+{% if payload.reports %}<p><strong>{{payload.reports[0].result.identification.job_title}}</strong></p>{% endif %}
+<p class="muted">Interview score: average of scored questions. Unanswered questions score zero. Candidates without both scores are not assigned a final rank.</p>
+{% for issue in payload.comparison.snapshot.incompatibilities %}<p class="notice">{{issue}}</p>{% endfor %}
+<table><thead><tr><th>Rank</th><th>Candidate</th><th>CV score</th><th>Interview score</th><th>Final score</th></tr></thead><tbody>
+{% for run in payload.reports %}{% set s=run.result.get('score_summary',{}) %}<tr><td>{{run.get('final_rank','-')}}</td><td><strong>{{run.result.identification.candidate_name}}</strong>{% if not s.get('ready') %}<p class="muted">{{s.get('reason','Calculate final ranking to update this older report.')}}</p>{% endif %}</td><td>{{percent(s.get('cv_score',run.result.cv.final_score if run.result.cv else none))}}</td><td>{{percent(s.get('interview_score'))}}</td><td class="score">{{percent(s.get('final_score'))}}</td></tr>{% endfor %}
+</tbody></table><p class="muted">These scores support the interviewer. They do not make a hiring decision.</p>
+{% endif %}
+{% for run in payload.reports if payload.kind != 'comparison' %}{% set r=run.result %}{% set s=r.get('score_summary',{}) %}{% set simple=r.get('simple_summary',{}) %}
+<article{% if payload.kind == 'comparison' or not loop.first %} class="page"{% endif %}>
+<p class="brand">HireSense</p><h1>{{r.identification.candidate_name}}</h1><p>{{r.identification.job_title}}</p>
+<div class="cards"><div class="card"><span>CV score</span><strong>{{percent(s.get('cv_score',r.cv.final_score if r.cv else none))}}</strong></div><div class="card"><span>Interview score</span><strong>{{percent(s.get('interview_score'))}}</strong></div><div class="card"><span>Final score</span><strong>{{percent(s.get('final_score'))}}</strong></div></div>
+<p>{{s.get('reason','Calculate final ranking to add interview and final scores to this older report.')}}</p>
+{% if s.get('ready') %}<p class="muted">CV 50% + interview 50%. Interview score: average of {{s.question_count}} {{'question' if s.question_count == 1 else 'questions'}}{% if s.unanswered_count %}, including {{s.unanswered_count}} unanswered (zero){% endif %}.</p>{% endif %}
+{% for key,title in [('strengths','Strengths'),('improvements','Areas to improve')] %}{% if simple.get(key) %}<h2>{{title}}</h2><ul>{% for item in simple[key] %}<li>{{item.text}}</li>{% endfor %}</ul>{% endif %}{% endfor %}
+<h2>Interview questions and scores</h2>
+{% for interview in r.interviews %}{% for pair in interview.pairs if pair.state != 'excluded' %}<section class="pair"><h3>{{loop.index}}. {{pair.question}}</h3><p class="score">Answer score: {{percent(pair.score.percentage if pair.score else none)}}</p><p class="literal"><strong>Answer: </strong>{{pair.answer or 'No answer recorded. This question scores zero.'}}</p>
+{% for key,title in [('relevance','Answered the question'),('accuracy','Correctness'),('completeness','Complete answer'),('quality','Clear explanation')] %}{% set dimension=pair.dimensions.get(key) %}{% if dimension %}<p><strong>{{title}}:</strong> {{dimension.get('simple_reason',dimension.finding)}}</p>{% endif %}{% endfor %}
+{% set seen=namespace(ids=[]) %}{% for dimension in pair.dimensions.values() %}{% for id in dimension.evidence_ids %}{% if id not in seen.ids and r.evidence[id].kind in ['transcript','answer_guide','technical_reference'] %}{% set seen.ids=seen.ids+[id] %}<blockquote>{{r.evidence[id].quote}}<p class="muted">{{r.evidence[id].locator}}</p></blockquote>{% endif %}{% endfor %}{% endfor %}
+</section>{% endfor %}{% else %}<p>Interview not scored yet.</p>{% endfor %}
+<p class="meta">Private interviewer report · Saved {{run.get('completed_at') or run.get('created_at')}} · Application {{r.identification.application_id}} · Result {{run.id}} · {{template_version}}</p>
+<p class="muted">Scores reflect saved job-related evidence, not a guarantee of job performance. The interviewer makes the hiring decision. Exact source evidence remains available in HireSense.</p>
+</article>{% endfor %}</body></html>

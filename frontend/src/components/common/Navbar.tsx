@@ -18,6 +18,7 @@ export function Navbar() {
           "candidates",
           "interviews",
           "assessments",
+          "reports",
         ]
       : ["dashboard", "interviews"];
 

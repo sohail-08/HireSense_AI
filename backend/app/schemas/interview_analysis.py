@@ -33,6 +33,7 @@ class Turn(Strict):
     reason: str = Field(max_length=500)
     uncertain: bool = False
     follow_up_of: str | None = None
+    requirement_ids: list[str] = Field(default_factory=list, max_length=20)
 
 
 class Detection(Strict):
