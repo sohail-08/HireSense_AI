@@ -210,6 +210,7 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
           : phase.startsWith("interview_") ? phaseLabels[phase]
           : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : phaseLabels[phase]}
         messages={messages}
+        assessmentLinks={response?.assessment_links}
         loading={loading}
         input={input}
         placeholder={page === "candidates" ? "e.g. Sync responses…"

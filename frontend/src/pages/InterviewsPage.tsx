@@ -5,7 +5,7 @@ import { ErrorMessage } from "../components/common/ErrorMessage";
 import { InterviewSchedulingPanel } from "../components/interviews/InterviewSchedulingPanel";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 
-type Schedule = { id: number; candidate_name: string; job_title: string; stage: string; local_start: string; timezone: string;
+type Schedule = { id: number; application_id: number; candidate_name: string; job_title: string; stage: string; local_start: string; timezone: string;
   duration_minutes: number; status: string; room_status: string; sequence: number; delivery_status: string; batch_id: number;
   delivery_id: number; delivery_attempts: number; delivery_in_flight: boolean; delivery_retryable: boolean; job_posting_id: number; history: { local_start: string; timezone: string; reason: string }[] };
 
@@ -43,6 +43,7 @@ export function InterviewsPage() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold">Interviews</h1>
+      <Link className="mt-2 inline-block text-sm text-blue-700 underline" to="/interviewer/reports">View consolidated assessment reports</Link>
       <p className="mt-2 text-sm text-slate-600">Schedules, delivery and rescheduling. Select ranked candidates on Assessments to schedule new interviews.</p>
       <ErrorMessage message={error} />
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -62,6 +63,7 @@ export function InterviewsPage() {
                       {isCompleted(item) ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span aria-hidden="true">✓ </span>Interview completed</span> : null}
                     </div>
                     <Link className="mt-2 inline-block font-medium text-blue-700" to={`/interviews/${item.id}/console`}>{isCompleted(item) ? "View interview details" : "Open interview console"}</Link>
+                    <Link className="ml-3 text-xs font-semibold text-blue-700" to={`/interviewer/reports?application=${item.application_id}`}>Assessment report</Link>
                     {canReschedule(item) ? <button type="button" className="ml-3 text-xs font-semibold text-blue-700" aria-label={`Reschedule ${item.candidate_name}`} onClick={() => setRescheduleId(item.id)}>Reschedule</button> : null}
                     <p className="mt-1 text-xs text-slate-500">{item.job_title} · {item.stage} · Interview #{item.id}</p>
                     {item.history.length ? (

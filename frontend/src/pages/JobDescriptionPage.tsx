@@ -371,6 +371,7 @@ export function JobDescriptionPage() {
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
             Create a job description
           </h1>
+          <a className="mt-2 inline-block text-sm text-blue-700 underline" href="/interviewer/reports">View candidate assessment reports</a>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Describe the role conversationally. HireSense will clarify the
             requirements, use approved knowledge sources, and prepare a draft

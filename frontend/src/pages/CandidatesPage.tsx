@@ -145,6 +145,7 @@ export function CandidatesPage() {
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
             Candidates and CVs
           </h1>
+          <a className="mt-2 inline-block text-sm text-blue-700 underline" href="/interviewer/reports">View consolidated assessment reports</a>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Import Google Form responses, preserve candidate information, and
             securely store CVs for screening and ranking.
@@ -350,6 +351,7 @@ export function CandidatesPage() {
                     ? "Deleting…"
                     : "Delete application"}
                 </button>
+                <a className="ml-4 text-sm font-semibold text-blue-700" href={`/interviewer/reports?application=${application.id}`}>Assessment report</a>
               </article>
             ))}
           </div>

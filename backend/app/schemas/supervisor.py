@@ -74,3 +74,4 @@ class SupervisorChatResponse(BaseModel):
     sync_result: GoogleFormsSyncResponse | None = None
     screening_batch: ScreeningBatchResponse | None = None
     interview_batch_id: int | None = None
+    assessment_links: list[dict[str, str]] = Field(default_factory=list)

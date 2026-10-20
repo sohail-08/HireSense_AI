@@ -49,6 +49,9 @@ Tools:
   posting. Set screening_scope=selected only when the user requests checked
   applications; otherwise use pending.
 - help: explain valid next actions when no business tool applies.
+- candidate_assessments: show or generate consolidated reports from saved CV/interview sources,
+  or compare 2–4 applications for the same posting. Use selected application IDs unless the
+  interviewer explicitly names application IDs. Never invent a combined score or email reports.
 - interviews: select candidates from persisted rankings, collect schedule details,
   preview/confirm email invitations, or reschedule existing interviews through MCP.
   Use this for scheduling requests and their follow-ups while interview_workflow

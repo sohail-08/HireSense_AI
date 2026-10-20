@@ -118,6 +118,8 @@ class SupervisorService:
         )
 
         callbacks = SupervisorToolCallbacks(
+            assessments=lambda text, request: self._safe_tool(supervisor, lambda _: self._assessments_tool(
+                db, supervisor, interviewer_user_id, request), preserve_phase=True)(text),
             interviews=self._safe_tool(supervisor, lambda text: self.interview_service.handle(
                 db, supervisor, interviewer_user_id, text,
                 self.screening_service.list_jobs(db, interviewer_user_id=interviewer_user_id) if self.screening_service else [],
@@ -196,7 +198,7 @@ class SupervisorService:
             "refresh_required": False,
         }
         assistant_message = graph_state.get("final_response") or result["assistant_message"]
-        if graph_state.get("tool_name") == "interviews":
+        if graph_state.get("tool_name") in {"interviews", "candidate_assessments"}:
             # Do not let response generation omit recipients, slots or exact email previews.
             assistant_message = result["assistant_message"]
 
@@ -229,10 +231,47 @@ class SupervisorService:
             refresh_required=result.get("refresh_required", False),
         )
         response["sync_result"] = result.get("sync_result")
+        response["assessment_links"] = result.get("assessment_links", [])
         response["screening_batch"] = result.get("screening_batch") or response.get("screening_batch")
         # Internal signal: the HTTP route queues work only for a newly created batch.
         response["screening_started"] = result.get("screening_started", False)
         return response
+
+    def _assessments_tool(self, db, supervisor, user_id, request):
+        from app.services.assessment_service import AssessmentService
+        from app.schemas.assessment import GenerateAssessment
+        service = AssessmentService()
+        state = supervisor.state_json or {}
+        ids = request.application_ids or state.get("selected_application_ids", [])
+        if not ids or len(ids) > 4 or len(ids) != len(set(ids)):
+            return {"outcome": "info", "assistant_message": "Select one application to show or generate its report, or select 2–4 applications from one job to compare.", "refresh_required": False}
+        reports, links = [], []
+        for app_id in ids:
+            available = service.list_application(db, user_id, app_id)
+            selected_job = state.get("selected_screening_job_posting_id")
+            if selected_job and available["job_posting_id"] != selected_job:
+                raise ValueError("Applications must belong to the selected job posting")
+            if request.operation == "generate":
+                run = service.enqueue(db, user_id, app_id, GenerateAssessment())
+                report = service.read(db, user_id, run.id)
+            else:
+                latest = next((r for r in available["versions"] if r["status"] == "completed"), None)
+                if not latest: raise ValueError(f"Generate a saved assessment for application #{app_id} first")
+                report = service.read(db, user_id, latest["id"])
+            reports.append(report)
+            links.append({"label": f"Application #{app_id}: assessment v{report['version']}",
+                "path": f"/interviewer/reports?application={app_id}&run={report['id']}"})
+        if request.operation == "compare":
+            if len(reports) < 2: raise ValueError("Select 2–4 applications to compare")
+            comparison = service.compare(db, user_id, [r["id"] for r in reports])
+            links = [{"label": "Open saved candidate comparison", "path": f"/interviewer/reports?comparison={comparison['id']}"}]
+            message = f"Saved comparison #{comparison['id']}: {comparison['snapshot']['basis']}. Interview findings are separate; no combined ranking is calculated."
+        elif request.operation == "generate":
+            message = "Assessment generation requested: " + "; ".join(f"application #{r['application_id']} — {r['status']}" for r in reports) + ". Open the report for progress; no CV screening or answer analysis was rerun."
+        else:
+            message = "\n".join(f"Application #{r['application_id']}: assessment v{r['version']}, {r['completeness']} evidence" + (", source changes detected" if r['stale'] else "") + ". " + " ".join(f['text'] for f in r['result']['summary']['position']) for r in reports)
+        return {"outcome": "success", "assistant_message": message, "assessment_links": links,
+            "refresh_required": request.operation == "generate"}
 
     def get_session(
         self,
