@@ -1,5 +1,8 @@
 # HireSense
 
+Consolidated candidate assessment reports, private HTML/PDF exports, saved comparison
+cohorts and explicit CV-only ordering are documented in [Feature 6](docs/consolidated-assessments.md).
+
 Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
 and interviewer correction/version history are documented in [Feature 5](docs/interview-analysis.md).
 
@@ -19,7 +22,8 @@ file manifest and Git checkpoints](docs/interview-rooms.md).
 The interviewer console also includes [private candidate information and a RAG question assistant](docs/interview-copilot.md), backed by a separately indexed synthetic interview question bank.
 The interviewer navigation bar shows [new application notifications](docs/application-notifications.md), including per-job counts of Google Form responses waiting to be synced.
 Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
-No external calendar API, recording or transcription is connected.
+No external calendar API or recording is connected. Consented Deepgram transcription
+and LiveKit captions are documented in [live transcription](docs/live-transcription.md).
 
 - Candidate-only registration
 - Email/password sign-in

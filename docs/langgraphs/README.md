@@ -2,8 +2,10 @@
 
 These editable draw.io diagrams cover the five graphs present before Feature 5.
 The sixth graph, `InterviewAnalysisGraph`, and its ten actual nodes/eleven edges are
-documented in [interview analysis](../interview-analysis.md); it is not yet included
-in these older draw.io bundles. Node identifiers and directed edges below were checked against
+documented in [interview analysis](../interview-analysis.md). The seventh graph,
+`ConsolidatedAssessmentGraph`, has seven nodes/eight edges documented in
+[consolidated assessments](../consolidated-assessments.md). These two graphs are not
+included in these older draw.io bundles. Node identifiers and directed edges below were checked against
 `workflow._compiled.get_graph()`; START and END display LangGraph's
 `__start__` and `__end__` sentinels.
 
@@ -39,9 +41,10 @@ answer. Invalid, missing, or multiple initial tool calls cannot execute operatio
 If final answer generation fails, completed tool results and refresh/background
 signals are retained.
 
-`backend/app/agents/supervisor_tools.py` defines nine recruitment-scoped `@tool`
+`backend/app/agents/supervisor_tools.py` defines ten recruitment-scoped `@tool`
 functions: requirements, generate_job_description, edit_job_description,
-approve_job_description, job_posting, sync_responses, screen_candidates, interviews, and help.
+approve_job_description, job_posting, sync_responses, screen_candidates, interviews,
+candidate_assessments, and help.
 Interview-room scope binds `suggest_interview_questions`, `interview_analysis`, and
 `help` instead. These are tools executed inside the existing `tools` node, not extra
 LangGraph nodes.
