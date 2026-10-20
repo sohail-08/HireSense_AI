@@ -17,10 +17,19 @@ def synthetic_source(application_id=101, name="Synthetic Candidate Alpha", long=
     if long:
         requirements += [{**requirements[1], "key": f"preferred_skill:{i}", "name": f"Synthetic integration requirement {i}: maintain clear, repeatable system verification with representative edge cases", "classification": "preferred"} for i in range(12)]
     dim = {"label": "direct", "justification": "The candidate describes an integration test for transaction rollback.", "citations": [citation], "references": [], "support_status": "supported_by_check", "evidence_gaps": []}
+    guide = {"id": "synthetic-guide", "title": "Transaction testing answer guide", "kind": "answer_guide", "version": "synthetic-guide-v1",
+        "content": "Use integration tests to check that commits persist changes and rollbacks restore the original state."}
+    assessment = {k: copy.deepcopy(dim) for k in ("relevance", "accuracy", "completeness", "quality")}
+    assessment["quality"]["label"] = "clear"
+    for key in ("accuracy", "completeness"):
+        assessment[key]["label"] = "partially_supported" if key == "accuracy" else "partial"
+        assessment[key]["references"] = [{"reference_id": guide["id"], "version": guide["version"], "kind": "answer_guide", "quote": guide["content"]}]
+    values = {"relevance": 1, "accuracy": .5, "completeness": .5, "quality": 1}
     pair = {"id": "pair-synthetic-1", "question_ids": [q["id"]], "answer_ids": [a["id"]], "context_ids": [], "state": "analyzed", "flags": [],
-        "question_requirement_ids": ["required_skill:0"], "assessment": {k: copy.deepcopy(dim) for k in ("relevance", "accuracy", "completeness", "quality")},
+        "question_requirement_ids": ["required_skill:0"], "assessment": assessment,
         "mappings": [{"requirement_id": "required_skill:0", "requirement_version": version, "status": "supporting_evidence", "support_status": "supported_by_check", "citations": [citation], "explanation": "A concrete rollback testing example supports this requirement."}],
-        "score": {"percentage": 75, "rubric_version": "synthetic-answer-rubric-v1"}}
+        "score": {"percentage": 75, "earned": 3, "possible": 4, "rubric_version": "answer-coverage-equal-dimensions-v2",
+            "breakdown": {k: {"value": v, "weight": 25, "status": "met" if v == 1 else "partially_met", "reason": "Synthetic saved rating"} for k,v in values.items()}}}
     cv = {"scoring_run_id": 301, "score_id": 401, "configuration_id": 501, "formula_version": "weighted-requirement-coverage-v1", "requirement_version": version,
         "configuration": {"category_weights": {"technical": "50", "experience": "30", "qualification": "20"}},
         "final_score": "75.000000", "categories": {"technical": "80.000000", "experience": "50.000000", "qualification": "100.000000"},
@@ -33,4 +42,4 @@ def synthetic_source(application_id=101, name="Synthetic Candidate Alpha", long=
     return {"identification": {"application_id": application_id, "job_posting_id": 1, "candidate_name": name, "job_title": "Synthetic Backend Engineer", "requirement_version": version},
         "cv": cv, "requirements": requirements, "flags": [], "missing": [], "source_key": "synthetic-source-v1", "model": "mock",
         "interviews": [{"id": 201, "date": "2026-10-20T04:00:00+00:00", "finalized": True, "segments": {s["id"]: s for s in (q, a)}, "reviews": [],
-            "analysis": {"id": 901, "version": 1, "requirement_version": version, "rubric_version": "synthetic-answer-rubric-v1", "snapshot": {"segments": [q, a], "references": []}, "result": {"pairs": [pair], "gaps": [], "reconciled": True}}}]}
+            "analysis": {"id": 901, "version": 1, "requirement_version": version, "rubric_version": "answer-coverage-equal-dimensions-v2", "snapshot": {"segments": [q, a], "watermark": {s["id"]: s["hash"] for s in (q,a)}, "references": [guide]}, "result": {"pairs": [pair], "gaps": [], "reconciled": True}}}]}

@@ -40,6 +40,10 @@ class ExportReport(Strict):
     retry: bool = False
 
 
+class BuildFinalRanking(Strict):
+    confirmed: Literal[True]
+
+
 class SummarySelection(Strict):
     """The model may prioritize supported facts, never author new claims or scores."""
     position: list[str] = Field(default_factory=list, max_length=5)
@@ -67,3 +71,5 @@ class ReportData(Strict):
     facts: list[Fact]
     summary: dict
     policy: str
+    score_summary: dict = Field(default_factory=dict)
+    simple_summary: dict = Field(default_factory=dict)

@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.candidate import CandidateApplication
 from app.models.job import JobPosting, JobDescription
-from app.schemas.assessment import GenerateAssessment, CompareAssessments, ReviewAssessment, ExportReport
+from app.schemas.assessment import GenerateAssessment, CompareAssessments, ReviewAssessment, ExportReport, BuildFinalRanking
 from app.security import require_interviewer
 from app.routes.interview_rooms import run, sensitive
 from app.services.assessment_service import AssessmentService
@@ -17,6 +17,20 @@ router = APIRouter(prefix="/api/assessments", tags=["Consolidated assessments"])
 
 def service(): return AssessmentService()
 def reports(): return ReportService()
+
+
+@router.get("/jobs/{job_id}/ranking")
+def final_ranking(job_id: int, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer)):
+    from app.services.final_ranking_service import FinalRankingService
+    sensitive(response)
+    return run(db, lambda: FinalRankingService().read(db, user.id, job_id))
+
+
+@router.post("/jobs/{job_id}/ranking", status_code=202)
+def calculate_ranking(job_id: int, data: BuildFinalRanking, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer)):
+    from app.services.final_ranking_service import FinalRankingService
+    sensitive(response)
+    return run(db, lambda: FinalRankingService().start(db, user.id, job_id))
 
 
 @router.get("/applications")

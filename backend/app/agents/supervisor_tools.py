@@ -59,7 +59,7 @@ class ScreeningToolArguments(ScreeningToolRequest):
 
 class AssessmentToolRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    operation: Literal["show", "generate", "compare"] = "show"
+    operation: Literal["show", "generate", "compare", "rank"] = "show"
     application_ids: list[int] = Field(default_factory=list, max_length=4)
 
 
@@ -195,10 +195,11 @@ def build_supervisor_tools(
         screen_candidates, help_tool,
     ]
     @tool("candidate_assessments", args_schema=AssessmentToolArguments)
-    def candidate_assessments(message: str, operation: Literal["show", "generate", "compare"] = "show", application_ids: list[int] = []) -> str:
+    def candidate_assessments(message: str, operation: Literal["show", "generate", "compare", "rank"] = "show", application_ids: list[int] = []) -> str:
         """Show saved consolidated candidate reports, generate a report from saved sources, or compare 2–4 applications for the same job.
 
-        Use server-selected applications if IDs are omitted. Never re-screen, re-analyze, email or invent scores.
+        Use rank only when asked to calculate final rankings for the selected job. It scores saved interview answers when needed and combines CV 50% + interview 50%.
+        Show/generate/compare use saved sources. Never re-screen CVs, email or invent scores or weights.
         """
         if not callbacks.assessments: raise ValueError("Candidate reports are unavailable")
         return json.dumps(callbacks.assessments(user_message, AssessmentToolRequest(operation=operation, application_ids=application_ids)), ensure_ascii=False)

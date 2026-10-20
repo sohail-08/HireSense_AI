@@ -242,6 +242,15 @@ class SupervisorService:
         from app.schemas.assessment import GenerateAssessment
         service = AssessmentService()
         state = supervisor.state_json or {}
+        if request.operation == "rank":
+            from app.services.final_ranking_service import FinalRankingService
+            job_id = state.get("selected_screening_job_posting_id")
+            if not job_id:
+                return {"outcome": "info", "assistant_message": "Select a job posting in Reports first.", "refresh_required": False}
+            ranking = FinalRankingService().start(db, user_id, job_id)
+            return {"outcome": "success", "assistant_message": "Final ranking is ready." if ranking["status"] == "completed" else
+                "I am scoring the saved interview answers and calculating the final ranking: CV 50% + interview 50%. Open Reports for progress.",
+                "assessment_links": [{"label": "Open final ranking", "path": f"/interviewer/reports?job={job_id}"}], "refresh_required": True}
         ids = request.application_ids or state.get("selected_application_ids", [])
         if not ids or len(ids) > 4 or len(ids) != len(set(ids)):
             return {"outcome": "info", "assistant_message": "Select one application to show or generate its report, or select 2–4 applications from one job to compare.", "refresh_required": False}
@@ -265,11 +274,22 @@ class SupervisorService:
             if len(reports) < 2: raise ValueError("Select 2–4 applications to compare")
             comparison = service.compare(db, user_id, [r["id"] for r in reports])
             links = [{"label": "Open saved candidate comparison", "path": f"/interviewer/reports?comparison={comparison['id']}"}]
-            message = f"Saved comparison #{comparison['id']}: {comparison['snapshot']['basis']}. Interview findings are separate; no combined ranking is calculated."
+            message = f"Saved comparison: {comparison['snapshot']['basis']}. " + comparison['snapshot']['policy']
         elif request.operation == "generate":
             message = "Assessment generation requested: " + "; ".join(f"application #{r['application_id']} — {r['status']}" for r in reports) + ". Open the report for progress; no CV screening or answer analysis was rerun."
         else:
-            message = "\n".join(f"Application #{r['application_id']}: assessment v{r['version']}, {r['completeness']} evidence" + (", source changes detected" if r['stale'] else "") + ". " + " ".join(f['text'] for f in r['result']['summary']['position']) for r in reports)
+            from app.services.scoring_calculation import display_score
+            lines = []
+            for report in reports:
+                totals = report["result"].get("score_summary", {})
+                name = report["result"]["identification"]["candidate_name"]
+                if totals.get("ready"):
+                    line = f"{name}: CV {display_score(totals['cv_score'])}%, interview {display_score(totals['interview_score'])}%, final {display_score(totals['final_score'])}% (CV 50% + interview 50%)."
+                else:
+                    line = f"{name}: " + totals.get("reason", "Calculate the final ranking to add interview and final scores.")
+                if report["stale"]: line += " Scores have changed; calculate the final ranking again."
+                lines.append(line)
+            message = "\n".join(lines)
         return {"outcome": "success", "assistant_message": message, "assessment_links": links,
             "refresh_required": request.operation == "generate"}
 

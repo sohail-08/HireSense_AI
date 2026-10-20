@@ -22,6 +22,8 @@ class ReportService:
             payload = {"kind": "individual", "reports": [report]}
         else:
             comparison = service.read_comparison(db, user_id, comparison_id)
+            if comparison["snapshot"].get("status", "completed") != "completed":
+                raise ValueError("Wait for the final ranking before exporting")
             payload = {"kind": "comparison", "comparison": comparison, "reports": comparison["snapshot"]["assessments"]}
         key = digest([TEMPLATE_VERSION, request.format, payload])
         artifact = db.scalar(select(ReportArtifact).where(ReportArtifact.fingerprint == key))

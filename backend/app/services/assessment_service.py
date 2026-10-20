@@ -9,7 +9,6 @@ from app.config import get_settings
 from app.agents.interview_analysis import digest
 from app.assessments.sources import owned_application, resolve_sources
 from app.assessments.workflow import ConsolidatedAssessmentGraph, PROMPT_VERSION, POLICY
-from app.llm.gemini import GeminiStructuredClient
 from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
 from app.models.candidate import CandidateApplication
 from app.models.interview import InterviewSchedule
@@ -123,7 +122,9 @@ class AssessmentService:
                 row.status, row.stage, row.completed_at = "completed", "completed", now()
                 db.commit()
         try:
-            ConsolidatedAssessmentGraph(self.model or GeminiStructuredClient(timeout_seconds=45), checkpoint, persist).graph.invoke({"snapshot": snapshot})
+            # Answer analysis already used the model. Combining numbers and writing
+            # short, source-backed explanations needs no additional provider call.
+            ConsolidatedAssessmentGraph(self.model, checkpoint, persist).graph.invoke({"snapshot": snapshot})
         except Exception:
             with self.factory() as db:
                 db.execute(update(AssessmentRun).where(AssessmentRun.id == run_id, AssessmentRun.status == "processing")
@@ -192,6 +193,12 @@ class AssessmentService:
             "interview_incompatibilities": interview_issues, "assessments": ordered,
             "selected_cohort_application_ids": sorted(r["application_id"] for r in reports),
             "assessment_ids": ids, "cohort_policy": "Explicit comparison cohort; original full-job CV ranks are preserved in each component."}
+        if any(r["result"].get("score_summary", {}).get("ready") for r in reports):
+            from app.assessments.final_scoring import rank_reports, POLICY as FINAL_POLICY
+            ordered, issue = rank_reports(reports)
+            snapshot.update(basis="Final candidate ranking", policy=FINAL_POLICY, assessments=ordered,
+                combined_ranking_available=not issue and any(r.get("final_rank") for r in ordered),
+                incompatibilities=[issue] if issue else [])
         fingerprint = digest(snapshot)
         job_id = next(iter(jobs))
         old = db.scalar(select(AssessmentComparison).where(AssessmentComparison.job_posting_id == job_id, AssessmentComparison.fingerprint == fingerprint))
@@ -206,6 +213,8 @@ class AssessmentService:
     def read_comparison(self, db, user_id, comparison_id):
         row = db.get(AssessmentComparison, comparison_id)
         if not row or not unexpired(row): raise LookupError("Comparison not found or expired")
+        from app.services.final_ranking_service import FinalRankingService
+        FinalRankingService.owned_job(db, user_id, row.job_posting_id)
         current = [self.read(db, user_id, i) for i in row.assessment_ids]
         return {"id": row.id, "created_at": utc(row.created_at).isoformat(), "snapshot": copy.deepcopy(row.snapshot),
             "stale_source_assessment_ids": [r["id"] for r in current if r["stale"]]}
@@ -215,9 +224,11 @@ class AssessmentService:
         rows = list(db.scalars(select(AssessmentRun)))
         ids = [r.id for r in rows if r.application_id in application_ids or
             any(i["id"] in interview_ids for i in r.snapshot.get("interviews", [])) or (expired and not unexpired(r))]
-        if not ids: return
         comparisons = list(db.scalars(select(AssessmentComparison)))
-        cids = [c.id for c in comparisons if set(c.assessment_ids) & set(ids)]
+        cids = [c.id for c in comparisons if set(c.assessment_ids) & set(ids) or
+            set(c.snapshot.get("selected_cohort_application_ids", [])) & set(application_ids) or
+            set(c.snapshot.get("source_interview_ids", [])) & set(interview_ids) or (expired and not unexpired(c))]
+        if not ids and not cids: return
         artifacts = list(db.scalars(select(ReportArtifact).where(
             ReportArtifact.assessment_id.in_(ids) | ReportArtifact.comparison_id.in_(cids))))
         paths = db.info.setdefault("deleted_report_paths", set())

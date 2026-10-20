@@ -1,7 +1,7 @@
 # HireSense
 
-Consolidated candidate assessment reports, private HTML/PDF exports, saved comparison
-cohorts and explicit CV-only ordering are documented in [Feature 6](docs/consolidated-assessments.md).
+Final candidate rankings (CV 50% + interview 50%), question scores, optional evidence,
+and private HTML/PDF reports are documented in [Feature 6](docs/consolidated-assessments.md).
 
 Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
 and interviewer correction/version history are documented in [Feature 5](docs/interview-analysis.md).

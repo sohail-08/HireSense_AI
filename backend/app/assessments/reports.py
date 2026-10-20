@@ -9,7 +9,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.agents.interview_analysis import digest
 from app.services.scoring_calculation import display_score
 
-TEMPLATE_VERSION = "assessment-report-v1"
+TEMPLATE_VERSION = "assessment-report-simple-v2"
 
 
 def render_html(payload):

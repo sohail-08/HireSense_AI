@@ -342,6 +342,8 @@ async def analysis_worker(stop):
             await asyncio.to_thread(service.tick)
             from app.services.assessment_service import AssessmentService
             await asyncio.to_thread(AssessmentService().tick)
+            from app.services.final_ranking_service import FinalRankingService
+            await asyncio.to_thread(FinalRankingService().tick)
         except Exception:
             pass  # Safe retry for DB availability; failures never affect media or disclose source text.
         try:

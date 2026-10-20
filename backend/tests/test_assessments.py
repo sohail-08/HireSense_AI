@@ -169,8 +169,8 @@ def test_ties_preserve_original_cohort_and_incompatible_comparison(consolidated)
     real_read = t.assessments.read
     t.assessments.read = lambda db, uid, rid: {**real_read(db, uid, rid), "stale": False}
     compared = t.assessments.compare(t.db, t.owner.id, [original.id, second.id])["snapshot"]
-    assert compared["cv_order_compatible"] and not compared["combined_ranking_available"]
-    assert [r["comparison_cv_rank"] for r in compared["assessments"]] == [1, 1]
+    assert compared["cv_order_compatible"] and compared["combined_ranking_available"]
+    assert [r["final_rank"] for r in compared["assessments"]] == [1, 1]
     assert all(r["result"]["cv"]["original_cohort"] == original.result["cv"]["original_cohort"] for r in compared["assessments"])
     second.result = {**second.result, "cv": {**second.result["cv"], "formula_version": "incompatible-formula"}}
     t.db.commit()

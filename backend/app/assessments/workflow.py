@@ -6,8 +6,8 @@ from langgraph.graph import START, END, StateGraph
 from app.agents.interview_analysis import canonical_quote, digest, provider_schema
 from app.schemas.assessment import SummarySelection, ReportData
 
-PROMPT_VERSION = "consolidation-fact-selection-v1"
-POLICY = "CV score order only. Interview findings are shown separately and do not contribute to this order. No approved combined-weight policy exists."
+PROMPT_VERSION = "consolidation-final-score-v2"
+POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 50% + interview 50%."
 
 
 class State(TypedDict, total=False):
@@ -90,6 +90,7 @@ def build_report(snapshot):
             p = {"id": pair["id"], "state": pair["state"], "question": "\n".join(allowed[i]["text"] for i in pair["question_ids"]),
                  "answer": "\n".join(allowed[i]["text"] for i in pair["answer_ids"]), "dimensions": {},
                  "score": copy.deepcopy(pair.get("score")), "notes": list(pair.get("flags", []))}
+            p["excluded"] = bool(pair.get("excluded"))
             p["evidence_ids"] = []
             for role, ids in (("INTERVIEWER", pair["question_ids"]), ("CANDIDATE", pair["answer_ids"])):
                 citations = [canonical_quote({"segment_id": i, "quote": allowed[i]["text"]}, allowed, set(ids)) for i in ids]
@@ -109,12 +110,19 @@ def build_report(snapshot):
                     source = next((r for r in analysis["snapshot"]["references"] if r["id"] == cite["reference_id"]), None)
                     if source and cite.get("version") == source["version"] and cite["quote"] in source["content"]:
                         eid = f"guide:{analysis['id']}:{source['id']}:{digest(cite['quote'])[:12]}"
-                        technical.append(add_evidence(eid, kind="answer_guide", quote=cite["quote"], locator=source["title"], source_version=source["version"]))
+                        technical.append(add_evidence(eid, kind=source.get("kind", "answer_guide"), quote=cite["quote"], locator=source["title"], source_version=source["version"]))
                     else:
                         flags.append(f"Interview #{interview['id']}: a technical reference failed validation")
                         validated = False
                 p["dimensions"][name] = {"label": dim["label"], "finding": dim["justification"] if validated else "The saved finding lacks sufficient validated support.",
                     "evidence_ids": refs + technical, "support_validated": validated, "gaps": dim.get("evidence_gaps", [])}
+                saved_value = ((pair.get("score") or {}).get("breakdown", {}).get(name) or {}).get("value")
+                reasons = {
+                    "relevance": {1: "The answer addressed the question.", .5: "The answer addressed part of the question.", 0: "The recorded answer did not address the question."},
+                    "accuracy": {1: "The answer matched the reference material.", .5: "The answer was partly correct against the reference material.", 0: "The recorded answer did not show a supported correct explanation."},
+                    "completeness": {1: "The answer covered the expected points.", .5: "The answer covered some expected points, but missed others.", 0: "The recorded answer did not cover the expected points."},
+                    "quality": {1: "The answer gave clear reasoning or useful examples.", .5: "The answer gave some reasoning, but needed more detail.", 0: "The recorded answer did not explain the reasoning clearly."}}
+                p["dimensions"][name]["simple_reason"] = reasons[name].get(saved_value, "This answer has not been scored yet.")
                 if dim["label"] == "unable_to_verify":
                     fact("limitations", f"Unable to verify: {name} for question '{p['question'][:140]}' remains unverified in the saved interview analysis.", refs + [source_id])
             item["pairs"].append(p)
@@ -245,9 +253,12 @@ class ConsolidatedAssessmentGraph:
         return {"report": build_report(state["snapshot"])}
 
     def aggregate_components(self, state):
-        # CV screening is evidence for the stored score, never a second weighted component.
+        from app.assessments.final_scoring import score_summary, simple_summary, POLICY as FINAL_POLICY
+        state["report"]["score_summary"] = score_summary(state["report"], state["snapshot"])
+        state["report"]["simple_summary"] = simple_summary(state["report"])
+        state["report"]["policy"] = FINAL_POLICY
         ReportData.model_validate(state["report"])
-        return {}
+        return {"report": state["report"]}
 
     def draft_summary(self, state):
         facts = state["report"]["facts"]

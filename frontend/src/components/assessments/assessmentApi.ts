@@ -11,14 +11,16 @@ export type CV = { final_score: string | null; categories: Record<string, string
   document_id: number; original_cv_rank: number | null; original_cohort: number[]; configuration_id: number; formula_version: string;
   written_justification: string; configuration: { category_weights: Record<string, string> }; breakdown: { counts: Record<string, number> } };
 export type ReportData = { identification: { application_id: number; job_posting_id: number; candidate_name: string; job_title: string; requirement_version: string };
+  score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; ready: boolean; reason: string; question_count: number; unanswered_count: number };
+  simple_summary?: { strengths: { text: string; evidence_ids: string[] }[]; improvements: { text: string; evidence_ids: string[] }[] };
   cv: CV | null; completeness: string; missing: string[]; flags: string[]; policy: string; evidence: Record<string, Evidence>; matrix: MatrixRow[];
   summary: { position: Fact[]; strengths: Fact[]; limitations: Fact[]; verification: Fact[]; basis: string };
   interviews: { id: number; date: string; analysis_id: number | null; analysis_version: number | null; rubric_version: string | null;
     limitations: string[]; pairs: { id: string; question: string; answer: string; state: string; evidence_ids: string[]; score?: { percentage: number };
-    dimensions: Record<string, { label: string; finding: string; evidence_ids: string[]; gaps: string[] }> }[] }[] };
+    dimensions: Record<string, { label: string; finding: string; simple_reason?: string; evidence_ids: string[]; gaps: string[] }> }[] }[] };
 export type Assessment = { id: number; version: number; application_id: number; job_posting_id: number; status: string; stage: string;
   completeness: string; review_status: string; stale: boolean; missing: string[]; error?: string; created_at: string; completed_at?: string;
-  selection_policy: string; result: ReportData; comparison_cv_rank?: number;
+  selection_policy: string; result: ReportData; comparison_cv_rank?: number; final_rank?: number;
   notes: { id: number; note: string; reviewed: boolean; author_id: number; created_at: string }[] };
 export type ApplicationAssessments = { application_id: number; job_posting_id: number; identification: ReportData["identification"];
   missing: string[]; selection_policy: string; versions: { id: number; version: number; status: string; completeness: string }[];
@@ -27,7 +29,12 @@ export type Comparison = { id: number; created_at: string; stale_source_assessme
   combined_ranking_available: boolean; incompatibilities: string[]; interview_incompatibilities: string[]; assessments: Assessment[];
   selected_cohort_application_ids: number[]; cohort_policy: string } };
 export type Artifact = { id: number; status: string; format: "html" | "pdf"; error?: string; sha256?: string };
+export type FinalRanking = { id: number | null; status: string; stage: string; policy: string; stale: boolean; error?: string;
+  incompatibilities: string[]; candidates: { application_id: number; candidate_name: string; cv_score: string | null;
+  interview_score: string | null; final_score: string | null; final_rank: number | null; assessment_id: number | null; reason: string }[] };
 export const assessmentApi = {
+  ranking: (job: number) => apiRequest<FinalRanking>(`/assessments/jobs/${job}/ranking`),
+  calculate: (job: number) => apiRequest<FinalRanking>(`/assessments/jobs/${job}/ranking`, { method: "POST", body: JSON.stringify({ confirmed: true }) }),
   list: (job: number) => apiRequest<ApplicationAssessments[]>(`/assessments/applications?job_posting_id=${job}`),
   application: (id: number) => apiRequest<ApplicationAssessments>(`/assessments/applications/${id}`),
   read: (id: number) => apiRequest<Assessment>(`/assessments/runs/${id}`),
