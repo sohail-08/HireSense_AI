@@ -1,7 +1,9 @@
 # HireSense LangGraph diagrams
 
-These editable draw.io diagrams match the five compiled graphs in the current
-backend. Node identifiers and directed edges were checked against
+These editable draw.io diagrams cover the five graphs present before Feature 5.
+The sixth graph, `InterviewAnalysisGraph`, and its ten actual nodes/eleven edges are
+documented in [interview analysis](../interview-analysis.md); it is not yet included
+in these older draw.io bundles. Node identifiers and directed edges below were checked against
 `workflow._compiled.get_graph()`; START and END display LangGraph's
 `__start__` and `__end__` sentinels.
 
@@ -37,10 +39,11 @@ answer. Invalid, missing, or multiple initial tool calls cannot execute operatio
 If final answer generation fails, completed tool results and refresh/background
 signals are retained.
 
-`backend/app/agents/supervisor_tools.py` defines eight request-scoped `@tool`
+`backend/app/agents/supervisor_tools.py` defines nine recruitment-scoped `@tool`
 functions: requirements, generate_job_description, edit_job_description,
-approve_job_description, job_posting, sync_responses, screen_candidates, and help.
-These are tools executed inside the existing `tools` node, not eight extra
+approve_job_description, job_posting, sync_responses, screen_candidates, interviews, and help.
+Interview-room scope binds `suggest_interview_questions`, `interview_analysis`, and
+`help` instead. These are tools executed inside the existing `tools` node, not extra
 LangGraph nodes.
 
 ## Specialist graph scope

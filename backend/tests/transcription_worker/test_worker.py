@@ -179,6 +179,124 @@ def test_two_track_streams_overlap_and_flush_finals_on_stop(monkeypatch, restart
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("muted_role", ["INTERVIEWER", "CANDIDATE"])
+@pytest.mark.parametrize("initially_muted", [False, True])
+def test_sdk_mute_events_resume_both_speakers_without_stopping_transcription(monkeypatch, muted_role, initially_muted):
+    pytest.importorskip("livekit.agents")
+    from livekit import rtc
+    from transcription_worker.main import register_track_handlers
+    from transcription_worker.runner import Runner
+
+    class FakeAudio:
+        def __init__(self, track, **kwargs):
+            self.track, self.first = track, True
+
+        async def __anext__(self):
+            if self.first:
+                self.first = False
+                return SimpleNamespace(frame=SimpleNamespace(samples_per_channel=320, sample_rate=16000,
+                    role=self.track.role))
+            await asyncio.Future()
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(rtc, "AudioStream", FakeAudio)
+
+    async def scenario():
+        room = rtc.Room()
+        sent, saved, streams, connections = [], [], {}, []
+
+        async def send_text(value, **kwargs):
+            import json
+            sent.append(json.loads(value))
+
+        # Use the SDK's actual event emitter, while isolating network/provider IO.
+        room._local_participant = SimpleNamespace(send_text=send_text)
+
+        class FakeBackend:
+            async def post(self, operation, payload):
+                if operation == "streams":
+                    role = participants[payload["participant_identity"]]
+                    streams[payload["stream_id"]] = role
+                    return {"start_offset_ms": 1000}
+                if operation == "update":
+                    return {"stop": False}
+                role = streams[payload["stream_id"]]
+                saved.append(role)
+                return {"id": payload["stream_id"], "speaker": role, "text": payload["text"]}
+
+        class Connection:
+            def __init__(self):
+                self.frame, self.finished = asyncio.Event(), asyncio.Event()
+                self.role = None
+
+            def push(self, frame):
+                self.role = frame.role
+                self.frame.set()
+
+            def finish(self):
+                self.finished.set()
+
+            async def close(self):
+                pass
+
+            async def events(self):
+                await self.frame.wait()
+                yield TranscriptEvent(f"{self.role} draft", False, 0, 10, "request", .9, [])
+                yield TranscriptEvent(f"{self.role} final", True, 0, 20, "request", .9, [])
+                await self.finished.wait()
+
+        class Provider:
+            def open(self, context):
+                connection = Connection()
+                connections.append(connection)
+                return connection
+
+        participants = {"opaque-i": "INTERVIEWER", "opaque-c": "CANDIDATE"}
+        context = {"session_id": "session", "participants": participants}
+        settings = SimpleNamespace(transcription_queue_size=8, transcription_flush_seconds=1, transcription_max_retries=0)
+        runner = Runner(room, FakeBackend(), context, Provider(), settings)
+        register_track_handlers(room, runner)
+        pubs, people = {}, {}
+        for identity, role in participants.items():
+            people[role] = SimpleNamespace(identity=identity)
+            pub = SimpleNamespace(sid=f"TR_{role}", source=2, track=SimpleNamespace(role=role),
+                muted=initially_muted and role == muted_role)
+            pubs[role] = pub
+            room.emit("track_subscribed", pub.track, pub, people[role])
+        task = asyncio.create_task(runner.run())
+
+        async def wait_until(predicate):
+            async def poll():
+                while not predicate():
+                    await asyncio.sleep(.001)
+            await asyncio.wait_for(poll(), 2)
+
+        try:
+            await wait_until(lambda: len(saved) == (1 if initially_muted else 2))
+            if not initially_muted:
+                pubs[muted_role].muted = True
+                room.emit("track_muted", people[muted_role], pubs[muted_role])
+                await wait_until(lambda: pubs[muted_role].sid not in runner.tracks)
+            pubs[muted_role].muted = False
+            room.emit("track_unmuted", people[muted_role], pubs[muted_role])
+            await wait_until(lambda: len(saved) == (2 if initially_muted else 3))
+            await wait_until(lambda: {event["speaker"] for event in sent if event["kind"] == "final"}
+                == {"INTERVIEWER", "CANDIDATE"})
+            assert not runner.stop.is_set() and not task.done()
+            assert set(saved) == {"INTERVIEWER", "CANDIDATE"}
+            assert len(connections) == (2 if initially_muted else 3)
+            other_role = "CANDIDATE" if muted_role == "INTERVIEWER" else "INTERVIEWER"
+            assert pubs[other_role].sid in runner.tracks
+        finally:
+            runner.stop.set()
+            await asyncio.wait_for(task, 3)
+            await room.disconnect()
+
+    asyncio.run(scenario())
+
+
 def test_sensitive_sdk_logs_are_filtered():
     pytest.importorskip("livekit.agents")
     from transcription_worker.main import SafeLogFilter

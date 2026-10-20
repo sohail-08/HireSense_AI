@@ -30,6 +30,8 @@ from app.seed_interviewer import seed_interviewer
 from app.services.screening_service import ScreeningService
 from app.services.interview_service import InterviewService
 from app.services.interview_rooms import InterviewRooms
+from app.routes.interview_analysis import router as interview_analysis_router
+from app.services.interview_analysis import InterviewAnalysisService, analysis_worker
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -55,11 +57,14 @@ async def lifespan(app: FastAPI):
         seed_interviewer(db)
         ScreeningService.recover_interrupted(db)
         pending_invites = InterviewService.recover_interrupted(db)
+        InterviewAnalysisService.recover(db)
 
     # Resume only previously confirmed, never-attempted deliveries. Uncertain
     # attempts remain uncertain; no automatic retry is performed for them.
     delivery_tasks = [asyncio.create_task(asyncio.to_thread(InterviewService().deliver_batch, batch_id)) for batch_id in pending_invites]
     room_recovery = asyncio.create_task(asyncio.to_thread(InterviewRooms().recover_ending, SessionLocal))
+    analysis_stop = asyncio.Event()
+    analysis_task = asyncio.create_task(analysis_worker(analysis_stop))
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -67,6 +72,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    analysis_stop.set()
+    await analysis_task
     if delivery_tasks:
         await asyncio.gather(*delivery_tasks, return_exceptions=True)
     await room_recovery
@@ -82,7 +89,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().frontend_url],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -97,6 +104,7 @@ app.include_router(scoring_router)
 app.include_router(interviews_router)
 app.include_router(transcription_router)
 app.include_router(transcription_internal_router)
+app.include_router(interview_analysis_router)
 app.include_router(interview_rooms_router)
 app.include_router(supervisor_router)
 

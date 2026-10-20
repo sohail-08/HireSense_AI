@@ -196,6 +196,14 @@ lint command in this repository. The implementation was additionally checked wit
 Ruff's syntax/undefined-name/unused-import rules on the new Python files; Python
 syntax, TS compilation and tests remain separate checks.
 
+Microphone lifecycle regression: LiveKit RTC emits `track_muted` and
+`track_unmuted` as `(participant, publication)`, while publish/unpublish callbacks
+use `(publication, participant)`. The worker adapts these argument orders before
+stopping or resuming a microphone pipeline. Without this adapter, a microphone
+subscribed while muted never starts transcription after unmuting. Tests exercise
+the SDK event emitter for either speaker, both initially muted and muted during
+an active session, and verify both speakers' final captions arrive before stopping.
+
 Manual two-device acceptance (explicit real-provider opt-in):
 
 1. Configure keys and start the worker, then join one interview from two distinct
@@ -209,6 +217,9 @@ Manual two-device acceptance (explicit real-provider opt-in):
    Refresh/reconnect the candidate: no complete history API is available. Unmute,
    switch microphone, temporarily disconnect, and verify the new track gets a new
    timestamp anchor without restarting the whole session.
+   Also start transcription with either microphone muted, unmute it, and verify
+   both speakers appear. Mute/unmute each person again while the other continues
+   speaking; the other microphone pipeline must remain active.
 5. Stop transcription: video must continue. Revoke consent: STT must stop. End the
    interview: the worker drains/closes and no further finals are accepted.
 6. In a synthetic session only, test bad key, worker disconnect, provider rate/error,

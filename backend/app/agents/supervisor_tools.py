@@ -14,6 +14,7 @@ ToolCallback = Callable[[str], dict[str, Any]]
 class InterviewRoomToolCallbacks:
     suggest_questions: ToolCallback
     help: ToolCallback
+    analysis: ToolCallback | None = None
 
 
 def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_message: str) -> list[BaseTool]:
@@ -33,7 +34,15 @@ def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_me
         """Explain interview-room capabilities or decline unsupported business actions."""
         return json.dumps(callbacks.help(user_message), ensure_ascii=False)
 
-    return [suggest_interview_questions, interview_help]
+    @tool("interview_analysis")
+    def interview_analysis(message: str) -> str:
+        """Score interview answers or read saved answer scores, assessments, requirement coverage and transcript evidence.
+
+        Queue incremental analysis if missing or stale. Does not change rankings or contact candidates.
+        """
+        return json.dumps(callbacks.analysis(user_message), ensure_ascii=False)
+
+    return [suggest_interview_questions, interview_help] + ([interview_analysis] if callbacks.analysis else [])
 
 
 class ScreeningToolRequest(BaseModel):

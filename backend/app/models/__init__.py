@@ -37,8 +37,10 @@ from app.models.scoring import CandidateScore, ScoringConfiguration, ScoringRequ
 from app.models.user import User, UserRole
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery, CandidateInterviewSession
 from app.models.transcription import TranscriptionSession, TranscriptionConsent, TranscriptionStream, TranscriptSegment
+from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
 
 __all__ = [
+    "InterviewAnalysisControl", "InterviewAnalysisRun", "InterviewAnalysisReview",
     "TranscriptionSession", "TranscriptionConsent", "TranscriptionStream", "TranscriptSegment",
     "InterviewBatch", "InterviewSchedule", "InterviewDelivery",
     "CandidateInterviewSession",

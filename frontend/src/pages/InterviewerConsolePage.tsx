@@ -7,6 +7,7 @@ import { InterviewCopilotPanel } from "../components/interviews/InterviewCopilot
 import { roomApi, type InterviewerRoomInfo, type DeviceChoices, type MediaAccess } from "../components/interviews/roomApi";
 import { formatRoomTime } from "../components/interviews/roomState";
 import { TranscriptionProvider, TranscriptionPanel } from "../components/interviews/TranscriptionPanel";
+import { InterviewAnalysisPanel } from "../components/interviews/InterviewAnalysisPanel";
 
 export function InterviewerConsolePage() {
   const id = Number(useParams().interviewId);
@@ -87,6 +88,7 @@ export function InterviewerConsolePage() {
             onEnd={() => setConfirmEnd(true)} /></div> : null}
           {info.room_status !== "ended" && info.room_status !== "cancelled" && !access ? <button className="mt-6 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white" disabled={busy} onClick={() => setConfirmEnd(true)}>{info.room_status === "ending" ? "Retry ending interview" : "End interview for everyone"}</button> : null}
           <TranscriptionPanel closed={Boolean(closed)} />
+          <InterviewAnalysisPanel key={id} interviewId={id} />
           </div>
           <InterviewCopilotPanel key={id} interviewId={id} />
           </div>

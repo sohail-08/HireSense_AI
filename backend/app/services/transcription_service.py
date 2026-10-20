@@ -306,6 +306,8 @@ class TranscriptionService:
 
     @staticmethod
     def delete_for_interviews(db, ids):
+        from app.services.interview_analysis import InterviewAnalysisService
+        InterviewAnalysisService.delete_for_interviews(db, ids)
         session_ids = select(TranscriptionSession.id).where(TranscriptionSession.interview_id.in_(ids))
         db.execute(delete(TranscriptSegment).where(TranscriptSegment.interview_id.in_(ids)))
         db.execute(delete(TranscriptionStream).where(TranscriptionStream.session_id.in_(session_ids)))

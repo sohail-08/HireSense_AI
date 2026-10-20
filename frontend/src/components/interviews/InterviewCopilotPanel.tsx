@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../../api/apiClient";
+import { TranscriptCitation } from "./TranscriptCitation";
+import type { Citation } from "./analysisApi";
 
 type Question = { question: string; requirement: string; source_ids: number[] };
 type Message = { role: "user" | "assistant"; content: string; questions: Question[];
-  sources: { chunk_id: number; document_title: string; excerpt: string }[] };
+  sources: { chunk_id: number; document_title: string; excerpt: string }[]; analysis_citations?: Citation[]; analysis_run_id?: number };
 export type CopilotContext = {
   candidate: { name: string; email: string | null; phone: string | null; location: string | null;
     skills: string[]; qualifications: string[]; experience_years: number | null; recent_roles: string[] };
@@ -78,10 +80,11 @@ export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) 
         {context.messages.map((item, index) => <article key={index} className={`min-w-0 rounded-xl p-3 text-sm ${item.role === "user" ? "ml-6 bg-blue-600 text-white" : "mr-2 bg-slate-50 text-slate-800"}`}>
           <p className="mb-1 text-xs font-semibold">{item.role === "user" ? "You" : "HireSense assistant"}</p>
           <p className="whitespace-pre-wrap break-words leading-6">{item.content}</p>
+          {item.analysis_run_id ? item.analysis_citations?.map((citation, i) => <TranscriptCitation key={i} citation={citation} runId={item.analysis_run_id!} interviewId={interviewId} />) : null}
           {item.questions.length ? <ol className="mt-3 list-decimal space-y-3 pl-5">{item.questions.map((question, i) => <li key={i}><p className="leading-6">{question.question}</p><p className="mt-1 text-xs text-slate-500">Job requirement: {question.requirement} · Sources: {question.source_ids.map((value) => `#${value}`).join(", ")}</p></li>)}</ol> : null}
           {item.sources.length ? <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-blue-700">Knowledge sources ({item.sources.length})</summary>{item.sources.map((source) => <blockquote key={source.chunk_id} className="mt-2 border-l-2 border-blue-200 pl-3"><p className="text-xs font-semibold">#{source.chunk_id} · {source.document_title}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">{source.excerpt}</p></blockquote>)}</details> : null}
         </article>)}
-        {busy ? <p role="status" className="text-sm text-slate-500">Searching the question bank and preparing suggestions…</p> : null}
+        {busy ? <p role="status" className="text-sm text-slate-500">Preparing your interview assistance…</p> : null}
       </div>
       <form className="border-t p-4" onSubmit={(event) => { event.preventDefault(); void send(message); }}>
         {error ? <div role="alert" className="mb-3 text-sm text-red-700">{error}<button type="button" className="ml-2 underline" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Reload conversation</button></div> : null}

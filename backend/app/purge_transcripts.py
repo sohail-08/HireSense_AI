@@ -14,6 +14,10 @@ def purge(db, now):
     ids = list(db.scalars(select(TranscriptionSession.id).where(TranscriptionSession.expires_at <= now,
         TranscriptionSession.status.not_in(["starting", "active", "stopping"]))))
     if ids:
+        from app.services.interview_analysis import InterviewAnalysisService
+        interviews = list(db.scalars(select(TranscriptionSession.interview_id).where(TranscriptionSession.id.in_(ids))))
+        # Analysis snapshots contain exact source text and must not bypass retention.
+        InterviewAnalysisService.delete_for_interviews(db, interviews)
         db.execute(delete(TranscriptSegment).where(TranscriptSegment.session_id.in_(ids)))
         db.execute(delete(TranscriptionStream).where(TranscriptionStream.session_id.in_(ids)))
         db.execute(delete(TranscriptionSession).where(TranscriptionSession.id.in_(ids)))
