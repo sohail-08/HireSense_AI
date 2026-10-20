@@ -106,7 +106,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
         })}
       </details>)}
       <details className="mt-4 rounded-xl border p-3"><summary className="cursor-pointer font-semibold">Requirement evidence coverage</summary>
-        {run.result.coverage?.map(item => <article key={item.requirement_id} className="mt-3 border-t pt-3"><p className="font-medium">{item.name} · {item.statuses.map(label).join(" / ")}</p>
+        {run.result.coverage?.map(item => <article key={item.requirement_id} className="mt-3 border-t pt-3"><p className="font-medium">{item.name} · {item.statuses.map(label).join(" / ")}</p><p className="text-xs">{label(item.coverage_status ?? "not_explored")}{item.question_pair_ids?.length ? ` · Questions: ${item.question_pair_ids.join(", ")}` : ""}</p>
           {item.statuses.includes("not_assessed") ? <p className="text-sm text-slate-500">This requirement has not been assessed; this is not a failure to meet it.</p> : null}
           {item.evidence.map((mapping, i) => <div key={i} className="mt-2 text-sm"><p>{mapping.explanation}</p>{citations(mapping.citations)}</div>)}</article>)}
       </details>

@@ -18,7 +18,7 @@ export type Pair = PairEdit & { state: string; flags: string[]; pairing_confiden
 export type Reference = { id: string; title: string; kind: "answer_guide" | "technical_reference"; content: string; requirement_ids: string[]; version?: string };
 export type AnalysisRun = { id: number; version: number; status: string; stage: string; stale: boolean; error?: string; created_at: string;
   snapshot: { segments: Segment[]; requirements: { requirements: { key: string; name: string }[] }; references: Reference[]; requirement_version: string };
-  result: { pairs?: Pair[]; coverage?: { requirement_id: string; name: string; statuses: string[]; evidence: Mapping[] }[]; gaps?: string[];
+  result: { pairs?: Pair[]; coverage?: { requirement_id: string; name: string; statuses: string[]; evidence: Mapping[]; coverage_status?: string; question_pair_ids?: string[] }[]; gaps?: string[];
     unpaired?: {segment_id: string; kind: string}[]; reconciled?: boolean };
   reviews: { id: number; kind: string; target_id: string; payload: { note?: string; segment_ids?: string[] }; created_at: string }[] };
 export type AnalysisState = { run: AnalysisRun | null; automatic: boolean; reference_revision: number; references: Reference[];
