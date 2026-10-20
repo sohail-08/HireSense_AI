@@ -37,6 +37,23 @@ test("missing category scores remain N/A instead of fabricated coverage", () => 
   assert.equal(displayPercent("0"), "0.00%");
 });
 
+test("PostgreSQL scientific-notation decimals retain exact half-up formatting", () => {
+  assert.equal(displayPercent("0E-60"), "0.00%");
+  assert.equal(displayPercent("1E-60"), "0.00%");
+  assert.equal(displayPercent("2.675E+0"), "2.68%");
+  assert.equal(displayPercent("8.2345e1"), "82.35%");
+  assert.equal(displayPercent("1E+2"), "100.00%");
+  assert.equal(displayPercent("-2.675E+0"), "-2.68%");
+  assert.equal(displayPercent(".005"), "0.01%");
+  assert.equal(displayPercent("-0E-60"), "0.00%");
+});
+
+test("invalid score text is unavailable instead of crashing or becoming zero", () => {
+  for (const value of ["", "NaN", "Infinity", "bad data", "1e1000000", "1.2.3", "9".repeat(513)]) {
+    assert.equal(displayPercent(value), "N/A", value);
+  }
+});
+
 test("evidence view omits complete evidence-only records without changing saved data", () => {
   const requirements = [
     { name: "React", category: "technical", score_included: true, evidence: ["Scored quote"] },

@@ -343,6 +343,21 @@ Manual acceptance checks:
 - The existing single-interviewer product policy is unchanged.
 - No real candidate report, credential, CV or transcript is added to Git.
 
+## Reports navbar crash regression (2026-10-20)
+
+A completed report with `Numeric(80, 60)` zero scores returned `0E-60` from
+PostgreSQL/Python Decimal. The fixed-point-only percentage formatter passed that
+string to `BigInt`, throwing during `AssessmentView` rendering and unmounting the
+application. The shared formatter now handles decimal/scientific notation using
+exact coefficient/exponent arithmetic and half-up rounding; invalid values remain
+unavailable rather than becoming zero. Stored report values are not changed.
+A Reports-scoped error boundary preserves navigation and offers recovery for
+unexpected future render/chunk errors. Full App/navbar regression tests cover
+initial navigation, automatic opening of the saved zero-score report, and recovery.
+Verification: 55 component tests, 9 scoring tests, 2 scheduling tests and both
+local/Docker production frontend builds passed. Direct browser inspection was
+blocked by saved browser permissions; no browser workaround was used.
+
 ## Suggested reviewable commits
 
 1. `feat: persist versioned consolidated assessment sources and lifecycle`
