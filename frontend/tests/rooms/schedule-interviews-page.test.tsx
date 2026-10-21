@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ScheduleInterviewsPage } from "../../src/pages/ScheduleInterviewsPage";
 import { apiRequest } from "../../src/api/apiClient";
+import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: vi.fn() }));
 const supervisor = vi.hoisted(() => ({ refreshVersion: 0, setSelectedJobPostingId: vi.fn(), setSelectedApplicationIds: vi.fn() }));
@@ -46,7 +47,7 @@ it("keeps candidate selections across pages and passes them to scheduling and th
   expect(screen.getByRole("region", { name: "Invitation form" }).textContent).toContain("Selected 1,11");
   expect(screen.getByText("11–12 of 12 candidates · 2 selected")).toBeTruthy();
   await waitFor(() => expect(supervisor.setSelectedApplicationIds).toHaveBeenLastCalledWith([1, 11]));
-  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
+  selectOption("Candidates per page", "20");
   expect((screen.getByRole("checkbox", { name: "Select Candidate 1 for interview" }) as HTMLInputElement).checked).toBe(true);
 });
 

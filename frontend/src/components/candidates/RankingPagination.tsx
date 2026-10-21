@@ -1,3 +1,5 @@
+import { StyledSelect } from "../common/StyledSelect";
+
 type Props = { count: number; page: number; pageSize: number; loading?: boolean; selectedCount?: number;
   onPage: (page: number) => void; onPageSize: (size: number) => void };
 
@@ -10,9 +12,8 @@ export function RankingPagination({ count, page, pageSize, loading = false, sele
   return <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
     <p aria-live="polite">{count ? `${start + 1}–${Math.min(start + pageSize, count)} of ${count} candidates` : "0 candidates"}{selectedCount ? ` · ${selectedCount} selected` : ""}</p>
     <label htmlFor="ranking-page-size" className="flex items-center gap-2 text-slate-600">Candidates per page
-      <select id="ranking-page-size" value={pageSize} disabled={loading} onChange={event => onPageSize(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-medium outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-        {[5, 10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
-      </select>
+      <StyledSelect id="ranking-page-size" label="Candidates per page" value={String(pageSize)} disabled={loading} compact className="w-20"
+        options={[5, 10, 20, 50].map(size => ({ value: String(size), label: String(size) }))} onChange={value => onPageSize(Number(value))} />
     </label>
     <nav aria-label="Ranking pages" className="flex flex-wrap items-center gap-2">
       <span className="mr-1">Page {current} of {pages}</span>

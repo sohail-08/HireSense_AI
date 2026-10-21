@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../../api/apiClient";
 import { ErrorMessage } from "../common/ErrorMessage";
+import { StyledSelect } from "../common/StyledSelect";
 import { buildInterviewSchedule } from "./interviewSchedule";
 
 type Recipient = { application_id: number; name: string; masked_email: string; rank?: number; score?: string;
@@ -94,9 +95,13 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
     <fieldset disabled={busy || batch?.status === "sending"} className="min-w-0">
       {!rescheduling ? <>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm">Which candidates?<select className={inputStyle} value={selectionMode} onChange={(event) => { setSelectionMode(event.target.value); selectionChanged(); }}><option value="manual">Candidates I checked ({selectedIds.length})</option><option value="top_n">Highest-ranked candidates</option><option value="threshold">Candidates above a score</option></select></label>
+          <label className="text-sm">Which candidates?<StyledSelect label="Which candidates?" className="mt-1" value={selectionMode} disabled={busy || batch?.status === "sending"}
+            options={[{ value: "manual", label: `Candidates I checked (${selectedIds.length})` }, { value: "top_n", label: "Highest-ranked candidates" }, { value: "threshold", label: "Candidates above a score" }]}
+            onChange={value => { setSelectionMode(value); selectionChanged(); }} /></label>
           {selectionMode === "top_n" ? <label className="text-sm">Number of candidates<input type="number" min="1" max="100" className={inputStyle} value={topN} onChange={(event) => { setTopN(event.target.value); selectionChanged(); }} /></label> : null}
-          {selectionMode === "threshold" ? <label className="text-sm">Candidate score (%)<div className="flex gap-2"><select className={inputStyle} value={operator} onChange={(event) => { setOperator(event.target.value); selectionChanged(); }}><option value="gt">Above</option><option value="gte">At least</option></select><input type="number" min="0" max="100" step="any" value={threshold} className={inputStyle} onChange={(event) => { setThreshold(event.target.value); selectionChanged(); }} /></div></label> : null}
+          {selectionMode === "threshold" ? <div className="text-sm"><label htmlFor="interview-score-threshold">Candidate score (%)</label><div className="flex gap-2"><StyledSelect label="Score comparison" className="mt-1" value={operator} disabled={busy || batch?.status === "sending"}
+            options={[{ value: "gt", label: "Above" }, { value: "gte", label: "At least" }]} onChange={value => { setOperator(value); selectionChanged(); }} />
+            <input id="interview-score-threshold" type="number" min="0" max="100" step="any" value={threshold} className={inputStyle} onChange={(event) => { setThreshold(event.target.value); selectionChanged(); }} /></div></div> : null}
         </div>
         <button type="button" className={buttonStyle + " mt-3"} disabled={!rankingRunId || (selectionMode === "manual" && !selectedIds.length)} onClick={() => void previewSelection()}>Preview candidate selection</button>
         {selection ? <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><p className="font-semibold">{selection.recipient_count} eligible recipient(s)</p><ul className="mt-2 space-y-1">{selection.selected.map((item) => <li key={item.application_id}>{item.name} · rank {item.rank} · {item.score}% · {item.masked_email}</li>)}</ul>{selection.warnings.map((warning) => <p key={warning} className="mt-2 text-amber-800">{warning}</p>)}{selection.excluded.length ? <details className="mt-3"><summary className="cursor-pointer font-medium">Excluded candidates ({selection.excluded.length})</summary><ul className="mt-2 space-y-1">{selection.excluded.map((item) => <li key={item.application_id}>{item.name}: {item.reasons.join("; ")}</li>)}</ul></details> : null}</div> : null}

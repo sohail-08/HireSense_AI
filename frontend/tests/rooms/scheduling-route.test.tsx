@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import App from "../../src/App";
 import { apiRequest } from "../../src/api/apiClient";
+import { selectOption } from "./selectHelpers";
 
 const auth = vi.hoisted(() => ({ role: "interviewer" }));
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: vi.fn(), API_URL: "/api", TOKEN_KEY: "hiresense_token", ApiError: class extends Error {} }));
@@ -57,4 +58,23 @@ it("does not expose scheduling to candidate accounts", async () => {
   expect(await screen.findByRole("heading", { name: "Candidate dashboard" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: "Schedule Interviews" })).toBeNull();
   expect(apiRequest).not.toHaveBeenCalled();
+});
+
+it("preserves highest-ranked and score-based selection values with styled menus", async () => {
+  render(<MemoryRouter initialEntries={["/interviewer/schedule-interviews"]}><App /></MemoryRouter>);
+  await screen.findByText("Synthetic Candidate");
+  selectOption("Which candidates?", "Highest-ranked candidates");
+  fireEvent.change(screen.getByLabelText("Number of candidates"), { target: { value: "3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Preview candidate selection" }));
+  await screen.findByText("1 eligible recipient(s)");
+  let calls = vi.mocked(apiRequest).mock.calls.filter(([path]) => path === "/interviews/selection/preview");
+  expect(JSON.parse(calls[0][1]!.body as string)).toMatchObject({ mode: "top_n", top_n: 3, application_ids: [] });
+  selectOption("Which candidates?", "Candidates above a score");
+  selectOption("Score comparison", "At least");
+  fireEvent.change(screen.getByLabelText("Candidate score (%)"), { target: { value: "80" } });
+  fireEvent.click(screen.getByRole("button", { name: "Preview candidate selection" }));
+  await screen.findByText("1 eligible recipient(s)");
+  calls = vi.mocked(apiRequest).mock.calls.filter(([path]) => path === "/interviews/selection/preview");
+  expect(JSON.parse(calls[1][1]!.body as string)).toMatchObject({ mode: "threshold", threshold: "80", operator: "gte", application_ids: [] });
+  expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path.includes("/confirm"))).toBe(false);
 });

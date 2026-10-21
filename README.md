@@ -415,6 +415,13 @@ An active conversational batch can be restored after reloading the page.
    The shared assistant receives the selected job and candidates on this page.
    **Interview** remains the page for meeting details, delivery and rescheduling.
 
+Application dropdowns share rounded, viewport-aware menus with selected-state
+indicators and keyboard navigation (arrows, Home/End, Enter, Escape and type-ahead).
+Page-size controls stay compact. Transcript multi-selects support checking and
+unchecking passages without Ctrl/Cmd-click. Menus avoid clipped cards and remain
+inside the active dialog when opened there. LiveKit device controls retain their
+SDK-provided meeting theme.
+
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported
 formats and documents outside the configured size/page/text limits are recorded as

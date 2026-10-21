@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { CandidateScoringPanel } from "../../src/components/candidates/CandidateScoringPanel";
 import { apiRequest } from "../../src/api/apiClient";
+import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: vi.fn() }));
 const supervisor = vi.hoisted(() => ({ setSelectedApplicationIds: vi.fn() }));
@@ -147,7 +148,7 @@ it("opens the right evidence and restores the current page", async () => {
   expect(screen.getByText("Page 2 of 2")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Previous" }));
   expect(screen.getByText("Applicant 1")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
+  selectOption("Candidates per page", "20");
   expect(screen.getByText("Page 1 of 1")).toBeTruthy();
   expect(screen.getByText("Applicant 11")).toBeTruthy();
 });
@@ -159,7 +160,7 @@ it("resets to page one when ranking is updated", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
   await screen.findByText("Ranking updated.");
-  expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+  expect(await screen.findByText("Page 1 of 2")).toBeTruthy();
   expect(screen.queryByText("Applicant 11")).toBeNull();
 });
 
@@ -183,7 +184,7 @@ it("bounds numbered controls for large rankings and changes page size", async ()
   expect(screen.getAllByRole("button", { name: /Go to ranking page/ }).length).toBeLessThanOrEqual(7);
   fireEvent.click(screen.getByRole("button", { name: "Go to ranking page 11" }));
   expect(screen.getByText("101–101 of 101 candidates")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "5" } });
+  selectOption("Candidates per page", "5");
   expect(screen.getByText("1–5 of 101 candidates")).toBeTruthy();
   expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(6);
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { analysisApi, type AnalysisState, type PairEdit, type Segment, type Citation } from "./analysisApi";
 import { TranscriptCitation } from "./TranscriptCitation";
 import { transcriptTime } from "./transcriptionApi";
+import { StyledSelect } from "../common/StyledSelect";
 
 const label = (text: string) => text.replaceAll("_", " ");
 const button = "rounded-lg border px-3 py-2 text-sm disabled:opacity-50";
@@ -59,8 +60,9 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
       {run ? <button className={button} disabled={busy} onClick={() => { setVersion(undefined); void action(() => analysisApi.start(interviewId, automatic, false, true), "A new analysis version was requested."); }}>Reanalyze</button> : null}
     </div>
     <p className="mt-2 text-xs text-slate-500">An answer stays in progress until a new question or the end of transcription. A pause alone does not finish it.</p>
-    {state?.versions.length ? <label className="mt-3 block text-sm">Analysis version <select className="ml-2 rounded border p-2" value={version || ""} onChange={e => { setVersion(e.target.value ? Number(e.target.value) : undefined); setEditing(undefined); }}>
-      <option value="">Latest</option>{state.versions.map(v => <option key={v.id} value={v.id}>Version {v.version} · {label(v.status)}</option>)}</select></label> : null}
+    {state?.versions.length ? <label className="mt-3 block text-sm">Analysis version <StyledSelect label="Analysis version" className="mt-1" value={version ? String(version) : ""}
+      options={[{ value: "", label: "Latest" }, ...state.versions.map(v => ({ value: String(v.id), label: `Version ${v.version} · ${label(v.status)}` }))]}
+      onChange={value => { setVersion(value ? Number(value) : undefined); setEditing(undefined); }} /></label> : null}
     {error || run?.error ? <p role="alert" className="mt-3 text-sm text-red-700">{error || run?.error}</p> : null}
     {notice ? <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p> : null}
     {run?.stale ? <p className="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-900">This version uses earlier transcript or reference material. Analyze saved answers to update it.</p> : null}
@@ -100,7 +102,9 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
             <p className="mt-1 text-xs text-slate-500">Requirements: {s.requirement_ids.join(", ") || "Question clarification"}</p>
             <div className="mt-2 flex flex-wrap gap-2"><button className={button} disabled={busy} onClick={() => void action(() => analysisApi.review(interviewId, run.id, "suggestion_used", s.id), "Marked used. Link a spoken question to confirm it was asked.")}>Mark used</button><button className={button} disabled={busy} onClick={() => void action(() => analysisApi.review(interviewId, run.id, "suggestion_dismissed", s.id), "Suggestion dismissed.")}>Dismiss</button></div>
             {reviews.length ? <p className="mt-2 text-xs">{reviews.map(r => label(r.kind)).join(" · ")}</p> : null}
-            <label className="mt-2 block text-xs">Confirm the spoken question<select className="mt-1 w-full rounded border p-2" value={linked[s.id] || ""} onChange={e => setLinked({ ...linked, [s.id]: e.target.value })}><option value="">Choose a transcript passage</option>{segments.filter(seg => seg.speaker === "INTERVIEWER").map(seg => <option key={seg.id} value={seg.id}>{transcriptTime(seg.start_offset_ms)} · {seg.text.slice(0, 100)}</option>)}</select></label>
+            <label className="mt-2 block text-xs">Confirm the spoken question<StyledSelect label="Confirm the spoken question" className="mt-1" value={linked[s.id] || ""}
+              options={[{ value: "", label: "Choose a transcript passage" }, ...segments.filter(seg => seg.speaker === "INTERVIEWER").map(seg => ({ value: seg.id, label: `${transcriptTime(seg.start_offset_ms)} · ${seg.text.slice(0, 100)}` }))]}
+              onChange={value => setLinked({ ...linked, [s.id]: value })} /></label>
             <button className={`${button} mt-2`} disabled={busy || !linked[s.id]} onClick={() => void action(() => analysisApi.review(interviewId, run.id, "suggestion_linked", s.id, "Confirmed by interviewer", [linked[s.id]]), "Suggestion linked to the spoken question.")}>Link spoken question</button>
           </article>;
         })}
@@ -133,6 +137,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
 }
 
 function SegmentSelect({ title, values, segments, onChange }: { title: string; values: string[]; segments: Segment[]; onChange: (value: string[]) => void }) {
-  return <label className="my-2 block text-sm">{title}<select multiple size={4} value={values} onChange={e => onChange(Array.from(e.target.selectedOptions, o => o.value))} className="mt-1 w-full rounded border p-2">
-    {segments.map(s => <option key={s.id} value={s.id}>{transcriptTime(s.start_offset_ms)} · {s.speaker.toLowerCase()} · {s.text.slice(0, 160)}</option>)}</select><span className="text-xs text-slate-500">Ctrl/Cmd-click to select multiple passages.</span></label>;
+  return <label className="my-2 block text-sm">{title}<StyledSelect multiple label={title} value={values} onChange={onChange} className="mt-1" placeholder="Choose transcript passages"
+    options={segments.map(s => ({ value: s.id, label: `${transcriptTime(s.start_offset_ms)} · ${s.speaker.toLowerCase()}`, description: s.text.slice(0, 160) }))} />
+    <span className="text-xs text-slate-500">Choose one or more passages. Click a selected passage to remove it.</span></label>;
 }

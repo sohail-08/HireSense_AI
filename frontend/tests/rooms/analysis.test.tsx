@@ -1,9 +1,10 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { InterviewAnalysisPanel } from "../../src/components/interviews/InterviewAnalysisPanel";
 import { TranscriptCitation } from "../../src/components/interviews/TranscriptCitation";
 import { analysisApi, type AnalysisState, type Citation } from "../../src/components/interviews/analysisApi";
+import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/components/interviews/analysisApi", () => ({ analysisApi: { read: vi.fn(), start: vi.fn(), correct: vi.fn(), review: vi.fn() } }));
 const citation: Citation = { interview_id: 1, segment_id: "a", session_id: "s", revision: "hash-a", quote: "commit changes", char_start: 13, char_end: 27,
@@ -76,6 +77,33 @@ describe("interviewer answer analysis", () => {
     fireEvent.click(screen.getByRole("button", { name: "Split — add exchange after this" }));
     fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Separate the follow-up." } });
     expect((screen.getByRole("button", { name: "Save correction & reanalyze" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it("keeps transcript IDs intact when selecting and removing styled multi-select choices", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Question–answer timeline");
+    fireEvent.click(screen.getByRole("button", { name: "Correct pairing / merge / split" }));
+    const control = screen.getByRole("combobox", { name: "Question segments" });
+    fireEvent.click(control);
+    const option = within(screen.getByRole("listbox", { name: "Question segments" })).getByRole("option");
+    expect(option.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(option);
+    fireEvent.keyDown(control, { key: "Escape" });
+    fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Fix pairing" } });
+    expect((screen.getByRole("button", { name: "Save correction & reanalyze" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(control); fireEvent.click(screen.getByRole("option")); fireEvent.keyDown(control, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Save correction & reanalyze" }));
+    await waitFor(() => expect(analysisApi.correct).toHaveBeenCalledWith(1, 10, expect.arrayContaining([
+      expect.objectContaining({ question_ids: ["q"], answer_ids: ["a"], context_ids: [] }),
+    ]), "Fix pairing"));
+  });
+  it("preserves version selection and spoken-question linking values", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Question–answer timeline");
+    selectOption("Analysis version", "Version 1 · completed");
+    await waitFor(() => expect(analysisApi.read).toHaveBeenCalledWith(1, 10));
+    selectOption("Confirm the spoken question", /Explain transactions/);
+    fireEvent.click(screen.getByRole("button", { name: "Link spoken question" }));
+    await waitFor(() => expect(analysisApi.review).toHaveBeenCalledWith(1, 10, "suggestion_linked", "follow", "Confirmed by interviewer", ["q"]));
   });
   it("shows scored evidence without an interview reference-entry or needs-review section", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);

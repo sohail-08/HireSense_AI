@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { CandidatesPage } from "../../src/pages/CandidatesPage";
 import { apiBlob, apiRequest } from "../../src/api/apiClient";
+import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: vi.fn(), apiBlob: vi.fn(), ApiError: class extends Error {} }));
 const supervisor = vi.hoisted(() => ({ refreshVersion: 0, response: undefined }));
@@ -61,7 +62,7 @@ it("shows numbered candidates without setup, initials or a CV column", async () 
 
 it("filters identical job titles by posting ID and combines that filter with search", async () => {
   openPage(); await screen.findByText("Ada Candidate");
-  fireEvent.change(screen.getByLabelText("Job posting"), { target: { value: "8" } });
+  selectOption("Job posting", /Posting #8/);
   expect(screen.queryByText("Ada Candidate")).toBeNull();
   expect(screen.getByText("Grace Candidate")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Search candidates"), { target: { value: "ada@example.test" } });
@@ -216,7 +217,7 @@ it("keeps pagination visible and disables navigation for a single page or empty 
 it("changes page size, navigates directly and keeps numbering and selection consistent", async () => {
   items = Array.from({ length: 23 }, (_, index) => ({ ...applications[0], id: index + 1, candidate: { ...applications[0].candidate, name: `Applicant ${index + 1}` } }));
   openPage(); await screen.findByText("Applicant 1");
-  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "5" } });
+  selectOption("Candidates per page", "5");
   expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(6);
   expect(screen.getByText("1–5 of 23 applications")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Select candidates" }));
@@ -225,7 +226,7 @@ it("changes page size, navigates directly and keeps numbering and selection cons
   expect(screen.getByText("11–15 of 23 applications")).toBeTruthy();
   expect(screen.getByText("1 selected · up to 100")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Go to page 3" }).getAttribute("aria-current")).toBe("page");
-  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
+  selectOption("Candidates per page", "20");
   expect(screen.getByText("Page 1 of 2")).toBeTruthy();
   expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(21);
   expect((screen.getByRole("checkbox", { name: "Select Applicant 1" }) as HTMLInputElement).checked).toBe(true);
@@ -241,7 +242,7 @@ it("bounds page buttons for a large list and allows jumping to the last page", a
   fireEvent.click(screen.getByRole("button", { name: "Go to page 11" }));
   expect(screen.getByText("101–101 of 101 applications")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText("Job posting"), { target: { value: "7" } });
+  selectOption("Job posting", /Posting #7/);
   expect(screen.getByText("Page 1 of 11")).toBeTruthy();
 });
 

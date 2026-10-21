@@ -5,6 +5,7 @@ import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { assessmentApi, type Assessment, type Comparison, type FinalRanking } from "../components/assessments/assessmentApi";
 import { AssessmentView, ComparisonView, ReportExports, reportButton, score } from "../components/assessments/AssessmentView";
 import type { ScreeningJobOption } from "../types";
+import { StyledSelect } from "../components/common/StyledSelect";
 
 export function ConsolidatedAssessmentsPage() {
   const [params, setParams] = useSearchParams();
@@ -73,9 +74,10 @@ export function ConsolidatedAssessmentsPage() {
     {error ? <p role="alert" className="my-3 rounded bg-red-50 p-3 text-red-700">{error}</p> : null}
     <section className="my-5 rounded-2xl border bg-white p-5">
       <div className="flex flex-wrap items-end gap-4">
-        <label className="min-w-0 flex-1 text-sm font-semibold">Job posting<select disabled={busy} className="mt-2 block w-full rounded-lg border p-3" value={job ?? ""} onChange={e => {
-          setJob(Number(e.target.value)); setReport(undefined); setComparison(undefined); setParams({}); setSelectedApplicationIds([]);
-        }}><option value="" disabled>Select a job</option>{jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}</select></label>
+        <label className="min-w-0 flex-1 text-sm font-semibold">Job posting<StyledSelect label="Job posting" disabled={busy} className="mt-2" value={job === undefined ? "" : String(job)} placeholder="Select a job"
+          options={jobs.map(j => ({ value: String(j.id), label: j.title, description: `Posting #${j.id}` }))} onChange={value => {
+            setJob(Number(value)); setReport(undefined); setComparison(undefined); setParams({}); setSelectedApplicationIds([]);
+          }} /></label>
         <button className={`${reportButton} bg-blue-600 text-white`} disabled={busy || !job || !ranking?.candidates.length || ranking?.status === "processing"} onClick={() => void calculate()}>
           {busy || ranking?.status === "processing" ? "Calculating…" : "Calculate final ranking"}</button>
       </div>

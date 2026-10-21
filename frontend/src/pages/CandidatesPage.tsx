@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
+import { StyledSelect } from "../components/common/StyledSelect";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { notifyApplicationsChanged } from "../components/common/applicationNotificationEvents";
 import { CandidateDetailsModal } from "../components/candidates/CandidateDetailsModal";
@@ -189,10 +190,9 @@ export function CandidatesPage() {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100" /></div>
           </label>
           <label className="block text-xs font-medium text-slate-500" htmlFor="candidate-job">Job posting
-            <select id="candidate-job" value={jobFilter} onChange={event => { setJobFilter(event.target.value); setPage(1); setChecked([]); }}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-              <option value="">All job postings</option>{jobs.map(job => <option key={job.id} value={job.id}>{job.title} · #{job.id}</option>)}
-            </select>
+            <StyledSelect id="candidate-job" label="Job posting" value={jobFilter} className="mt-1.5"
+              options={[{ value: "", label: "All job postings" }, ...jobs.map(job => ({ value: String(job.id), label: job.title, description: `Posting #${job.id}` }))]}
+              onChange={value => { setJobFilter(value); setPage(1); setChecked([]); }} />
           </label>
         </div>
       </div>
@@ -234,9 +234,8 @@ export function CandidatesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/40 px-5 py-3 text-xs text-slate-500">
         <p aria-live="polite">{filtered.length ? `${start + 1}–${Math.min(start + pageSize, filtered.length)} of ${filtered.length} application${filtered.length === 1 ? "" : "s"}` : "0 applications"}{(search || jobFilter) && filtered.length !== applications.length ? ` · ${applications.length} total` : ""}</p>
         <label className="flex items-center gap-2 text-slate-600" htmlFor="candidate-page-size">Candidates per page
-          <select id="candidate-page-size" value={pageSize} disabled={loading} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-medium outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-            {pageSizes.map(size => <option key={size} value={size}>{size}</option>)}
-          </select>
+          <StyledSelect id="candidate-page-size" label="Candidates per page" value={String(pageSize)} disabled={loading} compact className="w-20"
+            options={pageSizes.map(size => ({ value: String(size), label: String(size) }))} onChange={value => { setPageSize(Number(value)); setPage(1); }} />
         </label>
         <nav aria-label="Candidate pages" className="flex flex-wrap items-center gap-2">
           <span className="mr-1">Page {currentPage} of {pages}</span>
