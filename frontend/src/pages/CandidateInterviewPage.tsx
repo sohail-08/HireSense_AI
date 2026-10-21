@@ -75,7 +75,7 @@ export function CandidateInterviewPage() {
         <p className="text-xl font-bold text-blue-600">HireSense · Interview</p>
         {linkState ? <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm"><h1 className="text-2xl font-bold">{linkState.title}</h1><p className="mt-3 text-slate-600">{linkState.message}</p></section> : !info ? <p role="status" className="mt-6">Checking your interview invitation…</p> : <>
           <h1 className="mt-6 text-2xl font-bold">{info.job_title} interview</h1>
-          <p className="mt-2 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} ({info.timezone}) · Private one-to-one room · No recording</p>
+          <p className="mt-2 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} · Private one-to-one room · No recording</p>
           {info.media_notice ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{info.media_notice}</p> : null}
           <TranscriptionProvider>
           <div className="mt-6">

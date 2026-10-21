@@ -8,6 +8,7 @@ import ssl
 from string import Formatter
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from icalendar import Calendar, Event, vCalAddress, vText
+from app.services.date_time_display import format_date, format_time, format_date_time, time_zone_label
 
 UTC = timezone.utc
 
@@ -47,13 +48,12 @@ def allocate_slots(data, count, now=None):
 
 
 def render_email(settings, candidate, job_title, stage, slot, data, old=None):
-    local = datetime.fromisoformat(slot["local_start"])
     fields = {"candidate_name": candidate["name"], "job_title": job_title,
-        "company_name": settings.interview_company_name, "local_date": local.strftime("%d %B %Y"),
-        "local_start_time": local.strftime("%H:%M"), "timezone": slot["timezone"],
+        "company_name": settings.interview_company_name, "local_date": format_date(slot["local_start"], slot["timezone"]),
+        "local_start_time": format_time(slot["local_start"], slot["timezone"]), "timezone": time_zone_label(slot["timezone"]),
         "duration": str(slot["duration_minutes"]) + " minutes", "stage": stage,
         "contact_email": settings.interview_reply_to_email, "instructions": data.instructions,
-        "old_schedule": "" if not old else old["local_start"] + " (" + old["timezone"] + ")"}
+        "old_schedule": "" if not old else format_date_time(old["local_start"], old["timezone"])}
     subject = data.subject_template or (("Interview rescheduled" if old else "Interview invitation") + " for {job_title} at {company_name}")
     body = data.body_template or ("Dear {candidate_name},\n\nThank you for your application for the {job_title} position.\n\n"
         "We would like to invite you to an interview:\nDate: {local_date}\nTime: {local_start_time} ({timezone})\n"
@@ -80,12 +80,12 @@ def render_email(settings, candidate, job_title, stage, slot, data, old=None):
         if missing:
             body += "\n\nInterview details:\n" + "\n".join(missing)
     if old:
-        body += "\n\nPrevious schedule: " + fields["old_schedule"] + "\nNew schedule: " + slot["local_start"] + " (" + slot["timezone"] + ")"
+        body += "\n\nPrevious schedule: " + fields["old_schedule"] + "\nNew schedule: " + format_date_time(slot["local_start"], slot["timezone"])
         if getattr(data, "reason", ""):
             body += "\nReason: " + data.reason
     if "\r" in subject or "\n" in subject or len(subject) > 250:
         raise ValueError("Email subject must be a single line of at most 250 characters")
-    return {"subject": subject, "body": body.strip(), "template_version": "interview-v1"}
+    return {"subject": subject, "body": body.strip(), "template_version": "interview-v2-readable-time"}
 
 
 def calendar_invitation(settings, uid, sequence, slot, subject, body, recipient, sender=None):

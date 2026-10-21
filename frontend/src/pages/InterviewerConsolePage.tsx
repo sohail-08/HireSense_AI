@@ -66,7 +66,7 @@ export function InterviewerConsolePage() {
         {fatal ? <p role="alert" className="mt-6 rounded-xl bg-red-50 p-5 text-red-800">{fatal}</p> : !info ? <p role="status" className="mt-6">Loading interview console…</p> : <>
           <h1 className="mt-5 text-2xl font-bold">Interview console</h1>
           <p className="mt-2 font-medium">{info.candidate_name} · {info.job_title}</p>
-          <p className="mt-1 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} ({info.timezone}) · {info.room_status}</p>
+          <p className="mt-1 text-sm text-slate-600">{formatRoomTime(info.scheduled_start, info.timezone)} · {info.room_status}</p>
           {info.media_notice ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{info.media_notice}</p> : null}
           {info.link_origin_outdated ? <p className="mt-3 text-sm text-amber-900">This invitation uses a different website address. Update the candidate link before sharing it for this demo.</p> : null}
           {message ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{message}</p> : null}

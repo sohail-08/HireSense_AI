@@ -1,3 +1,5 @@
+import { formatDateTime } from "../../utils/dateTime";
+
 export function accessMessage(code: string): { title: string; message: string } {
   switch (code) {
     case "expired_link": return { title: "This invitation has expired", message: "Contact the interviewer for an updated invitation." };
@@ -20,5 +22,5 @@ export function deviceMessage(error: Error): string {
 }
 
 export function formatRoomTime(value: string, timezone: string): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
+  return formatDateTime(value, timezone);
 }

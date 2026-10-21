@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "../../api/apiClient";
 import { APPLICATIONS_CHANGED_EVENT } from "./applicationNotificationEvents";
+import { formatDateTime } from "../../utils/dateTime";
 
 type NotificationSummary = {
   status: "ready" | "not_configured" | "unavailable";
@@ -81,7 +82,7 @@ export function ApplicationNotifications() {
         {(summary.unmatched_count ?? 0) > 0 ? <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{summary.unmatched_count} response{summary.unmatched_count === 1 ? " needs" : "s need"} a valid, unambiguous job selection before syncing. Correct the Job Posting answer in the response sheet.</p> : null}
         <p className="mt-3 text-xs text-slate-500">Synced and deliberately deleted applications are not counted. Opening this panel does not clear pending responses.</p>
       </div> : <p role="status" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{summary.message}</p>}
-      {summary?.checked_at ? <p className="mt-3 text-xs text-slate-400">Sheet checked: {new Date(summary.checked_at).toLocaleTimeString()}</p> : null}
+      {summary?.checked_at ? <p className="mt-3 text-xs text-slate-400">Last checked: {formatDateTime(summary.checked_at)}</p> : null}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <button type="button" disabled={checking} className="text-sm font-medium text-blue-700 disabled:text-slate-400" onClick={() => setRetry((value) => value + 1)}>{checking ? "Checking…" : "Refresh count"}</button>
         <Link to="/interviewer/candidates" onClick={() => setOpen(false)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Review and sync</Link>

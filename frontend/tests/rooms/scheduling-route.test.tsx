@@ -25,7 +25,7 @@ beforeEach(() => {
     if (path === "/scoring/jobs/1/runs") return [{ id: 10, status: "completed" }];
     if (path === "/scoring/runs/10") return { id: 10, job_posting_id: 1, status: "completed", results: [{ id: 1, application_id: 7, rank: 1, display_score: "85.00", candidate_name: "Synthetic Candidate" }] };
     if (path === "/interviews/selection/preview") return { selection_token: "synthetic-selection", selected: [{ application_id: 7, name: "Synthetic Candidate", rank: 1, score: "85", email: "synthetic@example.test", masked_email: "s***@example.test" }], excluded: [], warnings: [], recipient_count: 1 };
-    if (path === "/interviews/invitations/prepare") return { id: 22, confirmation_token: "synthetic-confirmation", recipient_count: 1, sender: { from_email: "sender@example.test", reply_to: "reply@example.test" }, recipients: [{ application_id: 7, name: "Synthetic Candidate", email: "synthetic@example.test", subject: "Interview invitation", body: "Synthetic invitation body", local_start: "2028-02-29T08:00:00", local_end: "2028-02-29T08:30:00", timezone: "Asia/Dhaka", duration_minutes: 30 }] };
+    if (path === "/interviews/invitations/prepare") return { id: 22, confirmation_token: "synthetic-confirmation", recipient_count: 1, sender: { from_email: "sender@example.test", reply_to: "reply@example.test" }, recipients: [{ application_id: 7, name: "Synthetic Candidate", email: "synthetic@example.test", subject: "Interview invitation", body: "Synthetic invitation body", local_start: "2028-02-29T08:00:00+06:00", local_end: "2028-02-29T08:30:00+06:00", timezone: "Asia/Dhaka", duration_minutes: 30 }] };
     throw new Error("Synthetic request boundary");
   });
 });
@@ -103,6 +103,7 @@ it("uses modals for both previews, shows full emails and preserves the schedule 
   const preview = await screen.findByRole("dialog", { name: "Schedule & email preview" });
   expect(within(preview).getByText("synthetic@example.test")).toBeTruthy();
   expect(within(preview).getByText("Synthetic invitation body")).toBeTruthy();
+  expect(within(preview).getByText("29 Feb 2028, 8:00 AM – 8:30 AM (Dhaka time) · 30 minutes")).toBeTruthy();
   expect(within(preview).getByRole("button", { name: "Confirm & send 1 invitation(s)" })).toBeTruthy();
   const prepare = vi.mocked(apiRequest).mock.calls.find(([path]) => path === "/interviews/invitations/prepare");
   expect(JSON.parse(prepare![1]!.body as string)).toMatchObject({ date: "2028-02-29", start_time: "08:00", timezone: "Asia/Dhaka", mode: "sequential", duration_minutes: 30, buffer_minutes: 0, subject_template: "", body_template: "" });

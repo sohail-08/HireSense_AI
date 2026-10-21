@@ -103,10 +103,12 @@ def test_logical_support_failure_and_bounded_llm_fallback():
 def test_html_autoescaping_no_remote_assets_or_executable_candidate_content():
     result = report()
     result["identification"]["candidate_name"] = '<script src="https://bad.invalid/x">secret</script>'
-    run = {"id": 1, "version": 1, "result": result, "notes": [], "created_at": "synthetic", "review_status": "not_reviewed"}
+    run = {"id": 1, "version": 1, "result": result, "notes": [], "created_at": "2026-10-22T02:00:00Z", "review_status": "not_reviewed"}
     html = render_html({"kind": "individual", "reports": [run]})
     assert "<script" not in html and "&lt;script" in html
     assert "default-src 'none'" in html
+    assert "22 Oct 2026 at 8:00 AM (Dhaka time)" in html
+    assert "2026-10-22T02:00:00Z" not in html
 
 
 @pytest.fixture

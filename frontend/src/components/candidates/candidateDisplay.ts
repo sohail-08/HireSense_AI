@@ -1,3 +1,5 @@
+import { formatDate, formatDateTime } from "../../utils/dateTime";
+
 export const applicationStatuses: Record<string, { label: string; style: string }> = {
   received: { label: "New", style: "bg-blue-50 text-blue-700 ring-blue-100" },
   screening: { label: "Screening", style: "bg-amber-50 text-amber-800 ring-amber-100" },
@@ -8,8 +10,7 @@ export const applicationStatuses: Record<string, { label: string; style: string 
 };
 
 export function candidateDate(value: string, full = false): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Not provided" : full ? date.toLocaleString() : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return full ? formatDateTime(value) : formatDate(value);
 }
 
 export function cvSize(bytes: number): string {

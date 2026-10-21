@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { StyledSelect } from "./StyledSelect";
+import { formatDate, timeZoneLabel } from "../../utils/dateTime";
 
 const dayMs = 86400000;
 function dateAt(year: number, month: number, day: number) {
@@ -29,7 +30,7 @@ function timeParts(value: string) {
   const hour = valid ? Number(value.slice(0, 2)) : 8;
   return { hour: String(hour % 12 || 12).padStart(2, "0"), minute: valid ? value.slice(3) : "00", period: hour >= 12 ? "PM" : "AM" };
 }
-function timeLabel(value: string) { const parts = timeParts(value); return `${parts.hour}:${parts.minute} ${parts.period}`; }
+function timeLabel(value: string) { const parts = timeParts(value); return `${Number(parts.hour)}:${parts.minute} ${parts.period}`; }
 
 const actionStyle = "rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-500";
 const inputStyle = "mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
@@ -121,7 +122,7 @@ function TimeChoices({ value, onChange }: { value: string; onChange: (value: str
   const [hour, setHour] = useState(initial.hour); const [minute, setMinute] = useState(initial.minute); const [period, setPeriod] = useState(initial.period);
   const raw = `${String(Number(hour) % 12 + (period === "PM" ? 12 : 0)).padStart(2, "0")}:${minute}`;
   return <>
-    <div className="mb-4 rounded-xl bg-blue-50 p-4 text-center"><p className="text-2xl font-bold tracking-wide text-blue-700">{timeLabel(raw)}</p><p className="mt-1 text-xs text-slate-500">Asia/Dhaka</p></div>
+    <div className="mb-4 rounded-xl bg-blue-50 p-4 text-center"><p className="text-2xl font-bold tracking-wide text-blue-700">{timeLabel(raw)}</p><p className="mt-1 text-xs text-slate-500">{timeZoneLabel()}</p></div>
     <div className="grid grid-cols-3 gap-3">
       <label className="text-xs font-medium text-slate-500">Hour<StyledSelect label="Hour" className="mt-1" compact value={hour} options={Array.from({ length: 12 }, (_, index) => { const value = String(index + 1).padStart(2, "0"); return { value, label: value }; })} onChange={setHour} /></label>
       <label className="text-xs font-medium text-slate-500">Minute<StyledSelect label="Minute" className="mt-1" compact value={minute} options={Array.from({ length: 60 }, (_, index) => { const value = String(index).padStart(2, "0"); return { value, label: value }; })} onChange={setMinute} /></label>
@@ -136,7 +137,7 @@ export function DateTimePicker({ label, kind, value, onChange, disabled }: { lab
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
   const trigger = useRef<HTMLButtonElement>(null);
   const parsed = parse(value);
-  const caption = value ? (kind === "date" ? parsed ? dateLabel(parsed) : "Choose date" : timeLabel(value)) : kind === "date" ? "Choose date" : "Choose time";
+  const caption = value ? (kind === "date" ? parsed ? formatDate(value) : "Choose date" : timeLabel(value)) : kind === "date" ? "Choose date" : "Choose time";
   return <div><span className="text-sm">{label}</span><button ref={trigger} type="button" aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}
     className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm shadow-sm transition hover:border-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:opacity-50">
     <span className={value ? "font-medium text-slate-800" : "text-slate-400"}>{caption}</span>

@@ -11,6 +11,7 @@ import {
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { DiscordJobPostPanel } from "../components/jobs/DiscordJobPostPanel";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
+import { formatDateTime } from "../utils/dateTime";
 import type {
   JobDescriptionResponse,
   KnowledgeDocumentResponse,
@@ -555,7 +556,7 @@ export function JobDescriptionPage() {
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         Version {item.version} · Updated{" "}
-                        {new Date(item.updated_at).toLocaleString()}
+                        {formatDateTime(item.updated_at)}
                       </p>
                     </div>
                     <span

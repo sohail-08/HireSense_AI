@@ -76,10 +76,15 @@ delivery receipt. Configure domain authentication and privacy policies separatel
    Nothing is sent during selection or preview.
 7. Select **Confirm & send**. Schedules and delivery snapshots are committed first;
    background workers then send each email. The UI polls sent/failed/uncertain status.
-8. **Interviews** lists schedules, delivery status and previous times. Check one or
-   several interviews for the same job to preview and confirm rescheduling. An email
-   failure does not revert the new schedule. Retry only the latest eligible failed
-   delivery; uncertain/sent/superseded deliveries are never automatically retried.
+8. **Interviews** lists candidates, readable dates/times, status badges and a dedicated
+   **Actions** column. Button-styled links open the interview console, completed
+   interview details and assessment reports. There is no Delivery column. Each row
+   has a **Reschedule** button, disabled once the interview starts, finishes or is
+   cancelled. Completed details and reports remain accessible; closed rooms are
+   not presented as joinable consoles. Previous times remain expandable. Failed
+   invitation retries appear with the row actions only when relevant, and are
+   disabled for closed interviews. An email failure does not revert the schedule;
+   uncertain/sent/superseded deliveries are never automatically retried.
 
 Selection requires syntactically valid database emails, active/non-withdrawn applications,
 usable processed CVs without unresolved extraction problems, and no active interview
@@ -89,6 +94,22 @@ be arbitrary addresses supplied in a chat command. IANA-invalid, past, ambiguous
 nonexistent DST times are rejected. Conflicting interview slots must be changed;
 there is no silent conflict override. Older shared/group schedules remain readable;
 their history is preserved, but new previews and reschedules are sequential-only.
+
+## Readable time display
+
+App screens use dates such as **22 Oct 2026** and 12-hour times such as **8:00 AM**
+or **5:05 PM**, without seconds or ISO offsets. Interview schedules, previews and
+history use their saved time zone; other app timestamps use **Dhaka time**. The
+candidate room, interviewer console, candidate details, job update times, CV ranking
+updates and notification checks share this format. New invitation/reschedule email,
+chat previews and HTML/PDF report timestamps use the same readable style. Overnight
+ranges include both dates. Transcript positions remain elapsed minutes/seconds,
+not wall-clock times. Invalid or missing dates do not crash pages.
+
+Only presentation changes: API timestamps, YYYY-MM-DD/HH:mm form values, UTC
+calendar events, saved invitation bodies, prior messages and existing report files
+are preserved. New report requests use a new template version rather than silently
+reusing old-format exports. No existing emails are resent by this change.
 
 ## Central chatbot and MCP
 

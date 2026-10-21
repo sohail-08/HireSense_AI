@@ -5,6 +5,7 @@ import { StyledSelect } from "../common/StyledSelect";
 import { DateTimePicker } from "../common/DateTimePicker";
 import { PreviewModal } from "../common/PreviewModal";
 import { buildInterviewSchedule } from "./interviewSchedule";
+import { formatDateTime, formatTimeRange } from "../../utils/dateTime";
 
 type Recipient = { application_id: number; name: string; email?: string | null; masked_email?: string | null; rank?: number; score?: string;
   local_start?: string; local_end?: string; timezone?: string; duration_minutes?: number; subject?: string; body?: string;
@@ -110,7 +111,7 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
         {selection ? <p className="mt-3 text-sm text-slate-500">{selection.recipient_count} candidate(s) selected. <button type="button" className="font-semibold text-blue-700 hover:underline" onClick={() => setModal("selection")}>Review selection</button></p> : null}
       </> : <p className="mt-3 text-sm">{scheduleIds?.length} interview(s) selected.</p>}
       {rescheduling || selection?.recipient_count ? <>
-        <p className="mt-5 text-sm text-slate-500">Sequential individual slots · Times are in Asia/Dhaka.</p>
+        <p className="mt-5 text-sm text-slate-500">One candidate per time slot · All times are in Dhaka time.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <DateTimePicker label="Date" kind="date" value={fields.date} disabled={busy || batch?.status === "sending"} onChange={value => change("date", value)} />
           <DateTimePicker label="Start time" kind="time" value={fields.start_time} disabled={busy || batch?.status === "sending"} onChange={value => change("start_time", value)} />
@@ -138,8 +139,8 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
       <p className="mt-2 break-words text-xs text-slate-500">From: {preview.sender.from_email} · Reply-to: {preview.sender.reply_to}</p>
       <div className="mt-4 space-y-3">{preview.recipients.map(item => <details key={item.application_id} className="rounded-xl border border-slate-200 bg-slate-50 p-4" open={preview.recipients.length === 1}>
         <summary className="text-sm font-semibold"><span>{item.name}</span><span className="mt-1 block break-all font-normal text-slate-600">{item.email || item.masked_email || "No email address"}</span></summary>
-        {item.old_schedule ? <p className="mt-3 text-sm text-slate-500">Previous: {item.old_schedule.local_start} ({item.old_schedule.timezone})</p> : null}
-        <p className="mt-3 text-sm">{item.local_start} → {item.local_end} ({item.timezone}) · {item.duration_minutes} minutes</p>
+        {item.old_schedule ? <p className="mt-3 text-sm text-slate-500">Previous: {formatDateTime(item.old_schedule.local_start, item.old_schedule.timezone)}</p> : null}
+        <p className="mt-3 text-sm">{formatTimeRange(item.local_start, item.local_end, item.timezone)} · {item.duration_minutes} minutes</p>
         <p className="mt-3 text-sm font-semibold">Subject: {item.subject}</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{item.body}</p>
         <p className="mt-3 text-xs text-slate-500">Calendar attachment: interview.ics</p>
       </details>)}</div>

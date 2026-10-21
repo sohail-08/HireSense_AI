@@ -6,6 +6,7 @@ import { ErrorMessage } from "../common/ErrorMessage";
 import { RankingPagination } from "./RankingPagination";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
 import { RequirementEvidence, type EvidenceRequirement } from "./RequirementEvidence";
+import { formatDateTime } from "../../utils/dateTime";
 
 type Category = "technical" | "experience" | "qualification";
 type Weights = Record<Category, string>;
@@ -243,7 +244,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         {loading ? "Loading candidate ranking…" : processing ? "Your ranking is being prepared." : !applicationCount ? "Candidates will appear here after their applications are collected." : "Choose your weights, then select “Rank candidates” to see the results."}
       </p>}
       <RankingPagination count={ranked.length} page={currentPage} pageSize={pageSize} loading={loading} onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1); }} />
-      {run ? <p className="mt-3 text-xs text-slate-400">Last updated {new Date(run.created_at).toLocaleString()} · Scores reflect the CV, not a final hiring decision.</p> : null}
+      {run ? <p className="mt-3 text-xs text-slate-400">Last updated {formatDateTime(run.created_at)} · Scores reflect the CV, not a final hiring decision.</p> : null}
       </div>
     </section>
     {evidence ? <EvidenceModal key={evidence.id} result={evidence} restoreFocus={evidenceTrigger.current} onClose={closeEvidence} /> : null}
