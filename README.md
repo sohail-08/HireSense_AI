@@ -327,6 +327,25 @@ Complete these one-time setup steps:
    `GOOGLE_FORMS_*_COLUMN` variables shown in `.env.example`.
 6. Restart the backend, open **Candidates**, and choose **Sync responses**.
 
+The Candidates page opens directly on a searchable table, with filters for each
+job posting and ten applications per page. Choose **Inspect** to see contact
+details, application information, and CV files in a keyboard-accessible modal.
+**Open CV** opens a PDF in a new tab; Word CVs download to open on your device.
+Rows are numbered, and each row offers **Inspect** and **Delete**. Choose
+**Select candidates** to show checkboxes and delete up to 100 selected applications
+with one confirmation. Selection continues across pages and clears when filters
+change. The table omits CV counts and collection setup notes; CVs remain available
+in the details modal, which only shows relevant contact fields. Sync remains available.
+Bulk deletion checks ownership of every selected application before changing any
+records, commits the changes together, and only then removes their private CV files.
+
+CV files are served through
+`GET /api/candidates/applications/{application_id}/cvs/{document_id}` with the
+interviewer's authorization header. The server checks posting ownership, both
+record IDs, private storage boundaries, file format and checksum. Responses are
+not cached; no public storage URL or token-bearing link is created. The frontend
+uses temporary blob URLs and retains the usual expired-login handling.
+
 The sync is idempotent: importing the same Sheet row into the same job posting
 again does not create a duplicate application. Every row is routed independently
 using its job value. Missing, unknown, inaccessible, or ambiguous job values are

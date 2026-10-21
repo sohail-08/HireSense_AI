@@ -1,6 +1,8 @@
 import hashlib
 import json
 import logging
+import re
+import zipfile
 from pathlib import Path
 
 from sqlalchemy import delete, func, select
@@ -39,6 +41,43 @@ class CandidateApplicationService:
     def __init__(self, settings: Settings):
         self.settings = settings
 
+    def cv_file(self, db: Session, *, application_id: int, document_id: int,
+                interviewer_user_id: int) -> tuple[Path, str, str]:
+        """Resolve a private CV only after verifying posting ownership and both IDs."""
+        from app.screening.parsing import CVParser, CVReviewRequired
+
+        document = db.scalar(select(CVDocument)
+            .join(CandidateApplication, CandidateApplication.id == CVDocument.application_id)
+            .join(JobPosting, JobPosting.id == CandidateApplication.job_posting_id)
+            .join(JobDescription, JobDescription.id == JobPosting.job_description_id)
+            .where(CVDocument.id == document_id, CandidateApplication.id == application_id,
+                   JobDescription.created_by_user_id == interviewer_user_id))
+        if document is None:
+            raise LookupError("CV not found")
+        root = Path(self.settings.storage_root).expanduser().resolve()
+        cv_root = (root / "cvs").resolve()
+        path = (root / document.storage_path).resolve()
+        if root not in cv_root.parents or cv_root not in path.parents or not path.is_file():
+            raise LookupError("This CV is not available. Try syncing responses again.")
+        mime_types = {".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+        if path.suffix.lower() not in mime_types:
+            raise ValueError("Only PDF and Word (.docx) CV files can be opened.")
+        try:
+            CVParser(self.settings)._validate_file(path, document)
+            if path.suffix.lower() == ".docx":
+                with zipfile.ZipFile(path) as archive:
+                    if not {"[Content_Types].xml", "word/document.xml"}.issubset(archive.namelist()):
+                        raise ValueError("The saved file is not a Word document.")
+        except FileNotFoundError:
+            raise LookupError("This CV is no longer available.") from None
+        except (CVReviewRequired, ValueError, OSError, zipfile.BadZipFile):
+            raise ValueError("The saved CV could not be verified. Sync an updated copy and try again.") from None
+        filename = re.sub(r"[\x00-\x1f\x7f]", "", document.original_filename.replace("\\", "/").split("/")[-1]).strip()
+        if not filename: filename = "candidate-cv" + path.suffix.lower()
+        if not filename.lower().endswith(path.suffix.lower()): filename += path.suffix.lower()
+        return path, mime_types[path.suffix.lower()], filename
+
     def delete(
         self,
         db: Session,
@@ -46,7 +85,13 @@ class CandidateApplicationService:
         application_id: int,
         interviewer_user_id: int,
     ) -> None:
-        application = db.scalar(
+        self.delete_many(db, application_ids=[application_id], interviewer_user_id=interviewer_user_id)
+
+    def delete_many(self, db: Session, *, application_ids: list[int], interviewer_user_id: int) -> list[int]:
+        ids = list(dict.fromkeys(application_ids))
+        if not ids or len(ids) > 100 or any(type(value) is not int or value <= 0 for value in ids):
+            raise ValueError("Select between 1 and 100 applications to delete.")
+        applications = list(db.scalars(
             select(CandidateApplication)
             .join(
                 JobPosting,
@@ -57,23 +102,31 @@ class CandidateApplicationService:
                 JobDescription.id == JobPosting.job_description_id,
             )
             .where(
-                CandidateApplication.id == application_id,
+                CandidateApplication.id.in_(ids),
                 JobDescription.created_by_user_id == interviewer_user_id,
             )
-        )
-        if application is None:
+        ))
+        # Validate the entire selection before touching any application or file.
+        if len(applications) != len(ids):
             raise LookupError("Candidate application not found")
-
-        paths, candidate_id = self.delete_record(
-            db,
-            application=application,
-            interviewer_user_id=interviewer_user_id,
-            remember_import=True,
-        )
-        db.flush()
-        self.delete_orphan_candidate(db, candidate_id)
-        db.commit()
+        paths: list[Path] = []
+        candidate_ids: set[int | None] = set()
+        try:
+            for application in applications:
+                removed_paths, candidate_id = self.delete_record(db, application=application,
+                    interviewer_user_id=interviewer_user_id, remember_import=True)
+                paths.extend(removed_paths)
+                candidate_ids.add(candidate_id)
+                # Subsequent deletes must see updated shared snapshots even with autoflush disabled.
+                db.flush()
+            for candidate_id in candidate_ids:
+                self.delete_orphan_candidate(db, candidate_id)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         self.cleanup_cv_files(paths)
+        return ids
 
     def delete_record(
         self,

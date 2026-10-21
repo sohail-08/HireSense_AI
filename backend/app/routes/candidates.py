@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -14,6 +15,8 @@ from app.schemas.candidate import (
     GoogleFormsSyncRequest,
     GoogleFormsSyncResponse,
     ApplicationNotificationsResponse,
+    ApplicationBulkDeleteRequest,
+    ApplicationBulkDeleteResponse,
 )
 from app.security import require_interviewer
 from app.services.candidate_application_service import CandidateApplicationService
@@ -103,6 +106,35 @@ def list_candidate_applications(
         interviewer_user_id=interviewer.id,
         job_posting_id=job_posting_id,
     )
+
+
+@router.get("/applications/{application_id}/cvs/{document_id}")
+def open_candidate_cv(application_id: int, document_id: int, download: bool = False,
+                      db: Session = Depends(get_db), interviewer: User = Depends(require_interviewer)):
+    try:
+        path, mime_type, filename = CandidateApplicationService(get_settings()).cv_file(
+            db, application_id=application_id, document_id=document_id, interviewer_user_id=interviewer.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    return FileResponse(path, media_type=mime_type, filename=filename,
+        content_disposition_type="inline" if mime_type == "application/pdf" and not download else "attachment",
+        headers={"Cache-Control": "private, no-store", "Pragma": "no-cache", "Vary": "Authorization",
+                 "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
+
+
+@router.post("/applications/bulk-delete", response_model=ApplicationBulkDeleteResponse)
+def delete_candidate_applications(data: ApplicationBulkDeleteRequest,
+                                  db: Session = Depends(get_db), interviewer: User = Depends(require_interviewer)):
+    try:
+        ids = CandidateApplicationService(get_settings()).delete_many(
+            db, application_ids=data.application_ids, interviewer_user_id=interviewer.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return {"deleted_application_ids": ids, "deleted_count": len(ids)}
 
 
 @router.delete(

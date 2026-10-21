@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -95,6 +95,17 @@ class CandidateApplicationSummary(BaseModel):
     response_data: dict[str, Any]
     candidate: CandidateResponse
     cv_documents: list[CVDocumentResponse]
+
+
+class ApplicationBulkDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    application_ids: list[Annotated[int, Field(gt=0, strict=True)]] = Field(min_length=1, max_length=100)
+
+
+class ApplicationBulkDeleteResponse(BaseModel):
+    deleted_application_ids: list[int]
+    deleted_count: int
 
 
 class GoogleFormsConfigurationResponse(BaseModel):
