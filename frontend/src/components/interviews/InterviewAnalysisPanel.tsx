@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { analysisApi, type AnalysisState, type Citation } from "./analysisApi";
-import { TranscriptCitation } from "./TranscriptCitation";
+import { analysisApi, type AnalysisState } from "./analysisApi";
 import { transcriptTime } from "./transcriptionApi";
 
 const dimensions = ["relevance", "accuracy", "completeness", "quality"] as const;
@@ -10,7 +9,6 @@ const runLabel = (status: string) => ({ completed: "Ready", processing: "Analyzi
 const pairLabel = (status: string) => ({ awaiting_answer: "Waiting for an answer", answer_in_progress: "Answer in progress", unanswered: "No answer recorded", excluded: "Not scored", analysis_failed: "Could not score this answer" }[status] || "");
 const scoreLabel = (status: string) => ({ met: "Met", partially_met: "Partially met", unmet: "Unmet" }[status] || "Not scored");
 const scoreStyle = (status: string) => ({ met: "border-emerald-200 bg-emerald-50 text-emerald-800", partially_met: "border-amber-200 bg-amber-50 text-amber-800", unmet: "border-rose-200 bg-rose-50 text-rose-800" }[status] || "border-slate-200 bg-slate-50 text-slate-600");
-const coverageLabel = (status: string) => ({ supporting_evidence: "Supported by the interview", partial_supporting_evidence: "Partly supported", contradictory_evidence: "Conflicting evidence", insufficient_evidence: "Not enough evidence", not_assessed: "Not discussed" }[status] || label(status));
 
 // Condense known boilerplate for display, without changing saved reasons or scores.
 function shortReason(reason: string) {
@@ -51,7 +49,6 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   const run = state?.run;
   const segments = run?.snapshot.segments || [];
   const source = (ids: string[]) => ids.map(id => segments.find(s => s.id === id)?.text || "Source unavailable").join("\n");
-  const citations = (items: Citation[] = []) => run ? items.map((citation, i) => <TranscriptCitation key={`${citation.segment_id}-${i}`} citation={citation} runId={run.id} interviewId={interviewId} />) : null;
   const gaps = [...new Set(run?.result.gaps || [])];
   return <section id="interview-analysis" aria-label="Private interview analysis" className="hiresense-answer-analysis mt-5 min-w-0 rounded-2xl bg-white p-5 shadow-sm">
     <header className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold tracking-tight text-slate-800">Answer analysis</h2>
@@ -91,10 +88,19 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
           </div>
         </details>;
       })}</div>
-      {run.result.coverage?.length ? <details className="mt-4 rounded-xl border border-slate-100 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">Job requirements covered</summary>
-        {run.result.coverage.map(item => <article key={item.requirement_id} className="mt-3 border-t border-slate-100 pt-3"><p className="text-sm font-medium text-slate-700">{item.name}</p><p className="mt-1 text-xs text-slate-500">{item.coverage_status === "asked_unanswered" ? "Asked, but no answer was recorded." : item.coverage_status === "asked_answer_pending" ? "Asked; the answer is still in progress." : item.statuses.includes("not_assessed") ? "Not discussed — not a failure to meet it." : item.statuses.map(coverageLabel).join(" · ")}</p>{item.evidence.map((mapping, i) => <div key={i} className="mt-2 text-sm text-slate-600"><p>{mapping.explanation}</p>{citations(mapping.citations)}</div>)}</article>)}
+      {run.result.unpaired?.length ? <details className="group mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 flex-1">Other transcript passages</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs tabular-nums text-slate-500">{run.result.unpaired.length}</span>
+          <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
+        </summary>
+        <ol aria-label="Other transcript passages" className="space-y-2 border-t border-slate-100 p-3 sm:p-4">{run.result.unpaired.map(item => {
+          const segment = segments.find(segment => segment.id === item.segment_id);
+          const style = segment?.speaker === "CANDIDATE" ? "border-amber-200 border-l-amber-500 bg-amber-50" : segment?.speaker === "INTERVIEWER" ? "border-blue-200 border-l-blue-500 bg-blue-50" : "border-slate-200 border-l-slate-400 bg-slate-50";
+          return <li key={item.segment_id} data-speaker={segment?.speaker} className={`min-w-0 rounded-xl border border-l-[3px] px-3 py-2.5 ${style}`}>
+            <div className="flex items-start gap-3"><p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{segment?.text || "Source unavailable"}</p>{segment ? <span aria-label={`At ${transcriptTime(segment.start_offset_ms)}`} className="shrink-0 pt-1 font-mono text-[11px] tabular-nums text-slate-500">{transcriptTime(segment.start_offset_ms)}</span> : null}</div>
+          </li>;
+        })}</ol>
       </details> : null}
-      {run.result.unpaired?.length ? <details className="mt-3 rounded-xl border border-slate-100 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">Other transcript passages ({run.result.unpaired.length})</summary>{run.result.unpaired.map(item => <p key={item.segment_id} className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{source([item.segment_id])}</p>)}</details> : null}
     </> : null}
   </section>;
 }

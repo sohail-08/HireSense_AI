@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { assessmentApi, type Assessment, type Artifact, type Comparison } from "./assessmentApi";
 import { displayPercent } from "../candidates/scoringDisplay";
+import { ReportPdfDownload } from "./ReportPdfDownload";
 
 export const text = (value: string) => value.replaceAll("_", " ");
 export const score = (value: string | number | null | undefined) => value === null || value === undefined ? "—" : displayPercent(String(value));
@@ -67,11 +68,11 @@ export function AssessmentView({ report }: { report: Assessment; onReviewed?: (r
     {r.interviews.map(interview => <section key={interview.id} className="mt-3">
       {interview.pairs.filter(pair => pair.state !== "excluded").map(pair => <details key={pair.id} className="mt-3 rounded-xl border border-slate-200 p-4"><summary className="flex cursor-pointer items-start justify-between gap-4"><span className="font-medium text-slate-700">{pair.question}</span><span className="shrink-0 rounded-lg bg-blue-50 px-2 py-1 text-sm font-bold text-blue-700">{score(pair.score?.percentage)}</span></summary>
         <p className="mt-3 whitespace-pre-wrap text-sm"><strong>Answer: </strong>{pair.answer || "No answer recorded. This question scores zero."}</p>
-        <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Why this score? View evidence</summary>{Object.entries(pair.dimensions).map(([name, dimension]) => <section key={name} className="mt-4 text-sm"><h4 className="font-semibold">{dimensions[name] ?? text(name)}</h4><p className="mt-1">{dimension.simple_reason ?? dimension.finding}</p>{refs(dimension.evidence_ids)}</section>)}</details>
+        <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Why this score?</summary>{Object.entries(pair.dimensions).map(([name, dimension]) => <section key={name} className="mt-4 text-sm"><h4 className="font-semibold">{dimensions[name] ?? text(name)}</h4><p className="mt-1">{dimension.simple_reason ?? dimension.finding}</p></section>)}</details>
       </details>)}
     </section>)}
     <details className="mt-5 rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer text-sm text-blue-700">CV evidence</summary>{r.matrix.map(row => <section key={row.requirement_id} className="mt-4 text-sm"><p className="font-semibold">{row.name} · {text(row.cv_status)}</p>{refs(row.cv_evidence_ids)}</section>)}</details>
-    <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Download this report</summary><ReportExports id={report.id} /></details>
+    <ReportPdfDownload key={report.id} id={report.id} />
     <p className="mt-5 text-xs text-slate-500">Scores show evidence against the job requirements, not a guarantee of job performance. The interviewer makes the hiring decision.</p>
   </article>;
 }

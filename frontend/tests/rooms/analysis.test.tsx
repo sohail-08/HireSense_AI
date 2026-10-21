@@ -109,19 +109,64 @@ describe("simplified interviewer answer analysis", () => {
     expect(JSON.stringify(data)).toBe(original);
   });
 
-  it("keeps undisclosed requirements distinct from failing requirements", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Questions & answers");
-    fireEvent.click(screen.getByText("Job requirements covered"));
-    expect(screen.getByText("Not discussed — not a failure to meet it.")).toBeTruthy();
-  });
-
-  it("keeps supporting and conflicting requirement evidence distinct", async () => {
+  it("removes requirement coverage from the panel without changing saved mappings", async () => {
     const data = fixture(); data.run!.result.coverage![0].statuses = ["supporting_evidence", "contradictory_evidence"];
+    const saved = JSON.stringify(data);
     vi.mocked(analysisApi.read).mockResolvedValue(data);
     render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Questions & answers"); fireEvent.click(screen.getByText("Job requirements covered"));
-    expect(screen.getByText("Supported by the interview · Conflicting evidence")).toBeTruthy();
+    await screen.findByText("Questions & answers");
+    expect(screen.queryByText("Job requirements covered")).toBeNull();
+    expect(screen.queryByText("Testing")).toBeNull();
+    expect(screen.queryByText("Supported by the interview · Conflicting evidence")).toBeNull();
+    expect(JSON.stringify(data)).toBe(saved);
+  });
+
+  it("styles other passages as compact, color-coded cards with readable text and timestamps", async () => {
+    const data = fixture();
+    const interviewerText = "Welcome.\nCan you hear me clearly?";
+    const candidateText = "Yes, thank you. " + "long-text".repeat(30);
+    data.run!.snapshot.segments.push(
+      { id: "intro", hash: "intro", speaker: "INTERVIEWER", text: interviewerText, start_offset_ms: 61000, end_offset_ms: 64000 },
+      { id: "reply", hash: "reply", speaker: "CANDIDATE", text: candidateText, start_offset_ms: 65000, end_offset_ms: 69000 },
+    );
+    data.run!.result.unpaired = [{ segment_id: "intro", kind: "procedural" }, { segment_id: "reply", kind: "procedural" }];
+    const saved = JSON.stringify(data);
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    fireEvent.click(await screen.findByText("Other transcript passages"));
+    const list = screen.getByRole("list", { name: "Other transcript passages" });
+    const cards = within(list).getAllByRole("listitem");
+    expect(cards).toHaveLength(2);
+    expect(cards[0].textContent).toContain(interviewerText);
+    expect(cards[1].textContent).toContain(candidateText);
+    expect(cards[0].className).toContain("bg-blue-50");
+    expect(cards[1].className).toContain("bg-amber-50");
+    expect(within(cards[0]).getByLabelText("At 01:01")).toBeTruthy();
+    expect(within(cards[1]).getByLabelText("At 01:05")).toBeTruthy();
+    expect(cards[1].querySelector("p")?.className).toContain("[overflow-wrap:anywhere]");
+    expect(JSON.stringify(data)).toBe(saved);
+    expect(analysisApi.start).not.toHaveBeenCalled();
+  });
+
+  it("hides the other passages section when there are none", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    expect(screen.queryByText("Other transcript passages")).toBeNull();
+  });
+
+  it("handles missing passages and unknown speakers without inventing text or timestamps", async () => {
+    const data = fixture();
+    data.run!.snapshot.segments.push({ id: "unknown", hash: "unknown", speaker: "UNKNOWN", text: "A saved passage.", start_offset_ms: 10000, end_offset_ms: 12000 });
+    data.run!.result.unpaired = [{ segment_id: "missing", kind: "context" }, { segment_id: "unknown", kind: "context" }];
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    fireEvent.click(await screen.findByText("Other transcript passages"));
+    const cards = within(screen.getByRole("list", { name: "Other transcript passages" })).getAllByRole("listitem");
+    expect(within(cards[0]).getByText("Source unavailable")).toBeTruthy();
+    expect(cards[0].querySelector("[aria-label^='At ']")).toBeNull();
+    expect(cards[1].className).toContain("bg-slate-50");
+    expect(within(cards[1]).getByText("A saved passage.")).toBeTruthy();
+    expect(within(cards[1]).getByLabelText("At 00:10")).toBeTruthy();
   });
 
   it("does not invent a score when only an assessment is available", async () => {

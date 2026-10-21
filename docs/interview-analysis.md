@@ -37,9 +37,13 @@ candidate captions. Interim text never enters the analysis workflow.
    explanations. The per-answer **Evidence & details** expander, cited passages,
    reference quotes and full explanations are no longer rendered here. Saved evidence,
    references and original score explanations remain intact in backend records.
-   Citation verification in requirement coverage and other views is unchanged.
-7. **Job requirements covered** distinguishes an undiscussed requirement from one
-   that was assessed as unmet. Source gaps, errors and outdated inputs remain visible.
+   Citation verification in other views is unchanged.
+7. **Other transcript passages** shows remaining conversation in compact, spaced
+   cards with readable text and small elapsed timestamps. Interviewer passages use
+   blue and candidate passages use amber, matching the live transcript. Long text
+   wraps within the panel. The **Job requirements covered** section is no longer
+   displayed; its saved mappings are unchanged. Source gaps, errors and outdated
+   inputs remain visible.
 
 The panel always loads the latest analysis. Pairing/merge/split editing, manual review
 notes, suggested follow-ups and their annotation/linking controls, and analysis-version

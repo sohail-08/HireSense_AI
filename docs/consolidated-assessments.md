@@ -12,9 +12,12 @@
    ranking stays in place behind it, with search/page state preserved. Closing
    restores focus to the triggering button; loading failures can be retried inside
    the modal. Existing report/comparison deep links also open there. Expand a question and
-   **Why this score? View evidence** to read the answer and exact source quotes.
-7. Download the ranking or a candidate report if needed. HTML/print remains
-   available if PDF preparation fails.
+   **Why this score?** to read the score explanations. Each answer is displayed
+   once, without transcript source details or extra quoted passages beneath the
+   explanations. Saved evidence and the separate CV evidence section are unchanged.
+7. Click **Download this report** in candidate details to prepare and download
+   a PDF in one step. The button shows progress and can be retried if preparation
+   or download fails. Ranking/comparison exports retain their existing formats.
 
 The main screen does not expose source hashes, requirement matrices, review
 checkboxes, version selectors, or a multi-step comparison form. Evidence is optional
