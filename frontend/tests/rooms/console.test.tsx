@@ -5,6 +5,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { InterviewerConsolePage } from "../../src/pages/InterviewerConsolePage";
 import { ApiError } from "../../src/api/apiClient";
+import { getSdk } from "./setup";
 
 const api = vi.hoisted(() => ({ status: vi.fn(), admit: vi.fn(), end: vi.fn(), interviewerMedia: vi.fn(), interviewerConnected: vi.fn(), interviewerLeave: vi.fn(), link: vi.fn(), revoke: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
@@ -14,6 +15,8 @@ function open() { render(<MemoryRouter initialEntries={["/interviews/1/console"]
 beforeEach(() => {
   api.status.mockResolvedValue(info); api.admit.mockResolvedValue({ ...info, admitted: true, waiting: false, room_status: "ready" });
   api.end.mockResolvedValue({ ...info, admitted: true, waiting: false, room_status: "ended" });
+  api.interviewerMedia.mockResolvedValue({ server_url: "wss://test-project.livekit.cloud", participant_token: "fake-media-only", role: "interviewer" });
+  api.interviewerConnected.mockResolvedValue({ ...info, admitted: true, waiting: false, room_status: "active" });
 });
 test("console authorization failure does not expose candidate or room controls", async () => {
   api.status.mockRejectedValue(new ApiError("Forbidden", 403)); open();
@@ -71,4 +74,21 @@ test("ending requires a confirmation dialog and renders ended state", async () =
   await user.click(screen.getByRole("button", { name: "Confirm end interview" }));
   await screen.findByRole("heading", { name: "Interview ended" });
   expect(api.end).toHaveBeenCalledWith(1); expect(screen.queryByRole("button", { name: "Admit candidate" })).toBeNull();
+  expect((screen.getByRole("button", { name: "End interview for everyone" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Join interview room" })).toBeNull();
+});
+
+test("keeps the media room mounted while changing transcript and analysis tabs", async () => {
+  const user = userEvent.setup(); open();
+  await user.click(await screen.findByRole("button", { name: "Check devices" }));
+  await user.click(screen.getByRole("button", { name: "Devices ready" }));
+  await user.click(screen.getByRole("button", { name: "Join interview room" }));
+  const media = await screen.findByTestId("media-room");
+  await user.click(screen.getByRole("tab", { name: "Answer analysis" }));
+  expect(screen.getByTestId("media-room")).toBe(media);
+  await user.click(screen.getByRole("tab", { name: "Live transcript" }));
+  expect(screen.getByTestId("media-room")).toBe(media);
+  expect(getSdk().room.screen).toBe(false);
+  expect(api.interviewerConnected).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Share screen", exact: true })).toBeNull();
 });

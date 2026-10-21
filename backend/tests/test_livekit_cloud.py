@@ -66,7 +66,8 @@ def test_cloud_uses_own_project_for_sdk_and_tokens_not_application_credentials(m
     assert claims['exp'] - claims['nbf'] <= 120
     assert claims['video']['roomJoin'] and claims['video']['room'] == 'hs-test-cloud-room'
     assert not claims['video']['roomAdmin'] and not claims['video']['roomCreate']
-    assert claims['video']['canPublishSources'] == ['camera', 'microphone']
+    assert claims['video']['canPublishSources'] == ['camera', 'microphone', 'screen_share']
+    assert 'screen_share_audio' not in claims['video']['canPublishSources']
     assert settings.livekit_cloud_api_secret.get_secret_value() not in str(access)
     with pytest.raises(jwt.InvalidSignatureError):
         jwt.decode(access['participant_token'], settings.jwt_secret_key.get_secret_value(), algorithms=['HS256'])

@@ -52,6 +52,9 @@ test("devices and admission gate Cloud media", async () => {
   expect(screen.queryByRole("heading", { name: "Candidate information" })).toBeNull();
   expect(screen.queryByRole("region", { name: "Interview assistant" })).toBeNull();
   expect(screen.queryByLabelText("Ask the interview assistant")).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Candidate info" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Answer analysis" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Share screen", exact: true }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("leaving the waiting room does not complete the interview", async () => {

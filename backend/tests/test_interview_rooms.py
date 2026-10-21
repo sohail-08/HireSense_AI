@@ -232,14 +232,18 @@ def test_only_assigned_interviewer_can_admit_and_candidate_media_is_gated(room_s
     access = rooms.media_access(db, candidate_token=session_token)
     decoded = jwt.decode(access["participant_token"], rooms.settings.livekit_cloud_api_secret.get_secret_value(), algorithms=["HS256"], issuer=rooms.settings.livekit_cloud_api_key)
     assert decoded["sub"] == row.room_name + "-c" and decoded["video"]["room"] == row.room_name
-    assert decoded["video"]["roomJoin"] is True and decoded["video"]["canPublishSources"] == ["camera", "microphone"]
+    assert decoded["video"]["roomJoin"] is True and decoded["video"]["canPublishSources"] == ["camera", "microphone", "screen_share"]
     assert decoded["video"]["canPublishData"] is False and decoded["video"]["roomAdmin"] is False
     assert decoded["video"]["roomCreate"] is False and decoded["video"]["roomRecord"] is False
     assert decoded["video"]["canUpdateOwnMetadata"] is False
     assert decoded["exp"] - decoded["nbf"] <= 120
     assert json.loads(decoded["metadata"]) == {"role": "candidate"}
     assert "@" not in decoded["sub"] and "Candidate" not in row.room_name
-    assert rooms.media_access(db, user_id=owner.id, interview_id=row.id)["role"] == "interviewer"
+    interviewer = rooms.media_access(db, user_id=owner.id, interview_id=row.id)
+    assert interviewer["role"] == "interviewer"
+    claims = jwt.decode(interviewer["participant_token"], rooms.settings.livekit_cloud_api_secret.get_secret_value(), algorithms=["HS256"], issuer=rooms.settings.livekit_cloud_api_key)
+    assert claims["video"]["canPublishSources"] == ["camera", "microphone"]
+    assert "screen_share_audio" not in decoded["video"]["canPublishSources"]
 
 
 def test_server_verified_join_times_leave_rejoin_and_end_idempotency(room_setup):

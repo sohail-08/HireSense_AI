@@ -13,8 +13,8 @@ document.head.appendChild(deviceStyles);
 vi.mock("livekit-client", async (original) => ({ ...await original<any>(), isBrowserSupported: () => true }));
 
 const sdk = vi.hoisted(() => ({
-  prejoins: 0, room: null as any, connection: "connected", microphone: true, camera: false,
-  tracks: [] as any[],
+  prejoins: 0, room: null as any, connection: "connected", microphone: true, camera: false, sharing: false,
+  tracks: [] as any[], toggles: {} as Record<string, any>,
 }));
 
 export function getSdk() { return sdk; }
@@ -46,11 +46,11 @@ vi.mock("@livekit/components-react", async () => {
     ParticipantTile: ({ trackRef }: any) => <div>{trackRef.participant.name} video</div>,
     RoomAudioRenderer: () => <div data-testid="remote-audio" />,
     StartAudio: () => <button>Enable interview audio</button>,
-    TrackToggle: ({ source, onDeviceError, ...props }: any) => <button {...props} data-source={source} />,
-    DisconnectButton: ({ children }: any) => <button onClick={() => sdk.room?.onDisconnected() }>{children}</button>,
+    TrackToggle: ({ source, onDeviceError, captureOptions, showIcon, ...props }: any) => { sdk.toggles[source] = { onDeviceError, captureOptions }; return <button {...props} data-source={source} />; },
+    DisconnectButton: ({ children, ...props }: any) => <button {...props} onClick={() => sdk.room?.onDisconnected() }>{children}</button>,
     useConnectionState: () => sdk.connection,
     useTracks: () => sdk.tracks,
-    useLocalParticipant: () => ({ isMicrophoneEnabled: sdk.microphone, isCameraEnabled: sdk.camera }),
+    useLocalParticipant: () => ({ isMicrophoneEnabled: sdk.microphone, isCameraEnabled: sdk.camera, isScreenShareEnabled: sdk.sharing }),
     useRoomContext: () => ({ registerTextStreamHandler: vi.fn(), unregisterTextStreamHandler: vi.fn(), on: vi.fn(), off: vi.fn() }),
   };
 });
@@ -59,6 +59,8 @@ beforeEach(() => {
   // Keep the app override after SDK styles in JSDOM's simplified CSS cascade.
   document.head.appendChild(deviceStyles);
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn() } });
-  sdk.prejoins = 0; sdk.room = null; sdk.connection = "connected"; sdk.microphone = true; sdk.camera = false; sdk.tracks = [];
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value() { this.setAttribute("open", ""); } });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value() { this.removeAttribute("open"); } });
+  sdk.prejoins = 0; sdk.room = null; sdk.connection = "connected"; sdk.microphone = true; sdk.camera = false; sdk.sharing = false; sdk.tracks = []; sdk.toggles = {};
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });

@@ -151,7 +151,8 @@ export function TranscriptionPanel({ closed = false }: { closed?: boolean }) {
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">{interviewer ? "Live transcript" : "Live captions"}</h2>
       <span role="status" className={`rounded-full px-3 py-1 text-sm ${status.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-slate-100"}`}>{label}</span></div>
     {!closed && status.enabled ? <>
-      <p className="mt-3 text-sm text-slate-600">{status.notice} Saved text is retained for {status.retention_days} days.</p>
+      <p className="mt-3 text-sm leading-6 text-slate-500">With your consent, microphone audio is sent to Deepgram for live captions. Only final text is saved, for {status.retention_days} days. No audio or video is recorded.</p>
+      <details className="mt-2 text-xs text-slate-500"><summary className="font-medium text-blue-700">About transcription and privacy</summary><p className="mt-2 leading-5">{status.notice}</p></details>
       <label className="mt-3 flex items-start gap-2 text-sm"><input className="mt-1" type="checkbox" checked={status.consented} disabled={busy}
         onChange={event => void context.consent(event.target.checked)} />I consent to live transcription and storage of the final text.</label>
       {!status.both_consented ? <p className="mt-2 text-sm text-amber-800">Waiting for both participants to consent. No transcription can start yet.</p> : null}
@@ -163,7 +164,7 @@ export function TranscriptionPanel({ closed = false }: { closed?: boolean }) {
     {status.failure_code ? <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Transcription stopped ({status.failure_code.replaceAll("_", " ")}). Audio/video is unaffected. Ask the interviewer to retry after checking configuration.</p> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-amber-900">{error}</p> : null}
     <div ref={scroll} onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
-      className="mt-4 max-h-80 space-y-3 overflow-y-auto overscroll-contain" aria-label="Transcript segments" tabIndex={0}>
+      className="mt-4 h-72 space-y-3 overflow-y-auto overscroll-contain sm:h-80" aria-label="Transcript segments" tabIndex={0}>
       {!lines.length ? <p className="py-5 text-sm text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p> : lines.map(line => <article key={line.id || `interim-${line.speaker}`}
         className={`rounded-xl border-l-4 p-3 ${line.speaker === "INTERVIEWER" ? "border-blue-500 bg-blue-50" : "border-emerald-500 bg-emerald-50"} ${line.kind === "interim" ? "italic opacity-70" : ""}`}>
         <p className="text-xs font-semibold">{line.speaker === "INTERVIEWER" ? "Interviewer" : "Candidate"} · {transcriptTime(line.start_offset_ms)}{line.kind === "interim" ? " · Live draft" : " · Final"}</p>
