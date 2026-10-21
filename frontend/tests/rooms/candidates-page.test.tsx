@@ -184,7 +184,7 @@ it("paginates the table and resets the page when a filter changes", async () => 
   expect(within(screen.getByRole("table")).getAllByRole("row")[1].children[0].textContent).toBe("11");
   fireEvent.change(screen.getByLabelText("Search candidates"), { target: { value: "Applicant 1" } });
   expect(screen.getByText("Applicant 1")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 it("deletes an individual row only after confirmation and can cancel safely", async () => {
@@ -200,6 +200,61 @@ it("deletes an individual row only after confirmation and can cancel safely", as
   expect(screen.queryByText("Ada Candidate")).toBeNull();
   expect(screen.getByText("Grace Candidate")).toBeTruthy();
   expect(apiRequest).toHaveBeenCalledWith("/candidates/applications/bulk-delete", { method: "POST", body: JSON.stringify({ application_ids: [1] }) });
+});
+
+it("keeps pagination visible and disables navigation for a single page or empty results", async () => {
+  openPage(); await screen.findByText("Ada Candidate");
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Go to page 1" }).getAttribute("aria-current")).toBe("page");
+  expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Search candidates"), { target: { value: "not found" } });
+  expect(screen.getByText("0 applications · 2 total")).toBeTruthy();
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+});
+
+it("changes page size, navigates directly and keeps numbering and selection consistent", async () => {
+  items = Array.from({ length: 23 }, (_, index) => ({ ...applications[0], id: index + 1, candidate: { ...applications[0].candidate, name: `Applicant ${index + 1}` } }));
+  openPage(); await screen.findByText("Applicant 1");
+  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "5" } });
+  expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(6);
+  expect(screen.getByText("1–5 of 23 applications")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Select candidates" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select Applicant 1" }));
+  fireEvent.click(screen.getByRole("button", { name: "Go to page 3" }));
+  expect(screen.getByText("11–15 of 23 applications")).toBeTruthy();
+  expect(screen.getByText("1 selected · up to 100")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Go to page 3" }).getAttribute("aria-current")).toBe("page");
+  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
+  expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+  expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(21);
+  expect((screen.getByRole("checkbox", { name: "Select Applicant 1" }) as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText("21–23 of 23 applications")).toBeTruthy();
+  expect(within(screen.getByRole("table")).getAllByRole("row")[1].children[1].textContent).toBe("21");
+});
+
+it("bounds page buttons for a large list and allows jumping to the last page", async () => {
+  items = Array.from({ length: 101 }, (_, index) => ({ ...applications[0], id: index + 1, candidate: { ...applications[0].candidate, name: `Applicant ${index + 1}` } }));
+  openPage(); await screen.findByText("Applicant 1");
+  expect(screen.getAllByRole("button", { name: /Go to page/ }).length).toBeLessThanOrEqual(7);
+  fireEvent.click(screen.getByRole("button", { name: "Go to page 11" }));
+  expect(screen.getByText("101–101 of 101 applications")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Job posting"), { target: { value: "7" } });
+  expect(screen.getByText("Page 1 of 11")).toBeTruthy();
+});
+
+it("moves back when deletion empties the last page", async () => {
+  items = Array.from({ length: 11 }, (_, index) => ({ ...applications[0], id: index + 1, candidate: { ...applications[0].candidate, name: `Applicant ${index + 1}` } }));
+  openPage(); await screen.findByText("Applicant 1");
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete Applicant 11" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+  expect(screen.getByText("Applicant 1")).toBeTruthy();
+  expect(screen.getByText("1–10 of 10 applications")).toBeTruthy();
 });
 
 it("reveals selection controls on demand and deletes the group in one request", async () => {

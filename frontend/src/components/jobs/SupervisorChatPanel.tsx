@@ -144,7 +144,7 @@ export function SupervisorChatPanel({
       ) : null}
 
       <div
-        className={`fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[1px] transition-opacity duration-200 lg:hidden ${
+        className={`fixed inset-0 z-40 cursor-pointer bg-slate-950/25 backdrop-blur-[1px] transition-opacity duration-200 lg:hidden ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}

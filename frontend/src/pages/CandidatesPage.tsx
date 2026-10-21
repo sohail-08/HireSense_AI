@@ -8,7 +8,7 @@ import { DeleteApplicationsModal } from "../components/candidates/DeleteApplicat
 import { applicationStatuses, candidateDate } from "../components/candidates/candidateDisplay";
 import type { CandidateApplicationSummary, CandidateJobPostingOption, GoogleFormsConfiguration, GoogleFormsSyncResult } from "../types";
 
-const pageSize = 10;
+const pageSizes = [5, 10, 20, 50];
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "The request failed. Please try again.";
 }
@@ -29,6 +29,7 @@ export function CandidatesPage() {
   const [search, setSearch] = useState("");
   const [jobFilter, setJobFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState<number>();
   const [selecting, setSelecting] = useState(false);
   const [checked, setChecked] = useState<number[]>([]);
@@ -85,6 +86,9 @@ export function CandidatesPage() {
   }, [applications, jobFilter, search]);
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pages);
+  useEffect(() => { setPage(value => Math.min(value, pages)); }, [pages]);
+  const pageNumbers = pages <= 7 ? Array.from({ length: pages }, (_, index) => index + 1)
+    : [1, ...Array.from({ length: 3 }, (_, index) => Math.max(2, Math.min(currentPage - 1, pages - 3)) + index), pages];
   const start = (currentPage - 1) * pageSize;
   const visible = filtered.slice(start, start + pageSize);
   const selected = applications.find(application => application.id === selectedId);
@@ -229,7 +233,21 @@ export function CandidatesPage() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/40 px-5 py-3 text-xs text-slate-500">
         <p aria-live="polite">{filtered.length ? `${start + 1}–${Math.min(start + pageSize, filtered.length)} of ${filtered.length} application${filtered.length === 1 ? "" : "s"}` : "0 applications"}{(search || jobFilter) && filtered.length !== applications.length ? ` · ${applications.length} total` : ""}</p>
-        {pages > 1 ? <nav aria-label="Candidate pages" className="flex items-center gap-3"><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600 disabled:opacity-40">Previous</button><span>Page {currentPage} of {pages}</span><button type="button" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600 disabled:opacity-40">Next</button></nav> : null}
+        <label className="flex items-center gap-2 text-slate-600" htmlFor="candidate-page-size">Candidates per page
+          <select id="candidate-page-size" value={pageSize} disabled={loading} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-medium outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+            {pageSizes.map(size => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>
+        <nav aria-label="Candidate pages" className="flex flex-wrap items-center gap-2">
+          <span className="mr-1">Page {currentPage} of {pages}</span>
+          <button type="button" disabled={loading || currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+          {pageNumbers.map((number, index) => <span key={number} className="hidden items-center gap-2 sm:inline-flex">
+            {index > 0 && number - pageNumbers[index - 1] > 1 ? <span aria-hidden="true" className="px-1">…</span> : null}
+            <button type="button" aria-label={`Go to page ${number}`} aria-current={number === currentPage ? "page" : undefined} disabled={loading} onClick={() => setPage(number)}
+              className={`min-w-8 rounded-lg border px-2 py-2 font-semibold ${number === currentPage ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>{number}</button>
+          </span>)}
+          <button type="button" disabled={loading || currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+        </nav>
       </div>
     </section>
 

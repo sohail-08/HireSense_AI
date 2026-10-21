@@ -328,7 +328,10 @@ Complete these one-time setup steps:
 6. Restart the backend, open **Candidates**, and choose **Sync responses**.
 
 The Candidates page opens directly on a searchable table, with filters for each
-job posting and ten applications per page. Choose **Inspect** to see contact
+job posting and ten applications per page by default. Always-visible pagination
+includes Previous/Next, numbered page buttons on larger screens, and a choice of
+5, 10, 20 or 50 candidates per page. Search and job filters return to page one;
+row numbers continue across pages. Choose **Inspect** to see contact
 details, application information, and CV files in a keyboard-accessible modal.
 **Open CV** opens a PDF in a new tab; Word CVs download to open on your device.
 Rows are numbered, and each row offers **Inspect** and **Delete**. Choose

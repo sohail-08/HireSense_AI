@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* Interactive cursor defaults; utility classes can still override these. */
+@layer base {
+  :where(button, a[href], area[href], summary, select, label[for],
+    input[type="button"], input[type="submit"], input[type="reset"],
+    input[type="checkbox"], input[type="radio"], input[type="file"], input[type="range"],
+    [role="button"], [role="link"], [role="tab"], [role="menuitem"],
+    [role="checkbox"], [role="radio"], [role="switch"], [role="option"],
+    label:has(select, input[type="checkbox"], input[type="radio"], input[type="file"])):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  :where(button, input, select, textarea):disabled,
+  [aria-disabled="true"],
+  label:has(:disabled) {
+    cursor: not-allowed;
+  }
+
+  input[type="file"]::file-selector-button {
+    cursor: pointer;
+  }
+
+  input:not(:disabled)::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+
+  input[type="file"]:disabled::file-selector-button {
+    cursor: not-allowed;
+  }
+}
+
 /* LiveKit places the submit button in this same form. Hide only the name field. */
 .hiresense-device-check .lk-username-container input[name="username"] { display: none; }
 .hiresense-device-check .lk-username-container .lk-join-button { width: 100%; }
