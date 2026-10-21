@@ -1,7 +1,39 @@
 @import "tailwindcss";
 
+/* Shared primary palette. Existing blue-* utilities now use HireSense indigo,
+   including portalled dropdowns/dialogs and the standalone interview pages. */
+@theme {
+  --color-blue-50: #f3f1ff;
+  --color-blue-100: #e9e4fc;
+  --color-blue-200: #d4ccf5;
+  --color-blue-300: #b4a7e9;
+  --color-blue-400: #8b7bd3;
+  --color-blue-500: #6354b5;
+  --color-blue-600: #403795;
+  --color-blue-700: #352d80;
+  --color-blue-800: #2d266b;
+  --color-blue-900: #252153;
+  --color-blue-950: #171333;
+
+  --color-slate-50: #f8f9fc;
+  --color-slate-100: #eff0f5;
+  --color-slate-200: #e0e3ed;
+  --color-slate-300: #c9cedd;
+  --color-slate-400: #8992a9;
+  --color-slate-500: #626d85;
+  --color-slate-600: #4d5870;
+  --color-slate-700: #39435a;
+  --color-slate-800: #252f45;
+  --color-slate-900: #182136;
+  --color-slate-950: #0e1424;
+}
+
 /* Interactive cursor defaults; utility classes can still override these. */
 @layer base {
+  body { background-color: var(--color-slate-100); color: var(--color-slate-900); }
+  ::selection { background-color: var(--color-blue-100); color: var(--color-blue-900); }
+  input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--color-blue-600); }
+
   :where(button, a[href], area[href], summary, select, label[for],
     input[type="button"], input[type="submit"], input[type="reset"],
     input[type="checkbox"], input[type="radio"], input[type="file"], input[type="range"],
@@ -31,6 +63,7 @@
 }
 
 /* LiveKit places the submit button in this same form. Hide only the name field. */
+.hiresense-device-check[data-lk-theme], .hiresense-media-room[data-lk-theme] { --lk-accent-fg: white; --lk-accent-bg: var(--color-blue-600); --lk-accent2: var(--color-blue-700); --lk-accent3: var(--color-blue-800); --lk-accent4: var(--color-blue-900); }
 .hiresense-device-check .lk-username-container input[name="username"] { display: none; }
 .hiresense-device-check .lk-username-container .lk-join-button { width: 100%; }
 
@@ -50,9 +83,9 @@
 .hiresense-media-room .hiresense-meeting-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.625rem; padding: 1rem; }
 .hiresense-media-room .hiresense-meeting-control { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; min-height: 4.5rem; min-width: 6.5rem; max-width: 12rem; border: 1px solid #334155; border-radius: 1rem; background: #1e293b; padding: 0.75rem; font-size: 0.75rem; font-weight: 600; line-height: 1.25; color: #f8fafc; transition: background-color 150ms; }
 .hiresense-media-room .hiresense-meeting-control:hover { background: #334155; }
-.hiresense-media-room .hiresense-meeting-control:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+.hiresense-media-room .hiresense-meeting-control:focus-visible { outline: 2px solid var(--color-blue-300); outline-offset: 3px; }
 .hiresense-media-room .hiresense-meeting-control[aria-pressed="false"] { color: #cbd5e1; }
-.hiresense-media-room .hiresense-share-control[aria-pressed="true"] { border-color: #60a5fa; background: #1d4ed8; color: white; }
+.hiresense-media-room .hiresense-share-control[aria-pressed="true"] { border-color: var(--color-blue-300); background: var(--color-blue-600); color: white; }
 .hiresense-media-room .hiresense-leave-control, .hiresense-media-room .hiresense-end-control { border-color: #be123c; background: #be123c; color: white; }
 .hiresense-media-room .hiresense-leave-control:hover, .hiresense-media-room .hiresense-end-control:hover { background: #9f1239; }
 .hiresense-media-room .hiresense-meeting-control:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -81,9 +114,9 @@
 .hiresense-console-shell { display: flex; flex-direction: column; gap: 0.625rem; width: 100%; max-width: 1600px; height: 100%; min-height: 0; margin: 0 auto; }
 .hiresense-console-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; flex-shrink: 0; }
 .hiresense-console-heading { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-.hiresense-console-back { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 2.5rem; height: 2.5rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; background: white; color: #2563eb; font-size: 1.25rem; }
-.hiresense-console-back:hover { background: #eff6ff; }
-.hiresense-console-back:focus-visible, .hiresense-console-link-options:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.hiresense-console-back { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 2.5rem; height: 2.5rem; border: 1px solid var(--color-blue-200); border-radius: 0.75rem; background: white; color: var(--color-blue-600); font-size: 1.25rem; }
+.hiresense-console-back:hover { background: var(--color-blue-50); }
+.hiresense-console-back:focus-visible, .hiresense-console-link-options:focus-visible { outline: 2px solid var(--color-blue-600); outline-offset: 2px; }
 .hiresense-console-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.125rem 0.75rem; margin-top: 0.25rem; }
 .hiresense-console-meta > p { min-width: 0; }
 .hiresense-console-toolbar { display: flex; align-items: flex-end; gap: 0.75rem; }
@@ -102,9 +135,9 @@
 .hiresense-meeting-tabs-fill > [role="tablist"] { flex-shrink: 0; padding-top: 0; }
 .hiresense-meeting-tabs-fill > .hiresense-meeting-panel:not([hidden]) { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .hiresense-meeting-tabs-segmented { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.hiresense-meeting-tabs-segmented > [role="tablist"] { gap: 0.25rem; border: 0; border-radius: 0.875rem; background: #e2e8f0; padding: 0.25rem; }
+.hiresense-meeting-tabs-segmented > [role="tablist"] { gap: 0.25rem; border: 0; border-radius: 0.875rem; background: var(--color-slate-200); padding: 0.25rem; }
 .hiresense-meeting-tabs-segmented > [role="tablist"] > [role="tab"] { flex: 1; min-width: 0; min-height: 2.75rem; border: 1px solid transparent; border-radius: 0.625rem; padding: 0.5rem; font-size: 0.75rem; line-height: 1.25rem; color: #64748b; }
-.hiresense-meeting-tabs-segmented > [role="tablist"] > [role="tab"][aria-selected="true"] { border-color: #2563eb; background: white; color: #1d4ed8; box-shadow: 0 1px 3px #0f172a10; }
+.hiresense-meeting-tabs-segmented > [role="tablist"] > [role="tab"][aria-selected="true"] { border-color: var(--color-blue-200); background: var(--color-blue-50); color: var(--color-blue-700); box-shadow: 0 1px 3px #17133310; }
 .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel:not([hidden]) { overflow: hidden; margin-top: 0.625rem; scrollbar-gutter: auto; }
 .hiresense-private-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 .hiresense-private-panel[data-loading="true"] { display: block; overflow-y: auto; }
@@ -178,7 +211,7 @@
 .hiresense-console-review .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel:not([hidden]) { overflow: visible; }
 .hiresense-meeting-tabs-page { overflow: visible; }
 .hiresense-meeting-tabs-page > [role="tablist"] { position: sticky; top: var(--meeting-primary-tabs-height, 3.25rem); z-index: 20; background: white; border-radius: 0.875rem 0.875rem 0 0; box-shadow: 0 2px 4px #0f172a08; }
-.hiresense-meeting-tabs-page.hiresense-meeting-tabs-segmented > [role="tablist"] { top: 0; z-index: 30; border-radius: 0.875rem; background: #e2e8f0; }
+.hiresense-meeting-tabs-page.hiresense-meeting-tabs-segmented > [role="tablist"] { top: 0; z-index: 30; border-radius: 0.875rem; background: var(--color-slate-200); }
 .hiresense-console-review .hiresense-interview-assistant > [role="log"] { flex: none; height: auto; min-height: 0; max-height: none; overflow: visible; }
 
 /* Conversation-style captions retain individual segments and exact timestamps. */
@@ -200,8 +233,8 @@
 .hiresense-analysis-question-summary { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; list-style: none; }
 .hiresense-analysis-question-summary::-webkit-details-marker { display: none; }
 .hiresense-analysis-question-summary:hover { background: #f8fafc; }
-.hiresense-analysis-question-summary:focus-visible { outline: 2px solid #2563eb; outline-offset: -3px; border-radius: 1rem; }
-.hiresense-analysis-number { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 1.75rem; height: 1.75rem; border-radius: 0.625rem; background: #eff6ff; color: #2563eb; font-size: 0.75rem; font-weight: 700; }
+.hiresense-analysis-question-summary:focus-visible { outline: 2px solid var(--color-blue-600); outline-offset: -3px; border-radius: 1rem; }
+.hiresense-analysis-number { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 1.75rem; height: 1.75rem; border-radius: 0.625rem; background: var(--color-blue-50); color: var(--color-blue-600); font-size: 0.75rem; font-weight: 700; }
 .hiresense-analysis-question-summary > .hiresense-analysis-chevron { margin-top: 0.375rem; }
 .hiresense-analysis-question[open] > summary > .hiresense-analysis-chevron { transform: rotate(180deg); }
 .hiresense-analysis-score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 0.625rem; }

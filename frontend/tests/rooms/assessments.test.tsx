@@ -55,6 +55,9 @@ describe("simple candidate details", () => {
     expect(screen.queryByText("Prepare HTML / print")).toBeNull();
     expect(screen.queryByText("Prepare PDF")).toBeNull();
     expect(screen.getByText("70.00%")).toBeTruthy();
+    expect(screen.getByText("80.00%").className).toContain("text-teal-800");
+    expect(screen.getAllByText("60.00%")[0].className).toContain("text-violet-800");
+    expect(screen.getByText("70.00%").className).toContain("text-blue-700");
   });
   it("prints the answer once even when all scoring categories cite it", () => {
     const report = fixture();

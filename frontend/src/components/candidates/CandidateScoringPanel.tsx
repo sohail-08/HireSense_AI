@@ -36,6 +36,7 @@ type Result = {
 type Run = Summary & { configuration_id: number; configuration: ConfigurationSnapshot; results: Result[] };
 
 const categoryLabels: Record<Category, string> = { technical: "Technical skills", experience: "Experience", qualification: "Qualifications" };
+const categoryStyles: Record<Category, string> = { technical: "border-sky-100 bg-sky-50/70 text-sky-800", experience: "border-violet-100 bg-violet-50/70 text-violet-800", qualification: "border-amber-100 bg-amber-50/70 text-amber-800" };
 const categories = Object.keys(categoryLabels) as Category[];
 
 function EvidenceModal({ result, onClose, restoreFocus }: { result: Result; onClose: () => void; restoreFocus: HTMLElement | null }) {
@@ -213,7 +214,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
           <div className="self-center"><h3 className="text-sm font-semibold text-slate-800">Scoring weights</h3>
             <p aria-live="polite" className={"mt-1 text-xs " + (valid ? "text-emerald-700" : "text-red-700")}>{"Total: " + total + "%"}</p></div>
           <div className="grid min-w-0 flex-1 basis-64 grid-cols-3 gap-2">{categories.map((category) =>
-          <label key={category} className="flex flex-col justify-end text-xs font-medium text-slate-600">{categoryLabels[category]} (%)
+          <label key={category} className={`flex flex-col justify-end rounded-lg border p-2 text-xs font-medium ${categoryStyles[category]}`}>{categoryLabels[category]} (%)
             <input type="number" min="0" max="100" step="0.01" value={weights[category]} disabled={busy || processing}
               onChange={(event) => { draftChanged.current = true; setNotice(undefined); setWeights({ ...weights, [category]: event.target.value }); }}
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />

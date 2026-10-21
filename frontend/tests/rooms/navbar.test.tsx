@@ -24,7 +24,10 @@ it("shows the requested interviewer navigation order with existing destinations"
 
 it("highlights Assessment at the existing reports URL", () => {
   render(<MemoryRouter initialEntries={["/interviewer/reports"]}><Navbar /></MemoryRouter>);
-  expect(screen.getByRole("link", { name: "Assessment", exact: true }).getAttribute("aria-current")).toBe("page");
+  const active = screen.getByRole("link", { name: "Assessment", exact: true });
+  expect(active.getAttribute("aria-current")).toBe("page");
+  expect(active.className).toContain("border-blue-200 bg-blue-50 text-blue-800");
+  expect(screen.getByRole("link", { name: "Jobs", exact: true }).className).toContain("border-transparent");
 });
 
 it("leaves candidate navigation unchanged", () => {

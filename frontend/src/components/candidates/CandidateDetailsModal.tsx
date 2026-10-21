@@ -85,7 +85,7 @@ export function CandidateDetailsModal({ application, deleting, restoreFocus, onC
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}
     className="fixed inset-0 m-auto max-h-[90dvh] w-[94vw] max-w-2xl overflow-hidden rounded-3xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-sm">
     <div className="flex max-h-[90dvh] flex-col">
-      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-teal-100 bg-teal-50/60 px-6 py-5">
         <div className="flex min-w-0 items-center gap-4">
           <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Candidate details</p>
             <h2 id="candidate-detail-title" className="mt-1 break-words text-xl font-bold">{candidate.name || "Unnamed candidate"}</h2>

@@ -54,7 +54,7 @@ function DraftSection({
 }) {
   return (
     <section className="border-t border-slate-200 pt-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-700">
         {title}
       </h3>
       <div className="mt-2">{children}</div>
@@ -420,7 +420,7 @@ export function JobDescriptionPage() {
 
       <ErrorMessage message={error} />
 
-      <details className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <details className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 shadow-sm">
         <summary className="cursor-pointer px-5 py-4 font-semibold text-slate-900">
           Add previous job description
           <span className="ml-2 text-sm font-normal text-slate-500">

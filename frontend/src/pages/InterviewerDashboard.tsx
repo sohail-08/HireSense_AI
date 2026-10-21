@@ -6,21 +6,25 @@ const workspaces = [
     path: "jobs",
     title: "Jobs",
     description: "Create and manage job descriptions and job posts.",
+    accent: "border-t-sky-300",
   },
   {
     path: "candidates",
     title: "Candidates",
     description: "Review candidate profiles and CV information.",
+    accent: "border-t-teal-300",
   },
   {
     path: "interviews",
     title: "Interviews",
     description: "Manage interviews and access interview support.",
+    accent: "border-t-violet-300",
   },
   {
     path: "assessments",
     title: "Assessments",
     description: "Review assessments and candidate evaluations.",
+    accent: "border-t-amber-300",
   },
 ];
 
@@ -42,7 +46,7 @@ export function InterviewerDashboard() {
           <Link
             key={workspace.path}
             to={`/interviewer/${workspace.path}`}
-            className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-blue-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            className={`group rounded-2xl border border-slate-200 border-t-4 bg-white p-6 shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${workspace.accent}`}
           >
             <h2 className="text-xl font-semibold text-slate-900 transition group-hover:text-blue-700">
               {workspace.title}

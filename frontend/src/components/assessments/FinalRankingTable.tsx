@@ -5,7 +5,7 @@ import { RankingPagination } from "../candidates/RankingPagination";
 
 function ScoreCell({ value, interview = false }: { value: string | null; interview?: boolean }) {
   const numeric = value === null ? NaN : Number(value);
-  return <div className="min-w-20"><span className="font-medium tabular-nums text-slate-700">{score(value)}</span>{Number.isFinite(numeric) ? <div aria-hidden="true" className="mt-1.5 h-1.5 w-20 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${interview ? "bg-violet-400" : "bg-blue-400"}`} style={{ width: `${Math.max(0, Math.min(100, numeric))}%` }} /></div> : null}</div>;
+  return <div className="min-w-20"><span className="font-medium tabular-nums text-slate-700">{score(value)}</span>{Number.isFinite(numeric) ? <div aria-hidden="true" className="mt-1.5 h-1.5 w-20 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${interview ? "bg-violet-400" : "bg-teal-500"}`} style={{ width: `${Math.max(0, Math.min(100, numeric))}%` }} /></div> : null}</div>;
 }
 
 export function FinalRankingTable({ ranking, onDetails }: { ranking: FinalRanking; onDetails: (applicationId: number, assessmentId: number) => void }) {
