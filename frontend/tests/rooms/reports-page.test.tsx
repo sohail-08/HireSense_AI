@@ -42,9 +42,9 @@ beforeEach(() => {
   });
 });
 
-it("loads the full Reports route through the navbar with the real supervisor provider", async () => {
+it("loads the Assessment route through the navbar with the real supervisor provider", async () => {
   render(<MemoryRouter initialEntries={["/interviewer/dashboard"]}><App /></MemoryRouter>);
-  fireEvent.click(screen.getByRole("link", { name: "Reports" }));
+  fireEvent.click(screen.getByRole("link", { name: "Assessment", exact: true }));
   expect(await screen.findByRole("heading", { name: "Candidate ranking" })).toBeTruthy();
   expect(await screen.findByText("Synthetic Candidate")).toBeTruthy();
   expect(await screen.findByRole("button", { name: "Calculate final ranking" })).toBeTruthy();
@@ -103,7 +103,7 @@ it("opens an existing report containing PostgreSQL scientific-notation zero scor
     throw new Error(`Unexpected test API request: ${path}`);
   });
   render(<MemoryRouter initialEntries={["/interviewer/dashboard"]}><App /></MemoryRouter>);
-  fireEvent.click(screen.getByRole("link", { name: "Reports" }));
+  fireEvent.click(screen.getByRole("link", { name: "Assessment", exact: true }));
   fireEvent.click(await screen.findByRole("button", { name: "View details for Synthetic Candidate" }));
   expect(await screen.findByRole("article", { name: "Consolidated candidate assessment" })).toBeTruthy();
   expect(screen.getByText("0.00%")).toBeTruthy();

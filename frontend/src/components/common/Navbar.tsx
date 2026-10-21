@@ -13,14 +13,13 @@ export function Navbar() {
   const links =
     user.role === "interviewer"
       ? [
-          "dashboard",
-          "jobs",
-          "candidates",
-          "interviews",
-          "assessments",
-          "reports",
+          { page: "jobs", label: "Jobs" },
+          { page: "candidates", label: "Candidates" },
+          { page: "assessments", label: "CV Screening" },
+          { page: "interviews", label: "Interview" },
+          { page: "reports", label: "Assessment" },
         ]
-      : ["dashboard", "interviews"];
+      : [{ page: "dashboard", label: "Dashboard" }, { page: "interviews", label: "Interviews" }];
 
   function handleLogout() {
     logout();
@@ -41,7 +40,7 @@ export function Navbar() {
           aria-label="Main navigation"
           className="order-last flex w-full flex-wrap gap-2 lg:order-none lg:w-auto lg:flex-1"
         >
-          {links.map((page) => (
+          {links.map(({ page, label }) => (
             <NavLink
               key={page}
               to={`${prefix}/${page}`}
@@ -55,7 +54,7 @@ export function Navbar() {
                 ].join(" ")
               }
             >
-              {page.charAt(0).toUpperCase() + page.slice(1)}
+              {label}
             </NavLink>
           ))}
         </nav>

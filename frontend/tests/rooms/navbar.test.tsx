@@ -1,0 +1,36 @@
+import React from "react";
+import { beforeEach, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { Navbar } from "../../src/components/common/Navbar";
+
+const auth = vi.hoisted(() => ({ user: { role: "interviewer", name: "Synthetic User" }, logout: vi.fn() }));
+vi.mock("../../src/auth/AuthProvider", () => ({ useAuth: () => auth }));
+vi.mock("../../src/components/common/ApplicationNotifications", () => ({ ApplicationNotifications: () => null }));
+
+beforeEach(() => { auth.user.role = "interviewer"; });
+
+it("shows the requested interviewer navigation order with existing destinations", () => {
+  render(<MemoryRouter initialEntries={["/interviewer/assessments"]}><Navbar /></MemoryRouter>);
+  const nav = within(screen.getByRole("navigation", { name: "Main navigation" }));
+  const links = nav.getAllByRole("link");
+  expect(links.map(link => link.textContent)).toEqual(["Jobs", "Candidates", "CV Screening", "Interview", "Assessment"]);
+  expect(links.map(link => link.getAttribute("href"))).toEqual([
+    "/interviewer/jobs", "/interviewer/candidates", "/interviewer/assessments", "/interviewer/interviews", "/interviewer/reports",
+  ]);
+  expect(nav.queryByRole("link", { name: "Dashboard" })).toBeNull();
+  expect(nav.getByRole("link", { name: "CV Screening" }).getAttribute("aria-current")).toBe("page");
+});
+
+it("highlights Assessment at the existing reports URL", () => {
+  render(<MemoryRouter initialEntries={["/interviewer/reports"]}><Navbar /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "Assessment", exact: true }).getAttribute("aria-current")).toBe("page");
+});
+
+it("leaves candidate navigation unchanged", () => {
+  auth.user.role = "candidate";
+  render(<MemoryRouter initialEntries={["/candidate/dashboard"]}><Navbar /></MemoryRouter>);
+  const links = within(screen.getByRole("navigation", { name: "Main navigation" })).getAllByRole("link");
+  expect(links.map(link => link.textContent)).toEqual(["Dashboard", "Interviews"]);
+  expect(links.map(link => link.getAttribute("href"))).toEqual(["/candidate/dashboard", "/candidate/interviews"]);
+});
