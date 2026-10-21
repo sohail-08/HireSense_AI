@@ -4,15 +4,15 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { InterviewAnalysisPanel } from "../../src/components/interviews/InterviewAnalysisPanel";
 import { TranscriptCitation } from "../../src/components/interviews/TranscriptCitation";
 import { analysisApi, type AnalysisState, type Citation } from "../../src/components/interviews/analysisApi";
-import { selectOption } from "./selectHelpers";
+import { readFileSync } from "node:fs";
 
-vi.mock("../../src/components/interviews/analysisApi", () => ({ analysisApi: { read: vi.fn(), start: vi.fn(), correct: vi.fn(), review: vi.fn() } }));
+vi.mock("../../src/components/interviews/analysisApi", () => ({ analysisApi: { read: vi.fn(), start: vi.fn() } }));
 const citation: Citation = { interview_id: 1, segment_id: "a", session_id: "s", revision: "hash-a", quote: "commit changes", char_start: 13, char_end: 27,
   speaker: "CANDIDATE", start_at: "2026-10-19T00:00:03Z", end_at: "2026-10-19T00:00:05Z", start_offset_ms: 3000, end_offset_ms: 5000 };
 function fixture(): AnalysisState {
   const dimension = { label: "direct", justification: "The answer addresses transactions.", citations: [citation], references: [], evidence_gaps: [], flags: [] };
   return { automatic: false, references: [], reference_revision: 0, versions: [{ id: 10, version: 1, status: "completed", created_at: "2026-10-19" }], run: {
-    id: 10, version: 1, status: "completed", stage: "completed", stale: false, created_at: "2026-10-19", reviews: [],
+    id: 10, version: 1, status: "completed", stage: "completed", stale: false, created_at: "2026-10-19", reviews: [{ id: 4, kind: "assessment_review", target_id: "pair", payload: { note: "An old manual review" }, created_at: "2026-10-19" }],
     snapshot: { segments: [{ id: "q", hash: "hash-q", speaker: "INTERVIEWER", text: "Explain transactions", start_offset_ms: 0, end_offset_ms: 2000 },
       { id: "a", hash: "hash-a", speaker: "CANDIDATE", text: "Transactions commit changes atomically.", start_offset_ms: 3000, end_offset_ms: 5000 }],
       references: [], requirements: { requirements: [{ key: "skill:0", name: "Transactions" }] }, requirement_version: "v1" },
@@ -28,19 +28,146 @@ function fixture(): AnalysisState {
       coverage: [{ requirement_id: "skill:1", name: "Testing", statuses: ["not_assessed"], evidence: [] }], gaps: [], unpaired: [] },
   } };
 }
-beforeEach(() => { vi.mocked(analysisApi.read).mockResolvedValue(fixture()); vi.mocked(analysisApi.start).mockResolvedValue({}); });
+beforeEach(() => { vi.mocked(analysisApi.read).mockReset().mockResolvedValue(fixture()); vi.mocked(analysisApi.start).mockReset().mockResolvedValue({}); });
 
-describe("interviewer answer analysis", () => {
-  it("restores saved assessments without generating analysis on page load", async () => {
+describe("simplified interviewer answer analysis", () => {
+  it("loads only the latest saved analysis without generating anything on page load", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
-    expect(await screen.findByText("Question–answer timeline")).toBeTruthy();
-    expect(screen.getByText(/accuracy · unmet \(0\)/i)).toBeTruthy();
+    await screen.findByText("Questions & answers");
+    expect(screen.getByText("Ready")).toBeTruthy();
     expect(screen.getByLabelText("Answer score 75%")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "accuracy score" })).getByText("Unmet")).toBeTruthy();
+    expect(analysisApi.read).toHaveBeenCalledWith(1);
     expect(analysisApi.start).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Analyze saved answers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Analyze answers" }));
     await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true));
   });
-  it("opens and highlights the exact source and rejects changed source text", async () => {
+
+  it("removes pairing corrections, reviews, follow-ups and analysis versions including their controls", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    fireEvent.click(screen.getByText("Scoring options"));
+    fireEvent.click(screen.getByText("Evidence & details"));
+    for (const name of [/Correct pairing/i, /merge/i, /split/i, /Save review/i, /Mark used/i, /Dismiss/i, /Link spoken question/i]) expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    for (const text of [/Your review/i, /An old manual review/i, /Suggested follow-ups/i, /How would you test rollback/i, /Analysis version/i, /Version 1/i, /Pairing:/i]) expect(screen.queryByText(text)).toBeNull();
+    expect(screen.queryByText(/needs review/i)).toBeNull();
+  });
+
+  it("shows each shared evidence passage once, with a verified link to its original snapshot", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    expect(screen.getByText("Evidence & details").closest("details")?.open).toBe(false);
+    fireEvent.click(screen.getByText("Evidence & details"));
+    const evidence = screen.getByRole("region", { name: "Transcript evidence" });
+    expect(within(evidence).getByText("relevance · accuracy · completeness · quality")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Candidate · 00:03/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /Candidate · 00:03/ }));
+    await screen.findByRole("dialog", { name: "Transcript source passage" });
+    expect(document.querySelector("mark")?.textContent).toBe("commit changes");
+    expect(analysisApi.read).toHaveBeenLastCalledWith(1, 10);
+  });
+
+  it("shortens missing-evidence boilerplate while retaining original reasons and scores in details", async () => {
+    const data = fixture(); const pair = data.run!.result.pairs![0];
+    const transcriptReason = "The available transcript evidence does not establish this criterion. No credit is awarded for unsupported evidence.";
+    const referenceReason = "Accuracy is not established by a relevant cited answer guide or technical reference. No credit is awarded for missing support.";
+    pair.score!.breakdown.relevance = { ...pair.score!.breakdown.relevance, reason: transcriptReason, value: 0, status: "unmet" };
+    pair.score!.breakdown.accuracy.reason = referenceReason;
+    const original = JSON.stringify(data);
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    expect(within(screen.getByRole("region", { name: "relevance score" })).getByText("Not enough supporting evidence in the transcript.")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "accuracy score" })).getByText("No supporting guide or reference was available.")).toBeTruthy();
+    fireEvent.click(screen.getByText("Evidence & details"));
+    const details = screen.getByRole("region", { name: "Scoring details" });
+    expect(within(details).getByText(transcriptReason)).toBeTruthy();
+    expect(within(details).getByText(referenceReason)).toBeTruthy();
+    expect(JSON.stringify(data)).toBe(original);
+  });
+
+  it("retains all three scoring statuses with distinct colors and no invented score", async () => {
+    const data = fixture();
+    data.run!.result.pairs![0].score!.breakdown.completeness = { value: 0.5, weight: 25, status: "partially_met", reason: "Some answer points are missing." };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    expect(within(screen.getByRole("region", { name: "relevance score" })).getByText("Met").className).toContain("emerald");
+    expect(within(screen.getByRole("region", { name: "accuracy score" })).getByText("Unmet").className).toContain("rose");
+    expect(within(screen.getByRole("region", { name: "completeness score" })).getByText("Partially met").className).toContain("amber");
+    const css = readFileSync("src/index.css", "utf8");
+    expect(css).toContain("grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr))");
+  });
+
+  it("deduplicates answer references without dropping their source or quote", async () => {
+    const data = fixture(); const assessment = data.run!.result.pairs![0].assessment!;
+    const ref = { reference_id: "ref", title: "Transactions guide", quote: "Commit changes atomically.", version: "v1" };
+    assessment.accuracy.references = [ref]; assessment.completeness.references = [ref];
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers"); fireEvent.click(screen.getByText("Evidence & details"));
+    expect(screen.getAllByText("Transactions guide")).toHaveLength(1);
+    expect(screen.getByText("Commit changes atomically.")).toBeTruthy();
+  });
+
+  it("keeps undisclosed requirements distinct from failing requirements", async () => {
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    fireEvent.click(screen.getByText("Job requirements covered"));
+    expect(screen.getByText("Not discussed — not a failure to meet it.")).toBeTruthy();
+  });
+
+  it("keeps supporting and conflicting requirement evidence distinct", async () => {
+    const data = fixture(); data.run!.result.coverage![0].statuses = ["supporting_evidence", "contradictory_evidence"];
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers"); fireEvent.click(screen.getByText("Job requirements covered"));
+    expect(screen.getByText("Supported by the interview · Conflicting evidence")).toBeTruthy();
+  });
+
+  it("does not invent a score when only an assessment is available", async () => {
+    const data = fixture(); data.run!.result.pairs![0].score = undefined;
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers");
+    expect(screen.getAllByText("Not scored")).toHaveLength(4);
+    expect(screen.queryByLabelText(/Answer score/)).toBeNull();
+  });
+
+  it("preserves explicit reanalysis and stopping automatic updates without history controls", async () => {
+    vi.mocked(analysisApi.read).mockResolvedValue({ ...fixture(), automatic: true });
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Questions & answers"); fireEvent.click(screen.getByText("Scoring options"));
+    fireEvent.click(screen.getByRole("button", { name: "Analyze again" }));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true, false, true));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Stop live updates" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Stop live updates" }));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, false));
+  });
+
+  it("can score a finished live answer without exposing manual pairing edits", async () => {
+    const data = fixture(); data.run!.result.pairs![0].state = "answer_in_progress";
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Score this answer now" }));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true, true));
+  });
+
+  it("preserves transcript gaps and analysis failures without repeating warnings", async () => {
+    const data = fixture();
+    data.run!.status = "failed"; data.run!.error = "The analysis service is unavailable.";
+    data.run!.stale = true; data.run!.result.gaps = ["Some speech may be missing.", "Some speech may be missing."];
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    await screen.findByText("Analysis failed");
+    expect(screen.getByRole("alert").textContent).toContain("unavailable");
+    expect(screen.getAllByText("Some speech may be missing.")).toHaveLength(1);
+    expect(screen.getByText(/The transcript or reference material has changed/)).toBeTruthy();
+  });
+
+  it("opens exact sources and rejects a changed source revision", async () => {
     const { unmount } = render(<TranscriptCitation citation={citation} interviewId={1} runId={10} />);
     fireEvent.click(screen.getByRole("button"));
     expect(await screen.findByRole("dialog")).toBeTruthy();
@@ -53,66 +180,12 @@ describe("interviewer answer analysis", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
-  it("keeps not assessed distinct and records a suggestion as used without pretending it was spoken", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Question–answer timeline");
-    fireEvent.click(screen.getByText("Requirement evidence coverage"));
-    expect(screen.getByText(/not a failure to meet it/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Mark used" }));
-    await waitFor(() => expect(analysisApi.review).toHaveBeenCalledWith(1, 10, "suggestion_used", "follow"));
-    expect(await screen.findByText(/Link a spoken question to confirm/)).toBeTruthy();
-  });
+
   it("uses Unicode character offsets for exact highlighted quotes", async () => {
     const data = fixture(); data.run!.snapshot.segments[1].text = "👋 commit changes";
     vi.mocked(analysisApi.read).mockResolvedValue(data);
     render(<TranscriptCitation citation={{ ...citation, char_start: 2, char_end: 16 }} interviewId={1} runId={10} />);
-    fireEvent.click(screen.getByRole("button"));
-    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button")); await screen.findByRole("dialog");
     expect(document.querySelector("mark")?.textContent).toBe("commit changes");
-  });
-  it("offers correction controls and blocks saving an exchange with no question", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Question–answer timeline");
-    fireEvent.click(screen.getByRole("button", { name: "Correct pairing / merge / split" }));
-    fireEvent.click(screen.getByRole("button", { name: "Split — add exchange after this" }));
-    fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Separate the follow-up." } });
-    expect((screen.getByRole("button", { name: "Save correction & reanalyze" }) as HTMLButtonElement).disabled).toBe(true);
-  });
-  it("keeps transcript IDs intact when selecting and removing styled multi-select choices", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Question–answer timeline");
-    fireEvent.click(screen.getByRole("button", { name: "Correct pairing / merge / split" }));
-    const control = screen.getByRole("combobox", { name: "Question segments" });
-    fireEvent.click(control);
-    const option = within(screen.getByRole("listbox", { name: "Question segments" })).getByRole("option");
-    expect(option.getAttribute("aria-selected")).toBe("true");
-    fireEvent.click(option);
-    fireEvent.keyDown(control, { key: "Escape" });
-    fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Fix pairing" } });
-    expect((screen.getByRole("button", { name: "Save correction & reanalyze" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(control); fireEvent.click(screen.getByRole("option")); fireEvent.keyDown(control, { key: "Escape" });
-    fireEvent.click(screen.getByRole("button", { name: "Save correction & reanalyze" }));
-    await waitFor(() => expect(analysisApi.correct).toHaveBeenCalledWith(1, 10, expect.arrayContaining([
-      expect.objectContaining({ question_ids: ["q"], answer_ids: ["a"], context_ids: [] }),
-    ]), "Fix pairing"));
-  });
-  it("preserves version selection and spoken-question linking values", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Question–answer timeline");
-    selectOption("Analysis version", "Version 1 · completed");
-    await waitFor(() => expect(analysisApi.read).toHaveBeenCalledWith(1, 10));
-    selectOption("Confirm the spoken question", /Explain transactions/);
-    fireEvent.click(screen.getByRole("button", { name: "Link spoken question" }));
-    await waitFor(() => expect(analysisApi.review).toHaveBeenCalledWith(1, 10, "suggestion_linked", "follow", "Confirmed by interviewer", ["q"]));
-  });
-  it("shows scored evidence without an interview reference-entry or needs-review section", async () => {
-    render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Question–answer timeline");
-    expect(screen.queryByText("Approved answer guides & technical references")).toBeNull();
-    expect(screen.queryByLabelText("Reference title")).toBeNull();
-    expect(screen.queryByText(/needs review/i)).toBeNull();
-    expect(screen.getByText(/Answer score: 75%/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Candidate · 00:03/ }).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Accuracy is not established by the answer guide/)).toBeTruthy();
   });
 });

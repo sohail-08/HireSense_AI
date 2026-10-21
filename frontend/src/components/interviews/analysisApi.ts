@@ -28,8 +28,4 @@ export const analysisApi = {
   read: (id: number, runId?: number) => apiRequest<AnalysisState>(base(id) + (runId ? `?run_id=${runId}` : "")),
   start: (id: number, automatic: boolean, finalizeLast = false, reanalyze = false) => apiRequest(base(id), {
     method: "POST", body: JSON.stringify({ automatic, finalize_last: finalizeLast, reanalyze }) }),
-  correct: (id: number, runId: number, pairs: PairEdit[], reason: string) => apiRequest(base(id) + "/pairing", {
-    method: "POST", body: JSON.stringify({ run_id: runId, pairs, reason }) }),
-  review: (id: number, runId: number, kind: string, targetId: string, note = "", segmentIds: string[] = []) => apiRequest(base(id) + `/${runId}/reviews`, {
-    method: "POST", body: JSON.stringify({ kind, target_id: targetId, note, segment_ids: segmentIds }) }),
 };

@@ -12,16 +12,19 @@ candidate captions. Interim text never enters the analysis workflow.
    expected elements. Run `python -m app.seed_interview_questions` to index or upgrade
    the 24 synthetic question/guide records. There is no per-interview guide-entry
    or approval section. Previous JDs and CVs are not correctness references.
-3. Click **Analyze saved answers**. The HTTP request saves a queued run and returns
-   immediately. **Continue as new answers arrive** enables updates at most once per
-   20-second inspection interval when inputs change. Stop automatic updates from the
-   panel when desired. No model request is made merely by opening or refreshing it.
-4. Review the question–answer timeline. An interviewer question may contain several
+3. Click **Analyze answers**. The HTTP request saves a queued run and returns
+   immediately. **Update as answers arrive** enables updates at most once per
+   20-second inspection interval when inputs change. **Scoring options** contains
+   **Analyze again**, **Stop live updates** and the short scoring explanation.
+   No model request is made merely by opening or refreshing the panel.
+4. Read the numbered **Questions & answers** cards. Each card shows the question,
+   candidate's answer and percentage, with compact, color-coded Met, Partially met
+   and Unmet labels for the four scoring categories. An interviewer question may contain several
    segments/subparts. Candidate clarification and interviewer acknowledgements remain
    context. A new substantive question closes the prior exchange. A pause or final
-   STT event does not. Use **The answer is finished — analyze it** for an explicit
-   boundary, or correct the pairing. Overlap, uncertain turns, low confidence and
-   session gaps remain visible as transcript notes. Unanswered questions receive 0;
+   STT event does not. Use **Score this answer now** for an explicit boundary.
+   Overlap, uncertain turns, low confidence and session gaps remain available in
+   **Evidence & details**. Unanswered questions receive 0;
    procedural/excluded conversation and unfinished answers are not scored.
 5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
    accuracy, completeness and quality each weigh 25%. Met earns 1, partially met 0.5,
@@ -31,22 +34,24 @@ candidate captions. Interim text never enters the analysis workflow.
    (an answer guide for completeness). A missing reference does not prove a personal
    claim false; the explanation records the missing support. No result is placed in
    a "needs review" queue. Provider failures remain retryable errors, not candidate scores.
-6. Click a transcript quote to open the exact saved source version with the quoted
-   characters highlighted. Technical reference quotes are shown separately. There
-   is no audio playback because this application does not record audio.
-7. Review requirement coverage. **Not assessed** is not **unmet**. Multiple supporting
-   and contradictory mappings remain visible together. Choose follow-ups yourself.
-   **Mark used** is a workflow annotation; **Link spoken question** explicitly confirms
-   a corresponding interviewer transcript passage.
-8. Use **Correct pairing / merge / split** to move segments between question, answer,
-   and context, merge exchanges, add a split, mark unanswered, or exclude procedural
-   conversation. All original associated segments must remain accounted for. Saving
-   a reason queues a new version and preserves the earlier results. Assessment review
-   notes are append-only annotations; they do not overwrite generated conclusions.
-9. Choose a previous version to inspect its source snapshots and reviews. The central
-   chatbot can retrieve saved evidence, assessments, unassessed requirements and next
-   questions. If inputs are missing/stale it queues analysis and reports that status;
-   it does not pretend an unfinished analysis has completed.
+6. Open **Evidence & details** for supporting passages, answer references, original
+   score explanations and evidence gaps. Shared passages and reference quotes are
+   listed once rather than repeated in each scoring category. Click a transcript
+   quote to open its exact immutable source with the cited characters highlighted.
+   There is no audio playback because the application does not record audio.
+7. **Job requirements covered** distinguishes an undiscussed requirement from one
+   that was assessed as unmet. Source gaps, errors and outdated inputs remain visible.
+
+The panel always loads the latest analysis. Pairing/merge/split editing, manual review
+notes, suggested follow-ups and their annotation/linking controls, and analysis-version
+selection are no longer offered here. Their unused frontend request methods are
+removed. Backend records, historical snapshots and the analysis graph are unchanged;
+immutable run IDs remain necessary to verify evidence links. The central assistant's
+analysis and question tools are also unchanged.
+
+Known missing-evidence boilerplate is shortened for display without changing scores
+or claiming that missing support proves an answer wrong. Original wording remains
+under **Evidence & details**. Met earns 1, partially met 0.5, unmet 0, with equal weights.
 
 ## Actual graph and background execution
 
