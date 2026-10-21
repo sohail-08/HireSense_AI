@@ -108,11 +108,10 @@
 .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel:not([hidden]) { overflow: hidden; margin-top: 0.625rem; scrollbar-gutter: auto; }
 .hiresense-private-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 .hiresense-private-panel[data-loading="true"] { display: block; overflow-y: auto; }
-.hiresense-private-panel > p { flex-shrink: 0; margin-bottom: 0.5rem; }
 .hiresense-private-panel > .hiresense-meeting-tabs-fill { flex: 1; height: auto; min-height: 0; }
 .hiresense-meeting-tabs-fill > .hiresense-meeting-panel[data-panel-id="assistant"] { overflow: hidden; scrollbar-gutter: auto; }
 .hiresense-meeting-tabs-fill .hiresense-interview-assistant { height: 100%; min-height: 0; }
-.hiresense-meeting-tabs-fill .hiresense-interview-assistant > header, .hiresense-meeting-tabs-fill .hiresense-interview-assistant > form { flex-shrink: 0; }
+.hiresense-meeting-tabs-fill .hiresense-interview-assistant > form { flex-shrink: 0; }
 .hiresense-meeting-tabs-fill .hiresense-interview-assistant > [role="log"] { flex: 1; min-height: 0; height: auto; max-height: none; }
 .hiresense-console-media-slot > .hiresense-media-room { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
 .hiresense-console .hiresense-media-room > [role="alert"] { flex-shrink: 0; }
@@ -168,6 +167,19 @@
   .hiresense-console .hiresense-prejoin-stage p:last-child:not(:first-of-type) { display: none; }
   .hiresense-console .hiresense-connection-bar > span { display: none; }
 }
+
+/* After a room closes, review content uses the document scrollbar. Only tabs stick. */
+.hiresense-console-review { height: auto; min-height: 100dvh; overflow: visible; }
+.hiresense-console-review .hiresense-console-shell { height: auto; }
+.hiresense-console-review .hiresense-console-grid { display: block; }
+.hiresense-console-review .hiresense-console-tools,
+.hiresense-console-review .hiresense-console-transcript,
+.hiresense-console-review .hiresense-console-side { height: auto; overflow: visible; }
+.hiresense-console-review .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel:not([hidden]) { overflow: visible; }
+.hiresense-meeting-tabs-page { overflow: visible; }
+.hiresense-meeting-tabs-page > [role="tablist"] { position: sticky; top: var(--meeting-primary-tabs-height, 3.25rem); z-index: 20; background: white; border-radius: 0.875rem 0.875rem 0 0; box-shadow: 0 2px 4px #0f172a08; }
+.hiresense-meeting-tabs-page.hiresense-meeting-tabs-segmented > [role="tablist"] { top: 0; z-index: 30; border-radius: 0.875rem; background: #e2e8f0; }
+.hiresense-console-review .hiresense-interview-assistant > [role="log"] { flex: none; height: auto; min-height: 0; max-height: none; overflow: visible; }
 
 .interviewer-main {
   transition: padding-right 300ms ease-out;

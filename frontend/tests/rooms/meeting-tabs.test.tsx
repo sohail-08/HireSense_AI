@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 
@@ -31,4 +31,27 @@ it("follows live text in the nested transcript pane, not the non-scrolling works
   fireEvent.click(screen.getByRole("tab", { name: "Transcript group" }));
   expect(inner.scrollTop).toBe(1000);
   expect(outer.scrollTop).toBe(0);
+});
+
+it("measures and updates the sticky group bar height for page-scrolling review tabs", () => {
+  let resize = () => {};
+  const disconnect = vi.fn();
+  const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ height: 60 } as DOMRect);
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { resize = callback; }
+    observe = vi.fn();
+    disconnect = disconnect;
+  });
+  try {
+    const view = render(<MeetingTabs pageScroll variant="segmented" label="Review groups" tabs={[
+      { id: "transcript", label: "Transcript", content: <p>Review content</p> },
+    ]} />);
+    const root = screen.getByRole("tablist", { name: "Review groups" }).parentElement!;
+    expect(root.style.getPropertyValue("--meeting-primary-tabs-height")).toBe("60px");
+    bounds.mockReturnValue({ height: 80 } as DOMRect);
+    act(() => resize());
+    expect(root.style.getPropertyValue("--meeting-primary-tabs-height")).toBe("80px");
+    view.unmount();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  } finally { bounds.mockRestore(); vi.unstubAllGlobals(); }
 });

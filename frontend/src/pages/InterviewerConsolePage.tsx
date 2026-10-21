@@ -63,7 +63,7 @@ export function InterviewerConsolePage() {
   }
   const closed = info && ["ending", "ended", "cancelled"].includes(info.room_status);
   return (
-    <main className="hiresense-meeting-workspace hiresense-console bg-slate-50">
+    <main className={`hiresense-meeting-workspace hiresense-console bg-slate-50 ${closed ? "hiresense-console-review" : ""}`}>
       <div className="hiresense-console-shell">
         {fatal || !info ? <Link className="text-sm font-semibold text-blue-700" to="/interviewer/interviews">← Back to interviews</Link> : null}
         {fatal ? <p role="alert" className="mt-6 rounded-xl bg-red-50 p-5 text-red-800">{fatal}</p> : !info ? <p role="status" className="mt-6">Loading interview console…</p> : <>
@@ -103,14 +103,14 @@ export function InterviewerConsolePage() {
              /> : null}
           </div> : null}
           <aside className="hiresense-console-tools" aria-label="Interviewer workspace">
-          <MeetingTabs fill variant="segmented" label="Workspace panel" tabs={[
+          <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} variant="segmented" label="Workspace panel" tabs={[
             { id: "workspace-transcript", label: "Transcript & analysis", content: <div className="hiresense-console-transcript">
-              <MeetingTabs fill label="Interview workspace" tabs={[
-            { id: "transcript", label: "Live transcript", content: <TranscriptionPanel closed={Boolean(closed)} panelScroll /> },
+              <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} label="Interview workspace" tabs={[
+            { id: "transcript", label: "Live transcript", content: <TranscriptionPanel closed={Boolean(closed)} panelScroll={!closed} pageScroll={Boolean(closed)} /> },
             { id: "analysis", label: "Answer analysis", content: <InterviewAnalysisPanel key={id} interviewId={id} /> },
               ]} />
             </div> },
-            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel fill key={id} interviewId={id} /></div> },
+            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel fill={!closed} pageScroll={Boolean(closed)} key={id} interviewId={id} /></div> },
           ]} />
           </aside>
           </div>

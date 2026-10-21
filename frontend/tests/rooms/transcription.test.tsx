@@ -68,6 +68,26 @@ it("keeps consent controls at the top when saved transcript text exists but cons
   expect((screen.getByRole("button", { name: "Start transcription" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
+it("expands the saved transcript in review mode without auto-scrolling on history restore or tab changes", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue({ ...active, status: "completed" });
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1} closed><MeetingTabs pageScroll label="Review" tabs={[
+    { id: "transcript", label: "Transcript", content: <TranscriptionPanel closed pageScroll /> },
+    { id: "analysis", label: "Analysis", content: <p>Analysis</p> },
+  ]} /></TranscriptionProvider>);
+  await screen.findByText("A final answer");
+  const segments = screen.getByLabelText("Transcript segments");
+  expect(segments.getAttribute("data-scroll-mode")).toBe("page");
+  expect(segments.getAttribute("data-auto-follow")).toBe("false");
+  expect(segments.className).not.toContain("h-72");
+  expect(segments.className).not.toContain("overflow-y-auto");
+  const panel = screen.getByRole("tabpanel", { name: "Transcript" });
+  Object.defineProperty(panel, "scrollHeight", { configurable: true, value: 1000 });
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Transcript" }));
+  expect(panel.scrollTop).toBe(0);
+});
+
 describe("transcription controls and captions", () => {
   it("requires explicit consent before enabling start", async () => {
     show();

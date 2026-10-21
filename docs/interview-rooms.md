@@ -34,11 +34,21 @@ Video and meeting controls fill the left column. All other tools share the right
 column, using a **Transcript & analysis / Candidate & assistant** segmented tab
 switch. Each group retains its own inner tabs and scrollable content. Camera
 height comes from the available grid space, not an additional viewport-sized card.
-Device preview and the Join button fit the same area. Closed interviews give the
-entire workspace to the saved transcript/analysis and candidate tools. At narrow
+Device preview and the Join button fit the same area. Closed interviews switch to
+normal document scrolling: transcript, analysis, candidate information and assistant
+history expand with their content instead of using nested scrolling panes. Only
+the group switch and active group's inner tab row are sticky; the page header and
+closed-room notice scroll away. The inner row's offset follows the measured group
+bar height, including when labels wrap on smaller screens. Saved transcript restore
+and tab changes do not auto-scroll the review content. At narrow
 widths the video and tools stack within the viewport. Switching groups or inner
 tabs never unmounts either pane or the media connection.
 The candidate-facing page keeps its existing responsive layout.
+
+The assistant gives the available panel height to its scrollable conversation.
+It has no duplicate heading or repeated privacy text, and the compact composer
+keeps the message input and Send button on the same row. Interviewer-only access,
+knowledge sources, citations and draft retention are unchanged.
 
 Job requirements appear as a grouped card: minimum experience, required-skill tags,
 optional nice-to-have tags, qualifications and selection criteria. Values still

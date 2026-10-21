@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { InterviewCopilotPanel, type CopilotContext } from "../../src/components/interviews/InterviewCopilotPanel";
 import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
+import { readFileSync } from "node:fs";
 const api = vi.hoisted(() => vi.fn());
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: api }));
 const context: CopilotContext = {
@@ -19,7 +20,7 @@ test("shows saved candidate details and requests cited questions for this interv
     sources: [{ chunk_id: 7, document_title: "Synthetic React questions", excerpt: "State management question" }] }] });
   const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} />);
   await screen.findByText("Test Candidate");
-  expect(screen.getByText("Only you can see this panel")).toBeTruthy();
+  expect(screen.getByLabelText("Private interview assistance")).toBeTruthy();
   expect(screen.getByText("test@example.test")).toBeTruthy();
   expect(screen.getByText("Experience: 3 years")).toBeTruthy();
   await user.click(screen.getByRole("tab", { name: "Assistant", exact: true }));
@@ -29,7 +30,25 @@ test("shows saved candidate details and requests cited questions for this interv
   expect(JSON.parse(api.mock.calls[1][1].body).version).toBe(0);
   await user.click(screen.getByText("Knowledge sources (1)"));
   expect(screen.getByText("State management question")).toBeTruthy();
-  expect(screen.getByText("Not shared with the candidate")).toBeTruthy();
+  expect(screen.queryByText("Not shared with the candidate")).toBeNull();
+});
+
+test("prioritizes conversation space with no repeated header and a single-row composer", async () => {
+  const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} fill />);
+  await user.click(await screen.findByRole("tab", { name: "Assistant", exact: true }));
+  const assistant = screen.getByRole("region", { name: "Interview assistant" });
+  expect(assistant.querySelector("header")).toBeNull();
+  expect(screen.queryByText("Only you can see this panel")).toBeNull();
+  expect(screen.queryByText("Questions and follow-ups, just for you")).toBeNull();
+  const log = within(assistant).getByRole("log", { name: "Interview assistant conversation" });
+  expect(log.nextElementSibling?.className).toContain("hiresense-assistant-composer");
+  const input = within(assistant).getByRole("textbox", { name: "Ask the interview assistant" });
+  const send = within(assistant).getByRole("button", { name: "Send" });
+  expect(input.parentElement).toBe(send.parentElement);
+  expect(input.getAttribute("rows")).toBe("2");
+  const css = readFileSync("src/index.css", "utf8");
+  expect(css).toMatch(/\.hiresense-meeting-tabs-fill \.hiresense-interview-assistant > \[role="log"\] \{ flex: 1; min-height: 0; height: auto; max-height: none;/);
+  expect(css).toMatch(/\.hiresense-meeting-tabs-fill \.hiresense-interview-assistant > form \{ flex-shrink: 0;/);
 });
 test("keeps a failed message for retry and displays the failure", async () => {
   api.mockResolvedValueOnce(context).mockRejectedValueOnce(new Error("Assistant unavailable"));

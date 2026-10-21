@@ -83,6 +83,7 @@ test("groups candidate link actions in the header without creating or copying a 
 test("ending requires a confirmation dialog and renders ended state", async () => {
   const user = userEvent.setup(); open();
   await user.click(await screen.findByRole("button", { name: "End interview for everyone" }));
+  expect(document.querySelector("main")?.classList.contains("hiresense-console-review")).toBe(false);
   expect(screen.getByRole("dialog")).toBeTruthy(); expect(api.end).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Keep interview open" }));
   expect(api.end).not.toHaveBeenCalled();
@@ -92,6 +93,21 @@ test("ending requires a confirmation dialog and renders ended state", async () =
   expect(api.end).toHaveBeenCalledWith(1); expect(screen.queryByRole("button", { name: "Admit candidate" })).toBeNull();
   expect((screen.getByRole("button", { name: "End interview for everyone" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.queryByRole("button", { name: "Join interview room" })).toBeNull();
+  expect(document.querySelector("main")?.classList.contains("hiresense-console-review")).toBe(true);
+  const groupTabs = screen.getByRole("tablist", { name: "Workspace panel" }).parentElement!;
+  const innerTabs = screen.getByRole("tablist", { name: "Interview workspace" }).parentElement!;
+  for (const tabs of [groupTabs, innerTabs]) {
+    expect(tabs.classList.contains("hiresense-meeting-tabs-page")).toBe(true);
+    expect(tabs.classList.contains("hiresense-meeting-tabs-fill")).toBe(false);
+  }
+});
+
+test.each(["ended", "cancelled"])("opens %s interviews in document-scroll review mode", async room_status => {
+  api.status.mockResolvedValue({ ...info, room_status }); open();
+  await screen.findByRole("heading", { name: room_status === "ended" ? "Interview ended" : "Interview cancelled" });
+  expect(document.querySelector("main")?.classList.contains("hiresense-console-review")).toBe(true);
+  expect(document.querySelector(".hiresense-console-media-slot")).toBeNull();
+  expect(api.interviewerMedia).not.toHaveBeenCalled();
 });
 
 test("keeps the media on the left while switching right-side workspace groups and analysis tabs", async () => {
@@ -129,4 +145,7 @@ test("bounds the full-height left meeting and switchable right tools to one view
   expect(css).toContain('.hiresense-console-grid[data-closed="true"] { grid-template-columns: minmax(0, 1fr); }');
   expect(css).toMatch(/\.hiresense-console-tools > \.hiresense-meeting-tabs-segmented > \.hiresense-meeting-panel:not\(\[hidden\]\) \{ overflow: hidden/);
   expect(css).not.toContain("hiresense-console-primary");
+  expect(css).toMatch(/\.hiresense-console-review \{ height: auto; min-height: 100dvh; overflow: visible;/);
+  expect(css).toMatch(/\.hiresense-meeting-tabs-page > \[role="tablist"\] \{ position: sticky; top: var\(--meeting-primary-tabs-height, 3.25rem\)/);
+  expect(css).toMatch(/\.hiresense-meeting-tabs-page\.hiresense-meeting-tabs-segmented > \[role="tablist"\] \{ top: 0;/);
 });

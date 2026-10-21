@@ -15,7 +15,7 @@ export type CopilotContext = {
   minimum_experience: number | null; selection_criteria: string[]; messages: Message[]; version: number;
 };
 
-export function InterviewCopilotPanel({ interviewId, fill = false }: { interviewId: number; fill?: boolean }) {
+export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = false }: { interviewId: number; fill?: boolean; pageScroll?: boolean }) {
   const [context, setContext] = useState<CopilotContext>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string>();
@@ -78,27 +78,25 @@ export function InterviewCopilotPanel({ interviewId, fill = false }: { interview
       </details>
     </section>;
   const assistant = <section aria-label="Interview assistant" className="hiresense-interview-assistant flex min-w-0 flex-col">
-      <header className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold">HireSense assistant</h2><p className="mt-1 text-xs text-slate-500">Questions and follow-ups, just for you</p></header>
-      <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className="h-[25rem] max-h-[60svh] min-h-48 space-y-4 overflow-y-auto overscroll-contain p-4">
-        {!context.messages.length ? <div><p className="text-sm leading-6 text-slate-600">Ask me for questions relevant to this job, or request a more practical or challenging follow-up.</p><button disabled={busy} className="mt-3 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></div> : null}
+      <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className="h-[25rem] max-h-[60svh] min-h-48 space-y-3 overflow-y-auto overscroll-contain p-3">
+        {!context.messages.length ? <button disabled={busy} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button> : null}
         {context.messages.map((item, index) => <article key={index} className={`min-w-0 rounded-xl p-3 text-sm ${item.role === "user" ? "ml-6 bg-blue-600 text-white" : "mr-2 bg-slate-50 text-slate-800"}`}>
-          <p className="mb-1 text-xs font-semibold">{item.role === "user" ? "You" : "HireSense assistant"}</p>
+          <p className="mb-1 text-xs font-semibold">{item.role === "user" ? "You" : "Assistant"}</p>
           <p className="whitespace-pre-wrap break-words leading-6">{item.content}</p>
           {item.analysis_run_id ? item.analysis_citations?.map((citation, i) => <TranscriptCitation key={i} citation={citation} runId={item.analysis_run_id!} interviewId={interviewId} />) : null}
           {item.questions.length ? <ol className="mt-3 list-decimal space-y-3 pl-5">{item.questions.map((question, i) => <li key={i}><p className="leading-6">{question.question}</p><p className="mt-1 text-xs text-slate-500">Job requirement: {question.requirement} · Sources: {question.source_ids.map((value) => `#${value}`).join(", ")}</p></li>)}</ol> : null}
           {item.sources.length ? <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-blue-700">Knowledge sources ({item.sources.length})</summary>{item.sources.map((source) => <blockquote key={source.chunk_id} className="mt-2 border-l-2 border-blue-200 pl-3"><p className="text-xs font-semibold">#{source.chunk_id} · {source.document_title}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">{source.excerpt}</p></blockquote>)}</details> : null}
         </article>)}
-        {busy ? <p role="status" className="text-sm text-slate-500">Preparing your interview assistance…</p> : null}
+        {busy ? <p role="status" className="text-sm text-slate-500">Preparing a reply…</p> : null}
       </div>
-      <form className="border-t p-4" onSubmit={(event) => { event.preventDefault(); void send(message); }}>
+      <form className="hiresense-assistant-composer border-t border-slate-100 bg-white p-3" onSubmit={(event) => { event.preventDefault(); void send(message); }}>
         {error ? <div role="alert" className="mb-3 text-sm text-red-700">{error}<button type="button" className="ml-2 underline" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Reload conversation</button></div> : null}
         <label htmlFor="interview-assistant-message" className="sr-only">Ask the interview assistant</label>
-        <textarea id="interview-assistant-message" rows={2} maxLength={2000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} placeholder="Ask for a relevant interview question…" className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-        <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-slate-500">Not shared with the candidate</p><button type="submit" disabled={busy || !message.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">Send</button></div>
+        <div className="flex items-end gap-2"><textarea id="interview-assistant-message" rows={2} maxLength={2000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} placeholder="Ask a question…" className="min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm leading-5 text-slate-800 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+        <button type="submit" disabled={busy || !message.trim()} className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">Send</button></div>
       </form>
     </section>;
   return <aside aria-label="Private interview assistance" className={`min-w-0 ${fill ? "hiresense-private-panel" : ""}`}>
-    <p className="mb-3 flex items-center gap-1.5 px-1 text-xs text-slate-500"><MeetingIcon name="lock" className="h-3.5 w-3.5"/>Only you can see this panel</p>
-    <MeetingTabs fill={fill} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
+    <MeetingTabs fill={fill} pageScroll={pageScroll} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
   </aside>;
 }
