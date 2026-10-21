@@ -63,6 +63,7 @@ class CandidateReference(Boundary):
     application_id: int
     name: str
     masked_email: str | None
+    email: str | None = None
     rank: int | None = None
     score: str | None = None
     reasons: list[str] = Field(default_factory=list)
@@ -116,6 +117,7 @@ class DeliveryResult(Boundary):
     schedule_id: int
     application_id: int
     masked_email: str | None
+    email: str | None = None
     status: Literal["pending", "sent", "failed", "uncertain"]
     attempts: int
     in_flight: bool

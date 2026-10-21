@@ -46,30 +46,34 @@ delivery receipt. Configure domain authentication and privacy policies separatel
 
 ## Manual interviewer flow
 
-1. On **Assessments**, select a job and a current saved ranking.
-2. Use row checkboxes, or expand **Schedule interview** and choose **Highest-ranked
+1. On **Schedule Interviews**, select a job with a current saved CV ranking.
+2. Use row checkboxes, or choose **Highest-ranked
    candidates** or **Candidates above a score**. `Above` uses `>`; `At least` uses `>=`. Comparisons use saved,
    unrounded decimal scores. Selection previews filter candidates and list exclusions.
-3. Review selected names, ranks, display scores and masked emails. Top N examines
+3. Select **Preview candidate selection** to review names, ranks, scores and full
+   email addresses in a modal. Close it or choose **Continue to schedule** to return
+   to the form; **Review selection** reopens it. These details are restricted to the
+   authenticated interviewer. Top N examines
    the original first N saved ranking entries, then excludes ineligible applicants
    without backfilling from lower positions. Thus top 3 can yield fewer than 3
    invitations, but never select someone from position 6. Ties follow saved
    rank/application order and a boundary warning is shown. Historical/stale rankings
    must be refreshed.
-4. Enter the date, start time, duration and buffer. The form uses the default
+4. Choose the date and start time using the styled calendar and time popups, then
+   enter duration and buffer. The calendar supports keyboard navigation and an
+   explicit YYYY-MM-DD entry; the time picker uses hour, minute and AM/PM choices.
+   Saved values remain YYYY-MM-DD and 24-hour HH:mm. The form uses the default
    `technical` stage internally and `Asia/Dhaka` automatically; neither is an input.
    Every invitation and reschedule uses **sequential individual slots**. There is no
    scheduling-mode selector, and API/MCP requests for shared/group mode are rejected.
    A 30-minute duration and 10-minute buffer
    allocate 10:00, 10:40, 11:20, etc. UTC instants and original local times are saved.
-5. Optionally edit instructions and subject/body templates. Supported fields are
-   `{candidate_name}`, `{job_title}`, `{company_name}`, `{local_date}`,
-   `{local_start_time}`, `{timezone}`, `{duration}`, `{stage}`, `{contact_email}`,
-   `{instructions}` and `{old_schedule}`. Unsupported fields/header injection fail.
-   Essential details omitted from a custom body are appended to the exact preview;
-   optional instructions are omitted when empty.
-6. Preview every recipient, complete time allocation, sender/reply-to, subject, body
-   and calendar details. Nothing is sent during selection or preview.
+5. Optionally add instructions. The form uses the default invitation template;
+   there is no subject/body editor. Existing API/MCP template support is unchanged.
+6. Select **Preview schedule & email** to open a modal showing full recipient
+   emails, allocated times, sender/reply-to, subject, body and calendar attachment.
+   Close it to adjust the schedule or reopen it using **Review schedule & email**.
+   Nothing is sent during selection or preview.
 7. Select **Confirm & send**. Schedules and delivery snapshots are committed first;
    background workers then send each email. The UI polls sent/failed/uncertain status.
 8. **Interviews** lists schedules, delivery status and previous times. Check one or

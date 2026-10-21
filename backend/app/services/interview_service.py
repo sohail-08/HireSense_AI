@@ -139,13 +139,15 @@ class InterviewService:
             if score.rank is None or score.review_state != "ranked":
                 reasons.append("This historical score was excluded from ranking; recalculate first")
             entry = {"application_id": application.id, "name": candidate.name if candidate else "Unnamed candidate",
-                "rank": score.rank, "score": display_score(str(score.final_score)), "masked_email": masked_email(candidate.email) if candidate else None}
+                "rank": score.rank, "score": display_score(str(score.final_score)), "masked_email": masked_email(candidate.email) if candidate else None,
+                "email": normalized_email(candidate.email) if candidate else None}
             if reasons:
                 excluded.append({**entry, "reasons": reasons})
             else:
                 selected.append(entry)
         seal = fingerprint({"rule": data.model_dump(mode="json"), "run": run.id, "input_hash": run.input_hash,
-            "selected": selected, "emails": [db.get(Candidate, db.get(CandidateApplication, item["application_id"]).candidate_id).email for item in selected]})
+            "selected": [{key: value for key, value in item.items() if key != "email"} for item in selected],
+            "emails": [db.get(Candidate, db.get(CandidateApplication, item["application_id"]).candidate_id).email for item in selected]})
         payload = {"rule": data.model_dump(mode="json"), "run_id": run.id, "fingerprint": seal}
         warnings = ["The top-N boundary crosses a tie; stable application order determines selection."] if tie else []
         if data.mode == "top_n" and len(selected) < data.top_n:
@@ -215,11 +217,24 @@ class InterviewService:
         if not batch:
             raise LookupError("Invitation batch not found")
         deliveries = list(db.scalars(select(InterviewDelivery).where(InterviewDelivery.batch_id == batch.id).order_by(InterviewDelivery.id)))
+        deliveries_by_application = {entry.application_id: entry for entry in deliveries}
+        recipients = []
+        for item in batch.snapshot["recipients"]:
+            recipient = self.links.preview(item)
+            # Enrich legacy previews without rewriting their signed snapshot.
+            delivery = deliveries_by_application.get(item["application_id"])
+            address = delivery.recipient_email if delivery else item.get("email")
+            if not address:
+                application = db.get(CandidateApplication, item["application_id"])
+                candidate = db.get(Candidate, application.candidate_id) if application and application.candidate_id else None
+                address = candidate.email if candidate else None
+            recipient["email"] = normalized_email(address)
+            recipients.append(recipient)
         return {"id": batch.id, "kind": batch.kind, "job_posting_id": batch.job_posting_id, "status": batch.status,
-            "recipient_count": len(batch.snapshot["recipients"]), "recipients": [self.links.preview(item) for item in batch.snapshot["recipients"]],
+            "recipient_count": len(batch.snapshot["recipients"]), "recipients": recipients,
             "sender": batch.snapshot["sender"], "selection": batch.snapshot.get("selection"),
             "deliveries": [{"id": item.id, "schedule_id": item.schedule_id, "application_id": item.application_id,
-                "masked_email": masked_email(item.recipient_email), "status": item.status, "attempts": item.attempts,
+                "masked_email": masked_email(item.recipient_email), "email": normalized_email(item.recipient_email), "status": item.status, "attempts": item.attempts,
                 "in_flight": item.in_flight, "retryable": self.retryable(db, item),
                 "error_category": item.error_category, "sent_at": item.sent_at.isoformat() if item.sent_at else None} for item in deliveries],
             "sent": sum(item.status == "sent" for item in deliveries), "failed": sum(item.status == "failed" for item in deliveries),
@@ -413,7 +428,7 @@ class InterviewService:
                 "start_utc": utc(schedule.start_utc).isoformat(), "end_utc": utc(schedule.end_utc).isoformat()}
             recipient = {"schedule_id": schedule.id, "expected_version": schedule.version, "application_id": app.id,
                 "calendar_uid": schedule.calendar_uid, "sequence": schedule.sequence + 1,
-                "name": candidate.name, "masked_email": masked_email(candidate.email), "email_hash": fingerprint(candidate.email),
+                "name": candidate.name, "masked_email": masked_email(candidate.email), "email": normalized_email(candidate.email), "email_hash": fingerprint(candidate.email),
                 "stage": schedule.stage, "old_schedule": old, **slot,
                 **render_email(self.settings, {"name": candidate.name}, self.job(db, user_id, schedule.job_posting_id).title, schedule.stage, slot, data, old)}
             recipient = redact_join_links(recipient)
