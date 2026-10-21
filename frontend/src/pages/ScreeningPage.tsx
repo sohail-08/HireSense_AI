@@ -116,24 +116,27 @@ export function ScreeningPage() {
   const pendingCount = activeDashboard
     ? activeDashboard.applications.filter((application) => application.screening_status !== "completed").length
     : selectedJob?.pending_count ?? 0;
+  const jobSelector = <div>
+    <label htmlFor="screening-job" className="block text-xs font-semibold text-slate-600">Job posting</label>
+    <select id="screening-job" value={selectedJobId ?? ""} disabled={loading || !jobs.length}
+      onChange={event => setSelectedJobId(Number(event.target.value))}
+      className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+      {!jobs.length ? <option value="">{loading ? "Loading jobs…" : "No job postings available"}</option> : null}
+      {jobs.map(job => <option key={job.id} value={job.id}>{job.title + " · #" + job.id}</option>)}
+    </select>
+    {selectedJob ? <p className="mt-1.5 text-xs text-slate-500">{selectedJob.application_count} {selectedJob.application_count === 1 ? "candidate" : "candidates"}</p> : null}
+  </div>;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">Candidate ranking</h1>
-      <p className="mt-2 text-sm text-slate-600">Choose a job, set what matters most, and compare your candidates.</p>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900">CV Screening</h1>
+      <p className="mt-2 text-sm text-slate-600">Choose a job, adjust the weights, and compare candidates.</p>
       <ErrorMessage message={error} />
 
-      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <label htmlFor="screening-job" className="block text-sm font-semibold text-slate-900">Job posting</label>
-        <select id="screening-job" value={selectedJobId ?? ""} disabled={loading || !jobs.length}
-          onChange={(event) => setSelectedJobId(Number(event.target.value))}
-          className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm">
-          {!jobs.length ? <option value="">{loading ? "Loading jobs…" : "No job postings available"}</option> : null}
-          {jobs.map((job) => <option key={job.id} value={job.id}>{job.title + " · Posting #" + job.id}</option>)}
-        </select>
-        {selectedJob ? <p className="mt-2 text-sm text-slate-500">{selectedJob.application_count} applications received.</p> : null}
+      {!selectedJobId ? <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {jobSelector}
         {!loading && !jobs.length ? <p className="mt-3 text-sm text-slate-500">Create and approve a job description, then prepare a job posting to get started.</p> : null}
-      </section>
+      </section> : null}
 
       {failedApplications.length ? <section role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p>{failedApplications.length} CV(s) could not be processed. They have not been assigned a zero score. Fix the file or service issue, then retry.</p>
@@ -142,6 +145,7 @@ export function ScreeningPage() {
         </details>
       </section> : null}
       {selectedJobId ? <CandidateScoringPanel key={selectedJobId} jobId={selectedJobId}
+        jobSelector={jobSelector}
         refreshToken={String(refreshVersion) + "-" + currentBatch?.id + "-" + currentBatch?.status}
         applicationCount={activeDashboard?.applications.length ?? selectedJob?.application_count ?? 0}
         pendingCount={pendingCount} processing={processing} ready={Boolean(activeDashboard)}

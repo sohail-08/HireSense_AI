@@ -46,8 +46,8 @@ and LiveKit captions are documented in [live transcription](docs/live-transcript
 
 ## Requirements
 
-Deterministic technical/experience/qualification scoring is available on Assessments.
-Select a job, set three category weights, and choose **Save weights & rank candidates**.
+Deterministic technical/experience/qualification scoring is available on CV Screening.
+Select a job, set three category weights, and choose **Rank candidates**.
 Pending CVs are processed automatically; evidence is available only when requested.
 See [scoring formulas, immutable snapshots and reviewer steps](docs/deterministic-candidate-scoring.md).
 
@@ -389,19 +389,20 @@ An active conversational batch can be restored after reloading the page.
 
 1. Import applications and CVs with **Candidates → Sync responses** or the shared
    assistant. Syncing routes responses across all jobs using their Job Posting answers.
-   Assessments focuses on weights and ranking, without sync or application-list controls.
-2. Open **Assessments** and select the published job posting to assess. HireSense
+   CV Screening focuses on weights and ranking, without sync or application-list controls.
+2. Open **CV Screening** and select the job in the ranking section. HireSense
    uses only applications routed to that posting and requires its confirmed
    requirement profile and approved job description.
 3. Set the **Technical skills**, **Experience**, and **Qualifications** percentages
-   (total 100%). Choose **Save weights & rank candidates** to explicitly approve
+   (total 100%) in the compact weights row. Choose **Rank candidates** to explicitly approve
    them. Pending CVs are prepared in the background and scored after screening;
    existing screening results are reused when current.
 4. Read the single ranking table. Choose **Inspect evidence** only if you want
-   category scores, requirement outcomes, source quotations and PDF page/DOCX
-   block locations. All candidates receive a rank; processing/evidence issues are
-   disclosed inside the optional evidence view. Earlier results are tucked under
-   **Previous rankings**.
+   category scores, short explanations, focused CV quotations and PDF page/DOCX
+   block locations in a keyboard-accessible modal. Met is green, Partially met
+   is amber, and Unmet is red. Full-source expanders and the previous-ranking
+   selector are not shown; historical snapshots remain saved, and the page
+   loads the latest ranking. Closing the modal returns focus to its Inspect button.
 
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported
