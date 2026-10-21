@@ -403,6 +403,10 @@ An active conversational batch can be restored after reloading the page.
    is amber, and Unmet is red. Full-source expanders and the previous-ranking
    selector are not shown; historical snapshots remain saved, and the page
    loads the latest ranking. Closing the modal returns focus to its Inspect button.
+   Rankings show 10 candidates per page by default, with 5/10/20/50 row options,
+   numbered pages and Previous/Next controls. Rank values stay unchanged across
+   pages, and interview selections persist across pages. A new ranking returns
+   to page one and clears the previous interview selection.
 
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported

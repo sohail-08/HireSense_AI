@@ -27,17 +27,23 @@ const result = { id: 42, application_id: 7, candidate_name: "Synthetic Candidate
   } };
 const saved = { id: 10, configuration_id: 3, configuration, requirement_version: "requirements-v1", formula_version: "formula-v1",
   status: "completed", created_at: "2026-10-21T10:00:00Z", results: [result] };
+let results = saved.results;
+function makeResults(count: number) {
+  return Array.from({ length: count }, (_, index) => ({ ...result, id: index + 100, application_id: index + 1,
+    rank: index + 1, candidate_name: `Applicant ${index + 1}`, display_score: String(100 - index) }));
+}
 const defaultProps = { jobId: 1, refreshToken: "1", applicationCount: 1, pendingCount: 0, processing: false, ready: true,
   onScreenPending: vi.fn(async () => true), jobSelector: <label>Job posting<select id="screening-job" defaultValue="1"><option value="1">Example job</option></select></label> };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  results = saved.results;
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.setAttribute("open", ""); } });
   Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function(this: HTMLDialogElement) { this.removeAttribute("open"); } });
   vi.mocked(apiRequest).mockImplementation(async (path, options) => {
     if (path === "/scoring/jobs/1/configuration") return options?.method === "POST" ? { id: 4, snapshot: configuration } : { ...configuration, approved_configuration: null };
-    if (path === "/scoring/jobs/1/runs") return options?.method === "POST" ? { ...saved, id: 11, configuration_id: 4 } : [saved, { ...saved, id: 9 }];
-    if (path === "/scoring/runs/10") return saved;
+    if (path === "/scoring/jobs/1/runs") return options?.method === "POST" ? { ...saved, id: 11, configuration_id: 4, results } : [saved, { ...saved, id: 9 }];
+    if (path === "/scoring/runs/10") return { ...saved, results };
     throw new Error("Unexpected test request: " + path);
   });
 });
@@ -108,4 +114,80 @@ it("queues pending CV screening after saving weights and prevents duplicate acti
   fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
   await waitFor(() => expect(defaultProps.onScreenPending).toHaveBeenCalledOnce());
   expect(vi.mocked(apiRequest).mock.calls.some(([path, options]) => path.endsWith("/runs") && options?.method === "POST")).toBe(false);
+});
+
+it("paginates the complete sorted ranking without changing saved ranks or scores", async () => {
+  results = makeResults(23).reverse();
+  render(<CandidateScoringPanel {...defaultProps} />);
+  await screen.findByText("Applicant 1");
+  expect(screen.getByText("1–10 of 23 candidates")).toBeTruthy();
+  expect(screen.queryByText("Applicant 11")).toBeNull();
+  expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(11);
+  fireEvent.click(screen.getByRole("button", { name: "Go to ranking page 2" }));
+  const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
+  expect(firstRow.children[1].textContent).toBe("11");
+  expect(firstRow.children[3].textContent).toBe("90%");
+  expect(screen.getByText("11–20 of 23 candidates")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText("21–23 of 23 candidates")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Go to ranking page 3" }).getAttribute("aria-current")).toBe("page");
+});
+
+it("preserves interview selections and opens the right evidence on later pages", async () => {
+  results = makeResults(12);
+  render(<CandidateScoringPanel {...defaultProps} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Select Applicant 1 for interview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }));
+  expect(screen.getByText("Interview selection: 1,11")).toBeTruthy();
+  const trigger = screen.getByRole("button", { name: "Inspect evidence for Applicant 11" });
+  trigger.focus(); fireEvent.click(trigger);
+  expect(screen.getByRole("dialog", { name: "Applicant 11" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Close evidence" }));
+  expect(document.activeElement).toBe(trigger);
+  expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+  expect((screen.getByRole("checkbox", { name: "Select Applicant 1 for interview" }) as HTMLInputElement).checked).toBe(true);
+  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+  expect((screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }) as HTMLInputElement).checked).toBe(true);
+});
+
+it("resets to page one and clears interview selection when ranking is updated", async () => {
+  results = makeResults(12);
+  render(<CandidateScoringPanel {...defaultProps} />);
+  await screen.findByText("Applicant 1");
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
+  await screen.findByText("Ranking updated.");
+  expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+  expect(screen.getByText("Interview selection:")).toBeTruthy();
+  expect(screen.queryByText("Applicant 11")).toBeNull();
+});
+
+it("keeps controls visible but unavailable for a single page or an empty ranking", async () => {
+  const view = render(<CandidateScoringPanel {...defaultProps} />);
+  await screen.findByText("Synthetic Candidate");
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+  results = [];
+  view.rerender(<CandidateScoringPanel {...defaultProps} refreshToken="2" />);
+  await screen.findByText("0 candidates");
+  expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("bounds numbered controls for large rankings and changes page size", async () => {
+  results = makeResults(101);
+  render(<CandidateScoringPanel {...defaultProps} />);
+  await screen.findByText("Applicant 1");
+  expect(screen.getAllByRole("button", { name: /Go to ranking page/ }).length).toBeLessThanOrEqual(7);
+  fireEvent.click(screen.getByRole("button", { name: "Go to ranking page 11" }));
+  expect(screen.getByText("101–101 of 101 candidates")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "5" } });
+  expect(screen.getByText("1–5 of 101 candidates")).toBeTruthy();
+  expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(6);
 });
