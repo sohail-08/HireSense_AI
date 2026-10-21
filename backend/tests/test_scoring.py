@@ -182,6 +182,27 @@ def test_snapshot_reuse_idempotency_and_changed_inputs(records):
         service.detail(db, user_id=other.id, run_id=first["id"])
 
 
+def test_evidence_presentation_enriches_existing_results_without_rescoring(records):
+    db, owner, _, posting, _, _, _ = records
+    service = ScoringService()
+    configuration = service.approve(db, user_id=owner.id, job_id=posting.id, data=approval(db, owner, posting))
+    first = service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"]))
+    stored = db.scalar(select(CandidateScore).where(CandidateScore.scoring_run_id == first["id"]))
+    original_breakdown = deepcopy(stored.breakdown)
+    original_snapshot = deepcopy(db.get(ScoringRun, first["id"]).snapshot)
+    count = db.scalar(select(func.count(ScoringRun.id)))
+    detail = service.detail(db, user_id=owner.id, run_id=first["id"])
+    assert detail["results"][0]["final_score"] == first["results"][0]["final_score"]
+    for item in detail["results"][0]["breakdown"]["requirements"]:
+        assert item["reason"] and len(item["evidence_preview"]) <= 4
+        for preview in item["evidence_preview"]:
+            assert preview["quote"] in item["evidence"][preview["source_index"]]["quote"]
+    db.expire_all()
+    assert db.get(CandidateScore, stored.id).breakdown == original_breakdown
+    assert db.get(ScoringRun, first["id"]).snapshot == original_snapshot
+    assert db.scalar(select(func.count(ScoringRun.id))) == count
+
+
 def test_legacy_ambiguous_match_is_persisted_as_unmet_without_changing_history(records):
     db, owner, _, posting, _, _, _ = records
     service = ScoringService()

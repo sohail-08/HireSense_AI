@@ -15,6 +15,7 @@ from app.schemas.scoring import ScoreRunRequest, ScoringApproval
 from app.scoring.workflow import CandidateScoringWorkflow
 from app.services.scoring_calculation import CATEGORIES, DEFAULT_CATEGORY_WEIGHTS, FORMULA_VERSION, SNAPSHOT_VERSION, STATUS_VALUES, display_score
 from app.services.screening_service import ScreeningService
+from app.services.scoring_presentation import present_breakdown
 
 
 class ScoringConflict(ValueError):
@@ -237,7 +238,9 @@ class ScoringService:
         names = {app["application_id"]: app["candidate_name"] for app in run.snapshot["applications"]}
         results = []
         for score in db.scalars(select(CandidateScore).where(CandidateScore.scoring_run_id == run.id).order_by(CandidateScore.rank.asc().nulls_last(), CandidateScore.application_id)):
-            breakdown = score.breakdown
+            screening = db.get(ScreeningRun, score.screening_run_id) if score.screening_run_id else None
+            calculations = ((screening.processing_metadata or {}).get("evidence", {}).get("experience_calculations", {}) if screening else {})
+            breakdown = present_breakdown(score.breakdown, calculations)
             results.append({"id": score.id, "application_id": score.application_id, "candidate_name": names[score.application_id],
                             "screening_run_id": score.screening_run_id, "rank": score.rank, "review_state": score.review_state,
                             "final_score": breakdown["final_score"], "display_score": display_score(breakdown["final_score"]),

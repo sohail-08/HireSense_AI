@@ -5,6 +5,7 @@ import { ErrorMessage } from "../common/ErrorMessage";
 import { useSupervisor } from "../assistant/SupervisorProvider";
 import { InterviewSchedulingPanel } from "../interviews/InterviewSchedulingPanel";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
+import { RequirementEvidence, type EvidenceRequirement } from "./RequirementEvidence";
 
 type Category = "technical" | "experience" | "qualification";
 type Weights = Record<Category, string>;
@@ -17,7 +18,7 @@ type ConfigurationSnapshot = { requirement_version: string; category_weights: We
 type ApprovedConfiguration = { id: number; snapshot: ConfigurationSnapshot; approved_at: string };
 type Proposal = ConfigurationSnapshot & { approved_configuration: ApprovedConfiguration | null };
 type Summary = { id: number; requirement_version: string; formula_version: string; status: string; created_at: string };
-type BreakdownRequirement = Requirement & {
+type BreakdownRequirement = Requirement & EvidenceRequirement & {
   status: string; match_value: string; weighted_contribution: string;
   score_included?: boolean;
   evidence: { block_id: string; locator: string; quote: string }[];
@@ -35,9 +36,6 @@ type Run = Summary & { configuration_id: number; configuration: ConfigurationSna
 
 const categoryLabels: Record<Category, string> = { technical: "Technical skills", experience: "Experience", qualification: "Qualifications" };
 const categories = Object.keys(categoryLabels) as Category[];
-const outcomeLabels: Record<string, string> = {
-  met: "Met", partially_met: "Partially met", unmet: "Unmet", unable_to_determine: "Unmet",
-};
 
 function EvidencePanel({ result, onClose }: { result: Result; onClose: () => void }) {
   const panelRef = useRef<HTMLElement>(null);
@@ -67,16 +65,7 @@ function EvidencePanel({ result, onClose }: { result: Result; onClose: () => voi
       Unmet requirements: {unmetRequirements.map((item) => item.name).join(", ")}.
     </p> : null}
     <div className="mt-4 space-y-3">{requirements.map((item) =>
-      <article key={item.requirement_id} className="rounded-xl border border-slate-200 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="font-semibold text-slate-900">{item.name}</h4>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{outcomeLabels[item.status] ?? item.status}</span>
-        </div>
-        {item.evidence.length ? item.evidence.map((citation, index) =>
-          <blockquote key={index} className="mt-3 border-l-4 border-blue-200 bg-blue-50/50 px-3 py-2 text-sm leading-6 text-slate-700">
-            {"“" + citation.quote + "”"}<footer className="mt-1 text-xs font-medium text-blue-700">{citation.locator}</footer>
-          </blockquote>) : <p className="mt-2 text-sm text-slate-500">No verified supporting evidence was found in this CV.</p>}
-      </article>)}</div>
+      <RequirementEvidence key={item.requirement_id} requirement={item} />)}</div>
     {!requirements.length ? <p className="mt-4 text-sm text-slate-500">No scored requirements to display.</p> : null}
   </section>;
 }

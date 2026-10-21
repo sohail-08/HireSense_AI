@@ -67,6 +67,16 @@ An independent audit still rejects unsupported conclusions.
 
 ## Stable results and honest failures
 
+The evidence screen presents a short plain-language reason and up to four
+distinct, relevant source excerpts per requirement. Recorded experience months
+are expressed in years/months, without recalculating against today's date.
+Excerpts are exact contiguous slices of saved quotations; omitted text is marked.
+The original passages remain available under **View full source passages**.
+This is read-time presentation only: existing rankings update on refresh without
+rescoring, changing weights, rewriting evidence, or making new model calls.
+Older screenings without a saved duration use a general explanation rather than
+inventing an experience total.
+
 The engine identity includes the configured model, prompt/schema hashes, parser
 package versions, rubric/passage/retrieval versions, retrieval settings, encoder
 model digest, evaluation month, and the explicit policy revision. File metadata
