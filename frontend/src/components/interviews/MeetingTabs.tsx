@@ -1,15 +1,19 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 // Keep panels mounted so tab changes cannot lose a draft, captions or analysis.
-export function MeetingTabs({ label, tabs }: { label: string; tabs: { id: string; label: string; content: ReactNode }[] }) {
+export function MeetingTabs({ label, tabs, fill = false, variant = "underline" }: { label: string; tabs: { id: string; label: string; content: ReactNode }[]; fill?: boolean; variant?: "underline" | "segmented" }) {
   const [active, setActive] = useState(tabs[0].id);
   const uid = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   useEffect(() => {
-    const log = document.getElementById(`${uid}-${active}-panel`)?.querySelector<HTMLElement>('[role="log"]');
-    if (log) log.scrollTop = log.scrollHeight;
+    const panel = document.getElementById(`${uid}-${active}-panel`);
+    const log = panel?.querySelector<HTMLElement>('[role="log"]');
+    if (log && !log.closest("[hidden]")) log.scrollTop = log.scrollHeight;
+    const transcript = panel?.querySelector('[data-scroll-mode="panel"][data-has-lines="true"][data-auto-follow="true"]');
+    const transcriptPanel = transcript?.closest<HTMLElement>('[role="tabpanel"]');
+    if (transcriptPanel && !transcriptPanel.closest("[hidden]")) transcriptPanel.scrollTop = transcriptPanel.scrollHeight;
   }, [active, uid]);
-  return <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  return <section className={`hiresense-meeting-tabs min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${fill ? "hiresense-meeting-tabs-fill" : ""} ${variant === "segmented" ? "hiresense-meeting-tabs-segmented" : ""}`}>
     <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b border-slate-100 px-3 pt-2">
       {tabs.map((tab, index) => <button key={tab.id} ref={element => { buttons.current[index] = element; }} type="button" role="tab"
         id={`${uid}-${tab.id}-tab`} aria-controls={`${uid}-${tab.id}-panel`} aria-selected={active === tab.id} tabIndex={active === tab.id ? 0 : -1}
@@ -19,6 +23,6 @@ export function MeetingTabs({ label, tabs }: { label: string; tabs: { id: string
           if (next !== undefined) { event.preventDefault(); setActive(tabs[next].id); buttons.current[next]?.focus(); }
         }}>{tab.label}</button>)}
     </div>
-    {tabs.map(tab => <div key={tab.id} role="tabpanel" tabIndex={0} id={`${uid}-${tab.id}-panel`} aria-labelledby={`${uid}-${tab.id}-tab`} hidden={active !== tab.id} className="hiresense-meeting-panel min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200">{tab.content}</div>)}
+    {tabs.map(tab => <div key={tab.id} role="tabpanel" tabIndex={0} id={`${uid}-${tab.id}-panel`} data-panel-id={tab.id} aria-labelledby={`${uid}-${tab.id}-tab`} hidden={active !== tab.id} className="hiresense-meeting-panel min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200">{tab.content}</div>)}
   </section>;
 }

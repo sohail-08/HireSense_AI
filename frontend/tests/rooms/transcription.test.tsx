@@ -5,6 +5,7 @@ import { mergeFinals, transcriptTime, trustedTranscriptEvent, verifyCaptionMessa
 import { webcrypto } from "node:crypto";
 import { TextDecoder, TextEncoder } from "node:util";
 import { transcriptionApi } from "../../src/components/interviews/transcriptionApi";
+import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 
 const room = vi.hoisted(() => ({ registerTextStreamHandler: vi.fn(), unregisterTextStreamHandler: vi.fn(), on: vi.fn(), off: vi.fn() }));
 vi.mock("@livekit/components-react", () => ({ useRoomContext: () => room }));
@@ -31,6 +32,40 @@ beforeEach(() => {
   vi.mocked(transcriptionApi.status).mockResolvedValue(initial);
   vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [], next_cursor: null });
   room.registerTextStreamHandler.mockClear();
+});
+
+it("uses the bounded bottom pane for transcript scrolling and respects manual reading position", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue(active);
+  render(<TranscriptionProvider interviewId={1}><TranscriptReceiver /><MeetingTabs fill label="Transcript tools" tabs={[{ id: "transcript", label: "Live transcript", content: <TranscriptionPanel panelScroll /> }]} /></TranscriptionProvider>);
+  await screen.findByText("Transcription active");
+  const panel = screen.getByRole("tabpanel", { name: "Live transcript" });
+  const segments = screen.getByLabelText("Transcript segments");
+  expect(segments.getAttribute("data-scroll-mode")).toBe("panel");
+  expect(segments.className).not.toContain("overflow-y-auto");
+  Object.defineProperties(panel, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 200 } });
+  panel.scrollTop = 100; fireEvent.scroll(panel);
+  await receive({ ...line, kind: "interim", text: "Reading previous text" });
+  expect(panel.scrollTop).toBe(100);
+  panel.scrollTop = 800; fireEvent.scroll(panel);
+  await receive({ ...line, kind: "interim", text: "Follow live text again" });
+  expect(panel.scrollTop).toBe(1000);
+});
+
+it("keeps consent controls at the top when saved transcript text exists but consent is not given", async () => {
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1}><MeetingTabs fill label="Transcript tools" tabs={[
+    { id: "transcript", label: "Live transcript", content: <TranscriptionPanel panelScroll /> },
+    { id: "analysis", label: "Analysis", content: <p>Analysis content</p> },
+  ]} /></TranscriptionProvider>);
+  await screen.findByText("A final answer");
+  const panel = screen.getByRole("tabpanel", { name: "Live transcript" });
+  Object.defineProperties(panel, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 200 } });
+  panel.scrollTop = 0;
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Live transcript" }));
+  expect(panel.scrollTop).toBe(0);
+  expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByRole("button", { name: "Start transcription" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 describe("transcription controls and captions", () => {

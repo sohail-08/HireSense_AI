@@ -133,13 +133,23 @@ export function TranscriptReceiver() {
   return null;
 }
 
-export function TranscriptionPanel({ closed = false }: { closed?: boolean }) {
+export function TranscriptionPanel({ closed = false, panelScroll = false }: { closed?: boolean; panelScroll?: boolean }) {
   const context = useContext(TranscriptionContext);
   const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   useEffect(() => {
-    if (scroll.current && follow.current) scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [context?.finals, context?.interim]);
+    if (!panelScroll) return;
+    const host = scroll.current?.closest<HTMLElement>('[role="tabpanel"]');
+    if (!host) return;
+    const trackScroll = () => { follow.current = host.scrollHeight - host.scrollTop - host.clientHeight < 60; };
+    host.addEventListener("scroll", trackScroll);
+    return () => host.removeEventListener("scroll", trackScroll);
+  }, [panelScroll, Boolean(context?.status)]);
+  useEffect(() => {
+    if (panelScroll && (!(context?.finals.length || Object.keys(context?.interim || {}).length) || (!closed && !context?.status?.consented))) return;
+    const host = panelScroll ? scroll.current?.closest<HTMLElement>('[role="tabpanel"]') : scroll.current;
+    if (host && follow.current) host.scrollTop = host.scrollHeight;
+  }, [context?.finals, context?.interim, panelScroll, closed, context?.status?.consented]);
   if (!context) return null;
   const { status, finals, interim, error, busy, interviewer } = context;
   if (!status) return <section className="mt-5 rounded-2xl bg-white p-5"><h2 className="font-semibold">Live transcript</h2><p role="status">{error || "Loading transcription status…"}</p></section>;
@@ -163,8 +173,8 @@ export function TranscriptionPanel({ closed = false }: { closed?: boolean }) {
     </> : !status.enabled && !closed ? <p className="mt-3 text-sm text-slate-600">Transcription is not configured. The video interview works independently.</p> : null}
     {status.failure_code ? <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Transcription stopped ({status.failure_code.replaceAll("_", " ")}). Audio/video is unaffected. Ask the interviewer to retry after checking configuration.</p> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-amber-900">{error}</p> : null}
-    <div ref={scroll} onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
-      className="mt-4 h-72 space-y-3 overflow-y-auto overscroll-contain sm:h-80" aria-label="Transcript segments" tabIndex={0}>
+    <div ref={scroll} onScroll={() => { const el = scroll.current; if (el && !panelScroll) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
+      data-scroll-mode={panelScroll ? "panel" : "segments"} data-has-lines={lines.length > 0} data-auto-follow={closed || status.consented} className={panelScroll ? "mt-4 space-y-3" : "mt-4 h-72 space-y-3 overflow-y-auto overscroll-contain sm:h-80"} aria-label="Transcript segments" tabIndex={0}>
       {!lines.length ? <p className="py-5 text-sm text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p> : lines.map(line => <article key={line.id || `interim-${line.speaker}`}
         className={`rounded-xl border-l-4 p-3 ${line.speaker === "INTERVIEWER" ? "border-blue-500 bg-blue-50" : "border-emerald-500 bg-emerald-50"} ${line.kind === "interim" ? "italic opacity-70" : ""}`}>
         <p className="text-xs font-semibold">{line.speaker === "INTERVIEWER" ? "Interviewer" : "Candidate"} · {transcriptTime(line.start_offset_ms)}{line.kind === "interim" ? " · Live draft" : " · Final"}</p>

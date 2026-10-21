@@ -15,7 +15,7 @@ export type CopilotContext = {
   minimum_experience: number | null; selection_criteria: string[]; messages: Message[]; version: number;
 };
 
-export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) {
+export function InterviewCopilotPanel({ interviewId, fill = false }: { interviewId: number; fill?: boolean }) {
   const [context, setContext] = useState<CopilotContext>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string>();
@@ -44,7 +44,7 @@ export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) 
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not suggest questions. Please retry."); }
     finally { lock.current = false; setBusy(false); }
   }
-  if (!context) return <aside aria-label="Private interview assistance" className="rounded-2xl bg-white p-5 shadow-sm">
+  if (!context) return <aside aria-label="Private interview assistance" data-loading="true" className={`rounded-2xl bg-white p-5 shadow-sm ${fill ? "hiresense-private-panel" : ""}`}>
     {error ? <><p role="alert" className="text-red-700">{error}</p><button className="mt-3 text-blue-700" onClick={() => setAttempt((value) => value + 1)}>Reload candidate information</button></> : <p role="status">Loading candidate information…</p>}
   </aside>;
   const candidate = context.candidate;
@@ -66,16 +66,18 @@ export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) 
         {candidate.qualifications.map((value, index) => <p className="mt-2 text-sm" key={index}>{value}</p>)}
         {candidate.recent_roles.map((value, index) => <p className="mt-2 text-sm text-slate-600" key={index}>{value}</p>)}
       </details>
-      <details className="mt-4 border-t border-slate-100 pt-4">
-        <summary className="cursor-pointer font-semibold">Job requirements</summary>
-        <p className="mt-2 text-sm">Required: {context.required_skills.join(", ") || "Not specified"}</p>
-        <p className="mt-2 text-sm">Preferred: {context.preferred_skills.join(", ") || "Not specified"}</p>
-        <p className="mt-2 text-sm">Qualifications: {context.qualifications.join(", ") || "Not specified"}</p>
-        <p className="mt-2 text-sm">Minimum experience: {context.minimum_experience == null ? "Not specified" : `${context.minimum_experience} years`}</p>
-        {context.selection_criteria.length ? <p className="mt-2 text-sm">Selection criteria: {context.selection_criteria.join(", ")}</p> : null}
+      <details className="mt-5 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/70 to-white">
+        <summary className="flex cursor-pointer items-center gap-3 p-4 font-semibold text-slate-800"><span className="rounded-xl border border-blue-100 bg-white p-2 text-blue-600"><svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a22 22 0 0 0 18 0M12 11v4"/></svg></span><span className="flex-1">Job requirements<span className="mt-0.5 block text-xs font-normal text-slate-500">What to look for during this interview</span></span><span aria-hidden="true" className="text-blue-500">⌄</span></summary>
+        <div className="space-y-4 border-t border-blue-100/70 p-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3"><p className="text-xs font-semibold text-slate-500">Minimum experience</p><p className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-sm font-bold text-blue-700">{context.minimum_experience == null ? "Not specified" : `${context.minimum_experience}+ years`}</p></div>
+          <section aria-label="Required skills"><h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Required skills</h4><div className="mt-2 flex flex-wrap gap-1.5">{context.required_skills.length ? context.required_skills.map((skill, index) => <span key={index} className="max-w-full rounded-lg border border-blue-100 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700">{skill}</span>) : <p className="text-sm text-slate-500">No required skills listed.</p>}</div></section>
+          {context.preferred_skills.length ? <section aria-label="Preferred skills"><h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Nice to have</h4><div className="mt-2 flex flex-wrap gap-1.5">{context.preferred_skills.map((skill, index) => <span key={index} className="max-w-full rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700">{skill}</span>)}</div></section> : null}
+          <section aria-label="Qualifications"><h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Education & qualifications</h4>{context.qualifications.length ? <ul className="mt-2 space-y-2">{context.qualifications.map((qualification, index) => <li key={index} className="flex items-start gap-2 rounded-xl bg-white p-3 text-sm text-slate-700"><span aria-hidden="true" className="mt-0.5 text-blue-500">✓</span>{qualification}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No qualifications listed.</p>}</section>
+          {context.selection_criteria.length ? <section aria-label="Selection criteria"><h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Selection criteria</h4><ul className="mt-2 space-y-2">{context.selection_criteria.map((criterion, index) => <li key={index} className="flex items-start gap-2 text-sm leading-6 text-slate-600"><span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400"/>{criterion}</li>)}</ul></section> : null}
+        </div>
       </details>
     </section>;
-  const assistant = <section aria-label="Interview assistant" className="flex min-w-0 flex-col">
+  const assistant = <section aria-label="Interview assistant" className="hiresense-interview-assistant flex min-w-0 flex-col">
       <header className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold">HireSense assistant</h2><p className="mt-1 text-xs text-slate-500">Questions and follow-ups, just for you</p></header>
       <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className="h-[25rem] max-h-[60svh] min-h-48 space-y-4 overflow-y-auto overscroll-contain p-4">
         {!context.messages.length ? <div><p className="text-sm leading-6 text-slate-600">Ask me for questions relevant to this job, or request a more practical or challenging follow-up.</p><button disabled={busy} className="mt-3 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></div> : null}
@@ -95,8 +97,8 @@ export function InterviewCopilotPanel({ interviewId }: { interviewId: number }) 
         <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-slate-500">Not shared with the candidate</p><button type="submit" disabled={busy || !message.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">Send</button></div>
       </form>
     </section>;
-  return <aside aria-label="Private interview assistance" className="min-w-0">
+  return <aside aria-label="Private interview assistance" className={`min-w-0 ${fill ? "hiresense-private-panel" : ""}`}>
     <p className="mb-3 flex items-center gap-1.5 px-1 text-xs text-slate-500"><MeetingIcon name="lock" className="h-3.5 w-3.5"/>Only you can see this panel</p>
-    <MeetingTabs label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
+    <MeetingTabs fill={fill} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
   </aside>;
 }

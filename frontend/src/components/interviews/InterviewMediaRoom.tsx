@@ -32,7 +32,7 @@ function Controls({ role, onEnd, onDeviceError, onShareError }: {
     })}
   </div>;
   return <>
-    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs">
+    <div className="hiresense-connection-bar flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs">
       <p role="status" className="flex items-center gap-2 text-slate-300"><span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-400" : "bg-amber-400"}`} />{reconnecting ? "Reconnecting… Please keep this page open." : connection === "connected" ? "Connected" : "Connecting to your interview…"}</p>
       <span className="flex items-center gap-1.5 text-slate-400"><MeetingIcon name="lock" className="h-3.5 w-3.5"/>Private interview · No recording</span>
     </div>
@@ -40,7 +40,7 @@ function Controls({ role, onEnd, onDeviceError, onShareError }: {
       {screen ? <div className="hiresense-screen-tile" aria-label="Candidate shared screen"><ParticipantTile trackRef={screen} /><span className="hiresense-video-label">{role === "candidate" ? "You are sharing your screen" : "Candidate’s screen"}</span></div> : null}
       {cameras}
     </div>
-    <RoomAudioRenderer /><StartAudio label="Enable interview audio" />
+    <RoomAudioRenderer /><StartAudio className="hiresense-start-audio" label="Enable interview audio" />
     <div className="hiresense-meeting-controls" aria-label="Meeting controls">
       <TrackToggle className={button} source={Track.Source.Microphone} showIcon={false} aria-pressed={isMicrophoneEnabled} onDeviceError={onDeviceError}><MeetingIcon name="microphone"/>{isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}</TrackToggle>
       <TrackToggle className={button} source={Track.Source.Camera} showIcon={false} aria-pressed={isCameraEnabled} onDeviceError={onDeviceError}><MeetingIcon name="camera"/>{isCameraEnabled ? "Turn camera off" : "Turn camera on"}</TrackToggle>
@@ -73,7 +73,7 @@ export function InterviewMediaRoom({ access, devices, onConnected, onLeave, onEn
   return (
     <section className="hiresense-media-room min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-sm" data-lk-theme="default" aria-label="Interview meeting">
       {error ? <div role="alert" className="flex items-start justify-between gap-3 bg-amber-100 p-3 text-sm text-amber-900"><p>{error}</p><button type="button" onClick={() => setError(undefined)} className="shrink-0 font-semibold underline">Dismiss</button></div> : null}
-      <LiveKitRoom token={access.participant_token} serverUrl={access.server_url} connect
+      <LiveKitRoom className="hiresense-livekit-room" token={access.participant_token} serverUrl={access.server_url} connect
         audio={audio} video={video} screen={false} options={options}
         onConnected={onConnected} onError={showError}
         onMediaDeviceFailure={() => setError("A camera or microphone failed. Check permissions or choose another input when you rejoin.")}

@@ -1,8 +1,9 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { InterviewCopilotPanel, type CopilotContext } from "../../src/components/interviews/InterviewCopilotPanel";
+import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 const api = vi.hoisted(() => vi.fn());
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: api }));
 const context: CopilotContext = {
@@ -48,14 +49,36 @@ test("does not send duplicate requests while generating", async () => {
   expect(api).toHaveBeenCalledTimes(2);
 });
 
-test("keeps private assistant drafts when switching back to candidate information", async () => {
-  const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} />);
+test("keeps private assistant drafts and inner tab selection when switching workspace groups", async () => {
+  const user = userEvent.setup(); render(<MeetingTabs fill variant="segmented" label="Workspace panel" tabs={[
+    { id: "private", label: "Candidate & assistant", content: <InterviewCopilotPanel interviewId={12} fill /> },
+    { id: "transcript", label: "Transcript & analysis", content: <p>Transcript tools</p> },
+  ]} />);
   await user.click(await screen.findByRole("tab", { name: "Assistant", exact: true }));
   await user.type(screen.getByLabelText("Ask the interview assistant"), "Ask about testing");
+  await user.click(screen.getByRole("tab", { name: "Transcript & analysis" }));
+  expect(screen.queryByRole("tab", { name: "Assistant", exact: true })).toBeNull();
+  await user.click(screen.getByRole("tab", { name: "Candidate & assistant" }));
+  expect(screen.getByRole("tab", { name: "Assistant", exact: true }).getAttribute("aria-selected")).toBe("true");
+  expect((screen.getByLabelText("Ask the interview assistant") as HTMLTextAreaElement).value).toBe("Ask about testing");
   await user.click(screen.getByRole("tab", { name: "Candidate info" }));
   expect(screen.getByRole("heading", { name: "Candidate information" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   await user.click(screen.getByRole("tab", { name: "Assistant", exact: true }));
   expect((screen.getByLabelText("Ask the interview assistant") as HTMLTextAreaElement).value).toBe("Ask about testing");
   expect(api).toHaveBeenCalledTimes(1);
+});
+
+test("groups real job requirements into styled skills, experience, qualifications and selection criteria", async () => {
+  api.mockResolvedValue({ ...context, preferred_skills: ["Accessibility"], qualifications: ["Relevant degree or equivalent experience"], selection_criteria: ["Explain testing choices"] });
+  const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} fill />);
+  await user.click(await screen.findByText("Job requirements"));
+  const required = screen.getByRole("region", { name: "Required skills" });
+  expect(within(required).getByText("React").className).toContain("rounded-lg");
+  expect(within(screen.getByRole("region", { name: "Preferred skills" })).getByText("Accessibility")).toBeTruthy();
+  expect(screen.getByText("2+ years")).toBeTruthy();
+  expect(screen.getByText("Relevant degree or equivalent experience")).toBeTruthy();
+  expect(screen.getByText("Explain testing choices")).toBeTruthy();
+  expect(screen.getByLabelText("Private interview assistance").className).toContain("hiresense-private-panel");
+  expect(screen.getByRole("tabpanel", { name: "Candidate info" }).parentElement?.className).toContain("hiresense-meeting-tabs-fill");
 });

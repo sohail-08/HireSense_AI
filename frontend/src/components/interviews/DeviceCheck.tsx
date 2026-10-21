@@ -12,7 +12,7 @@ export function DeviceCheck({ role, onReady }: { role: "candidate" | "interviewe
   if (!enabled) return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="hiresense-prejoin-stage"><div className="flex max-w-sm flex-col items-center gap-4"><span className="rounded-3xl bg-slate-800 p-5"><MeetingIcon name="camera" className="h-10 w-10 text-blue-300"/></span><p className="text-xl font-semibold">Let’s get you ready</p><p className="text-sm leading-6 text-slate-400">Your camera preview will appear here. You are not connected to the meeting yet.</p></div></div>
-      <div className="p-5 sm:flex sm:items-center sm:justify-between sm:gap-5"><div>
+      <div className="hiresense-device-intro-footer p-5 sm:flex sm:items-center sm:justify-between sm:gap-5"><div>
       <h2 className="font-semibold">Check your camera and microphone</h2>
       <p className="mt-1 text-sm text-slate-500">You can join with either device off. Nothing is recorded.</p>
       {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}

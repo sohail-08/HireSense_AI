@@ -1,11 +1,12 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { InterviewerConsolePage } from "../../src/pages/InterviewerConsolePage";
 import { ApiError } from "../../src/api/apiClient";
 import { getSdk } from "./setup";
+import { readFileSync } from "node:fs";
 
 const api = vi.hoisted(() => ({ status: vi.fn(), admit: vi.fn(), end: vi.fn(), interviewerMedia: vi.fn(), interviewerConnected: vi.fn(), interviewerLeave: vi.fn(), link: vi.fn(), revoke: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
@@ -26,6 +27,10 @@ test("console authorization failure does not expose candidate or room controls",
 });
 test("shows a waiting candidate and admits them without joining media automatically", async () => {
   const user = userEvent.setup(); open();
+  const header = (await screen.findByRole("heading", { name: "Interview console" })).closest("header")!;
+  expect(within(header).getByRole("region", { name: "Candidate admission" })).toBeTruthy();
+  expect(within(header).getByRole("link", { name: "Back to interviews" })).toBeTruthy();
+  expect(within(header).getByLabelText("Candidate link options")).toBeTruthy();
   await user.click(await screen.findByRole("button", { name: "Admit candidate" }));
   await screen.findByText("Candidate admitted");
   expect(api.admit).toHaveBeenCalledWith(1); expect(api.interviewerMedia).not.toHaveBeenCalled();
@@ -59,10 +64,21 @@ test("updating an old-origin link requires explicit confirmation", async () => {
   api.status.mockResolvedValue({ ...info, link_origin_outdated: true });
   api.link.mockResolvedValue({ join_url: "https://demo.trycloudflare.com/interview/join/fake-test-only" });
   const user = userEvent.setup(); open();
+  await user.click(await screen.findByLabelText("Candidate link options"));
   await user.click(await screen.findByRole("button", { name: "Update candidate link" }));
   expect(screen.getByRole("dialog")).toBeTruthy(); expect(api.link).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Confirm" }));
   expect(api.link).toHaveBeenCalledWith(1, "/rotate");
+});
+test("groups candidate link actions in the header without creating or copying a link on menu open", async () => {
+  api.link.mockResolvedValue({ join_url: "https://demo.trycloudflare.com/interview/join/fake-test-only" });
+  const user = userEvent.setup(); open();
+  await user.click(await screen.findByLabelText("Candidate link options"));
+  expect(api.link).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Replace link" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Revoke link" })).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Copy candidate link" }));
+  expect(api.link).toHaveBeenCalledWith(1, "");
 });
 test("ending requires a confirmation dialog and renders ended state", async () => {
   const user = userEvent.setup(); open();
@@ -78,12 +94,21 @@ test("ending requires a confirmation dialog and renders ended state", async () =
   expect(screen.queryByRole("button", { name: "Join interview room" })).toBeNull();
 });
 
-test("keeps the media room mounted while changing transcript and analysis tabs", async () => {
+test("keeps the media on the left while switching right-side workspace groups and analysis tabs", async () => {
   const user = userEvent.setup(); open();
   await user.click(await screen.findByRole("button", { name: "Check devices" }));
   await user.click(screen.getByRole("button", { name: "Devices ready" }));
   await user.click(screen.getByRole("button", { name: "Join interview room" }));
   const media = await screen.findByTestId("media-room");
+  const tools = screen.getByRole("complementary", { name: "Interviewer workspace" });
+  expect(tools.contains(media)).toBe(false);
+  await user.click(within(tools).getByRole("tab", { name: "Candidate & assistant" }));
+  expect(screen.getByRole("tabpanel", { name: "Candidate & assistant" })).toBeTruthy();
+  expect(screen.queryByRole("tab", { name: "Live transcript" })).toBeNull();
+  expect(screen.getByText("Private interview assistance").closest('[role="tabpanel"]')?.hasAttribute("hidden")).toBe(false);
+  expect(screen.getByTestId("media-room")).toBe(media);
+  await user.click(within(tools).getByRole("tab", { name: "Transcript & analysis" }));
+  expect(screen.getByRole("tabpanel", { name: "Transcript & analysis" })).toBeTruthy();
   await user.click(screen.getByRole("tab", { name: "Answer analysis" }));
   expect(screen.getByTestId("media-room")).toBe(media);
   await user.click(screen.getByRole("tab", { name: "Live transcript" }));
@@ -91,4 +116,17 @@ test("keeps the media room mounted while changing transcript and analysis tabs",
   expect(getSdk().room.screen).toBe(false);
   expect(api.interviewerConnected).toHaveBeenCalledTimes(1);
   expect(screen.queryByRole("button", { name: "Share screen", exact: true })).toBeNull();
+});
+
+test("bounds the full-height left meeting and switchable right tools to one viewport", () => {
+  const css = readFileSync("src/index.css", "utf8");
+  expect(css).toMatch(/\.hiresense-console \{[^}]*height: 100dvh;[^}]*overflow: hidden/);
+  expect(css).toMatch(/\.hiresense-console-grid \{[^}]*grid-template-columns: minmax\(0, 1.7fr\) minmax\(22rem, 1fr\); grid-template-rows: minmax\(0, 1fr\)/);
+  expect(css).toMatch(/\.hiresense-console-toolbar \{[^}]*display: flex;[^}]*align-items: flex-end/);
+  expect(css).toMatch(/@media \(max-width: 899px\)[\s\S]*\.hiresense-console-header \{ grid-template-columns: minmax\(0, 1fr\)/);
+  expect(css).toMatch(/\.hiresense-console \.hiresense-video-stage \{[^}]*flex: 1;[^}]*min-height: 0; height: auto/);
+  expect(css).toMatch(/\.hiresense-meeting-tabs-fill > \.hiresense-meeting-panel:not\(\[hidden\]\) \{[^}]*overflow-y: auto/);
+  expect(css).toContain('.hiresense-console-grid[data-closed="true"] { grid-template-columns: minmax(0, 1fr); }');
+  expect(css).toMatch(/\.hiresense-console-tools > \.hiresense-meeting-tabs-segmented > \.hiresense-meeting-panel:not\(\[hidden\]\) \{ overflow: hidden/);
+  expect(css).not.toContain("hiresense-console-primary");
 });

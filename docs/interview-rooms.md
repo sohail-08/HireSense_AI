@@ -27,8 +27,25 @@ and the central assistant's interview tools; neither is rendered in the candidat
 
 ## Meeting layout and candidate screen sharing
 
+The interviewer console occupies one `100dvh` viewport. Candidate admission and
+invitation actions share the compact page header instead of taking a separate
+full-width row; **Candidate link** groups Copy/Generate/Update, Replace and Revoke.
+Video and meeting controls fill the left column. All other tools share the right
+column, using a **Transcript & analysis / Candidate & assistant** segmented tab
+switch. Each group retains its own inner tabs and scrollable content. Camera
+height comes from the available grid space, not an additional viewport-sized card.
+Device preview and the Join button fit the same area. Closed interviews give the
+entire workspace to the saved transcript/analysis and candidate tools. At narrow
+widths the video and tools stack within the viewport. Switching groups or inner
+tabs never unmounts either pane or the media connection.
+The candidate-facing page keeps its existing responsive layout.
+
+Job requirements appear as a grouped card: minimum experience, required-skill tags,
+optional nice-to-have tags, qualifications and selection criteria. Values still
+come from the saved job profile; the styling does not add or score requirements.
+
 - The console keeps the meeting stage and labeled microphone/camera/leave controls
-  together, with **Live transcript** and **Answer analysis** tabs underneath. The
+  together, with **Live transcript** and **Answer analysis** tabs on the right. The
   **Candidate info** and **Assistant** tabs are interviewer-only. Tabs keep their
   contents mounted, preserving drafts, captions, analysis and the live connection.
 - Device preview, waiting room and live video use bounded frames. Camera videos
