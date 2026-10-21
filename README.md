@@ -1,5 +1,8 @@
 # HireSense
 
+Evidence-grounded semantic CV matching, private pgvector passages, stable result
+reuse, and calibration checks are described in [robust CV screening](docs/robust-cv-screening.md).
+
 Final candidate rankings (CV 50% + interview 50%), question scores, optional evidence,
 and private HTML/PDF reports are documented in [Feature 6](docs/consolidated-assessments.md).
 

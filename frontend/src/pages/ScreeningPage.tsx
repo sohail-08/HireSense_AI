@@ -112,6 +112,7 @@ export function ScreeningPage() {
   const processing = preparing || Boolean(currentBatch && ["queued", "processing"].includes(currentBatch.status));
   const selectedJob = jobs.find((job) => job.id === selectedJobId);
   const activeDashboard = dashboard && dashboard.job_posting_id === selectedJobId ? dashboard : undefined;
+  const failedApplications = activeDashboard?.applications.filter(application => application.screening_status === "failed") ?? [];
   const pendingCount = activeDashboard
     ? activeDashboard.applications.filter((application) => application.screening_status !== "completed").length
     : selectedJob?.pending_count ?? 0;
@@ -134,6 +135,12 @@ export function ScreeningPage() {
         {!loading && !jobs.length ? <p className="mt-3 text-sm text-slate-500">Create and approve a job description, then prepare a job posting to get started.</p> : null}
       </section>
 
+      {failedApplications.length ? <section role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p>{failedApplications.length} CV(s) could not be processed. They have not been assigned a zero score. Fix the file or service issue, then retry.</p>
+        <details className="mt-2"><summary className="cursor-pointer font-medium">See affected candidates</summary>
+          <ul className="mt-2 list-disc space-y-2 pl-5">{failedApplications.map(application => <li key={application.id}><strong>{application.candidate_name}:</strong> {application.error_message || "CV screening could not finish. Please retry."}</li>)}</ul>
+        </details>
+      </section> : null}
       {selectedJobId ? <CandidateScoringPanel key={selectedJobId} jobId={selectedJobId}
         refreshToken={String(refreshVersion) + "-" + currentBatch?.id + "-" + currentBatch?.status}
         applicationCount={activeDashboard?.applications.length ?? selectedJob?.application_count ?? 0}

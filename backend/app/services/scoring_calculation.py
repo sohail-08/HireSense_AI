@@ -5,8 +5,8 @@ from decimal import Decimal, ROUND_HALF_UP, localcontext
 from fractions import Fraction
 
 
-FORMULA_VERSION = "category-weighted-coverage-v4"
-SNAPSHOT_VERSION = "scoring-snapshot-v4"
+FORMULA_VERSION = "category-weighted-coverage-v5"
+SNAPSHOT_VERSION = "scoring-snapshot-v5"
 CATEGORIES = ("technical", "experience", "qualification")
 STATUS_VALUES = {"met": "1", "partially_met": "0.5", "unmet": "0"}
 DEFAULT_CATEGORY_WEIGHTS = {"technical": "50", "experience": "30", "qualification": "20"}

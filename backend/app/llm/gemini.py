@@ -35,6 +35,7 @@ class GeminiStructuredClient:
             timeout_seconds or settings.gemini_timeout_seconds
         )
         self._post = post or httpx.post
+        self.last_model_version = None
 
     def generate_json(
         self,
@@ -79,6 +80,7 @@ class GeminiStructuredClient:
             )
             response.raise_for_status()
             response_data = response.json()
+            self.last_model_version = response_data.get("modelVersion")
             text = self._response_text(response_data)
             parsed = json.loads(text)
             if not isinstance(parsed, dict):

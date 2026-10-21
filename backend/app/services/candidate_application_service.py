@@ -148,6 +148,8 @@ class CandidateApplicationService:
             db.execute(delete(CandidateScore).where(CandidateScore.scoring_run_id.in_(score_run_ids)))
             db.execute(delete(ScoringRun).where(ScoringRun.id.in_(score_run_ids)))
         for document in documents:
+            from app.models.cv_evidence import CVPassage
+            db.execute(delete(CVPassage).where(CVPassage.document_id == document.id))
             db.delete(document)
         db.delete(application)
         return paths, candidate_id
