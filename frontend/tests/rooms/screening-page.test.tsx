@@ -41,8 +41,9 @@ it("places the job selector inside the ranking section and switches the selected
   render(<ScreeningPage />);
   const controls = await screen.findByRole("region", { name: "Ranking controls" });
   expect(within(controls).getByLabelText("Job posting")).toBeTruthy();
-  expect(within(controls).getByText("1 candidate")).toBeTruthy();
-  fireEvent.change(within(controls).getByLabelText("Job posting"), { target: { value: "2" } });
+  expect(within(controls).getByText(/1 candidate/)).toBeTruthy();
+  fireEvent.click(within(controls).getByLabelText("Job posting"));
+  fireEvent.click(screen.getByRole("option", { name: /Posting #2/ }));
   expect(await screen.findByText("Selected job 2")).toBeTruthy();
   expect(screen.getAllByLabelText("Job posting")).toHaveLength(1);
 });

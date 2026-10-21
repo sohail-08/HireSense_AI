@@ -4,6 +4,7 @@ import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { CandidateScoringPanel } from "../components/candidates/CandidateScoringPanel";
+import { JobPostingSelect } from "../components/candidates/JobPostingSelect";
 import type { ScreeningBatch, ScreeningDashboard, ScreeningJobOption } from "../types";
 
 function messageFor(error: unknown): string {
@@ -116,16 +117,7 @@ export function ScreeningPage() {
   const pendingCount = activeDashboard
     ? activeDashboard.applications.filter((application) => application.screening_status !== "completed").length
     : selectedJob?.pending_count ?? 0;
-  const jobSelector = <div>
-    <label htmlFor="screening-job" className="block text-xs font-semibold text-slate-600">Job posting</label>
-    <select id="screening-job" value={selectedJobId ?? ""} disabled={loading || !jobs.length}
-      onChange={event => setSelectedJobId(Number(event.target.value))}
-      className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-      {!jobs.length ? <option value="">{loading ? "Loading jobs…" : "No job postings available"}</option> : null}
-      {jobs.map(job => <option key={job.id} value={job.id}>{job.title + " · #" + job.id}</option>)}
-    </select>
-    {selectedJob ? <p className="mt-1.5 text-xs text-slate-500">{selectedJob.application_count} {selectedJob.application_count === 1 ? "candidate" : "candidates"}</p> : null}
-  </div>;
+  const jobSelector = <JobPostingSelect jobs={jobs} value={selectedJobId} loading={loading} onChange={setSelectedJobId} />;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
