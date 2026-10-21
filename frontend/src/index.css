@@ -181,6 +181,21 @@
 .hiresense-meeting-tabs-page.hiresense-meeting-tabs-segmented > [role="tablist"] { top: 0; z-index: 30; border-radius: 0.875rem; background: #e2e8f0; }
 .hiresense-console-review .hiresense-interview-assistant > [role="log"] { flex: none; height: auto; min-height: 0; max-height: none; overflow: visible; }
 
+/* Conversation-style captions retain individual segments and exact timestamps. */
+.hiresense-transcript-heading, .hiresense-transcript-notice, .hiresense-transcript-thread { width: 100%; max-width: 64rem; margin-left: auto; margin-right: auto; }
+.hiresense-transcript-entry { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); align-items: start; gap: 0.5rem; min-width: 0; }
+.hiresense-transcript-avatar { display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin-top: 0.375rem; border-radius: 50%; background: #2563eb; font-size: 0.625rem; font-weight: 700; color: white; }
+.hiresense-transcript-entry[data-speaker="CANDIDATE"] .hiresense-transcript-avatar { background: #b45309; }
+.hiresense-transcript-bubble { display: flex; align-items: flex-start; justify-self: start; gap: 0.75rem; width: fit-content; max-width: 100%; min-width: 0; border: 1px solid #e2e8f0; border-radius: 0.25rem 0.875rem 0.875rem 0.875rem; background: #f8fafc; padding: 0.5rem 0.75rem; }
+.hiresense-transcript-entry[data-speaker="INTERVIEWER"] .hiresense-transcript-bubble { border-color: #93c5fd; border-left: 3px solid #2563eb; background: #dbeafe; }
+.hiresense-transcript-entry[data-speaker="CANDIDATE"] .hiresense-transcript-bubble { border-color: #fcd34d; border-left: 3px solid #d97706; background: #fef3c7; }
+.hiresense-transcript-meta { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; gap: 0.25rem; padding-top: 0.125rem; font-style: normal; }
+.hiresense-transcript-time { margin-left: auto; color: #475569; font-family: ui-monospace, monospace; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+.hiresense-transcript-copy { min-width: 0; color: #1e293b; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.hiresense-transcript-draft { border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; padding: 0.125rem 0.375rem; color: #475569; font-size: 0.625rem; font-weight: 600; }
+.hiresense-transcript-entry[data-kind="interim"] .hiresense-transcript-bubble { border-style: dashed; }
+.hiresense-console-review .hiresense-transcript-copy { font-size: 0.9375rem; }
+
 .interviewer-main {
   transition: padding-right 300ms ease-out;
 }

@@ -45,6 +45,19 @@ widths the video and tools stack within the viewport. Switching groups or inner
 tabs never unmounts either pane or the media connection.
 The candidate-facing page keeps its existing responsive layout.
 
+Transcript segments use conversation cards with blue interviewer and amber candidate
+backgrounds, matching avatars and accent borders. Speaker names are not repeated
+above each message; accessible segment labels still identify the speaker. Elapsed
+timestamps and readable wrapped text remain visible.
+Compact bubbles fit short messages instead of stretching across the page. Small
+avatars and inline timestamps reduce row height; long messages still wrap within
+the available width, without changing segment boundaries or saved text.
+Only interim text has a
+visible **Live draft** badge; final status remains in each segment's accessible
+label without repeating it visually. Wide review pages limit the conversation's
+reading width. Failure notices remain visible, with diagnostic codes under
+**Technical details**. These changes do not alter captions, storage or scrolling.
+
 The assistant gives the available panel height to its scrollable conversation.
 It has no duplicate heading or repeated privacy text, and the compact composer
 keeps the message input and Send button on the same row. Interviewer-only access,

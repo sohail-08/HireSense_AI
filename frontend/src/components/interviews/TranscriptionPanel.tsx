@@ -159,9 +159,9 @@ export function TranscriptionPanel({ closed = false, panelScroll = false, pageSc
   const label = status.status === "active" ? status.connection_status === "transcribing" ? "Transcription active" : status.connection_status
     : { not_started: "Not started", starting: "Connecting", stopping: "Stopping and saving", completed: "Stopped", failed: "Failed" }[status.status];
   const lines = [...finals, ...Object.values(interim)];
-  return <section className="mt-5 min-w-0 rounded-2xl bg-white p-5 shadow-sm" aria-label={interviewer ? "Interview transcript" : "Live captions"}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">{interviewer ? "Live transcript" : "Live captions"}</h2>
-      <span role="status" className={`rounded-full px-3 py-1 text-sm ${status.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-slate-100"}`}>{label}</span></div>
+  return <section className="hiresense-transcript mt-5 min-w-0 rounded-2xl bg-white p-5 shadow-sm" aria-label={interviewer ? "Interview transcript" : "Live captions"}>
+    <div className="hiresense-transcript-heading flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2.5"><span aria-hidden="true" className="rounded-xl bg-blue-50 p-2 text-blue-600"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><h2 className="text-base font-bold tracking-tight text-slate-800">{interviewer ? "Live transcript" : "Live captions"}</h2></div>
+      <span role="status" className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${status.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : status.status === "failed" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current"/>{label}</span></div>
     {!closed && status.enabled ? <>
       <p className="mt-3 text-sm leading-6 text-slate-500">With your consent, microphone audio is sent to Deepgram for live captions. Only final text is saved, for {status.retention_days} days. No audio or video is recorded.</p>
       <details className="mt-2 text-xs text-slate-500"><summary className="font-medium text-blue-700">About transcription and privacy</summary><p className="mt-2 leading-5">{status.notice}</p></details>
@@ -173,14 +173,18 @@ export function TranscriptionPanel({ closed = false, panelScroll = false, pageSc
         <button className="rounded-lg border px-4 py-2 text-sm disabled:text-slate-400" disabled={busy || !running || status.status === "stopping"}
           onClick={() => void context.control("stop")}>Stop transcription</button></div> : null}
     </> : !status.enabled && !closed ? <p className="mt-3 text-sm text-slate-600">Transcription is not configured. The video interview works independently.</p> : null}
-    {status.failure_code ? <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Transcription stopped ({status.failure_code.replaceAll("_", " ")}). Audio/video is unaffected. Ask the interviewer to retry after checking configuration.</p> : null}
+    {status.failure_code ? <div role="alert" className="hiresense-transcript-notice mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 p-3 text-amber-900"><svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg><div className="min-w-0"><p className="text-sm font-semibold">Transcription stopped</p><p className="mt-0.5 text-xs leading-5">Audio/video is unaffected. {closed ? "Any saved transcript text remains available below." : "Ask the interviewer to retry after checking configuration."}</p><details className="mt-1 text-xs"><summary className="w-fit font-medium text-amber-800">Technical details</summary><p className="mt-1 break-words">{status.failure_code.replaceAll("_", " ")}</p></details></div></div> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-amber-900">{error}</p> : null}
     <div ref={scroll} onScroll={() => { const el = scroll.current; if (el && !panelScroll) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
-      data-scroll-mode={pageScroll ? "page" : panelScroll ? "panel" : "segments"} data-has-lines={lines.length > 0} data-auto-follow={!pageScroll && (closed || status.consented)} className={panelScroll || pageScroll ? "mt-4 space-y-3" : "mt-4 h-72 space-y-3 overflow-y-auto overscroll-contain sm:h-80"} aria-label="Transcript segments" tabIndex={0}>
-      {!lines.length ? <p className="py-5 text-sm text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p> : lines.map(line => <article key={line.id || `interim-${line.speaker}`}
-        className={`rounded-xl border-l-4 p-3 ${line.speaker === "INTERVIEWER" ? "border-blue-500 bg-blue-50" : "border-emerald-500 bg-emerald-50"} ${line.kind === "interim" ? "italic opacity-70" : ""}`}>
-        <p className="text-xs font-semibold">{line.speaker === "INTERVIEWER" ? "Interviewer" : "Candidate"} · {transcriptTime(line.start_offset_ms)}{line.kind === "interim" ? " · Live draft" : " · Final"}</p>
-        <p className="mt-1 whitespace-pre-wrap break-words text-sm">{line.text}</p></article>)}
+      data-scroll-mode={pageScroll ? "page" : panelScroll ? "panel" : "segments"} data-has-lines={lines.length > 0} data-auto-follow={!pageScroll && (closed || status.consented)} className={`hiresense-transcript-thread ${panelScroll || pageScroll ? "mt-5 space-y-2" : "mt-5 h-72 space-y-2 overflow-y-auto overscroll-contain sm:h-80"}`} aria-label="Transcript segments" tabIndex={0}>
+      {!lines.length ? <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-5 py-8 text-center"><p className="text-sm leading-6 text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p></div> : lines.map(line => {
+        const speaker = line.speaker === "INTERVIEWER" ? "Interviewer" : "Candidate";
+        const draft = line.kind === "interim";
+        return <article key={line.id || `interim-${line.speaker}`} aria-label={`${speaker} · ${transcriptTime(line.start_offset_ms)} · ${draft ? "Live draft" : "Final"}`} data-speaker={line.speaker} data-kind={line.kind} className="hiresense-transcript-entry">
+          <span aria-hidden="true" className="hiresense-transcript-avatar">{speaker[0]}</span>
+          <div className={`hiresense-transcript-bubble ${draft ? "italic" : ""}`}><p className="hiresense-transcript-copy">{line.text}</p><div className="hiresense-transcript-meta">{draft ? <span className="hiresense-transcript-draft">Live draft</span> : null}<span className="hiresense-transcript-time" title="Time from the start of transcription">{transcriptTime(line.start_offset_ms)}</span></div></div>
+        </article>;
+      })}
     </div>
     {!interviewer ? <p className="mt-2 text-xs text-slate-500">Live captions only. Saved transcript history is interviewer-only.</p> : null}
   </section>;
