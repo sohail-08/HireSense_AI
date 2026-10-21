@@ -13,8 +13,8 @@ type Invitation = { id?: number; status?: string; recipient_count: number; recip
 const inputStyle = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 const buttonStyle = "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300";
 
-export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = [], scheduleIds, onUpdated }:
-  { jobId?: number; rankingRunId?: number; selectedIds?: number[]; scheduleIds?: number[]; onUpdated?: () => void }) {
+export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = [], scheduleIds, onUpdated, onBusyChange }:
+  { jobId?: number; rankingRunId?: number; selectedIds?: number[]; scheduleIds?: number[]; onUpdated?: () => void; onBusyChange?: (busy: boolean) => void }) {
   const rescheduling = Boolean(scheduleIds?.length);
   const [selectionMode, setSelectionMode] = useState("manual");
   const [topN, setTopN] = useState("5");
@@ -31,6 +31,10 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
   const actionBusy = useRef(false);
   const selectedKey = selectedIds.join(",");
   const scheduleKey = scheduleIds?.join(",");
+  useEffect(() => {
+    onBusyChange?.(busy || batch?.status === "sending");
+    return () => onBusyChange?.(false);
+  }, [busy, batch?.status, onBusyChange]);
   useEffect(() => { setSelection(undefined); setPreview(undefined); setBatch(undefined); setError(undefined); }, [jobId, rankingRunId, selectedKey, scheduleKey]);
   useEffect(() => {
     if (!batch?.id || batch.status !== "sending") return;

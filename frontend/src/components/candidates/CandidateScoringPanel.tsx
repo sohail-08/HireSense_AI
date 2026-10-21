@@ -3,8 +3,7 @@ import { createPortal } from "react-dom";
 
 import { apiRequest } from "../../api/apiClient";
 import { ErrorMessage } from "../common/ErrorMessage";
-import { useSupervisor } from "../assistant/SupervisorProvider";
-import { InterviewSchedulingPanel } from "../interviews/InterviewSchedulingPanel";
+import { RankingPagination } from "./RankingPagination";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
 import { RequirementEvidence, type EvidenceRequirement } from "./RequirementEvidence";
 
@@ -84,8 +83,6 @@ type Props = {
 };
 
 export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, onScreenPending, jobSelector }: Props) {
-  const { setSelectedApplicationIds } = useSupervisor();
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [proposal, setProposal] = useState<Proposal>();
@@ -103,9 +100,6 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
   const actionBusy = useRef(false);
   const waitingForConfiguration = useRef<number | undefined>(undefined);
   const evidenceTrigger = useRef<HTMLElement | null>(null);
-
-  useEffect(() => { setSelectedIds([]); setSelectedApplicationIds([]); }, [run?.id, jobId, setSelectedApplicationIds]);
-  useEffect(() => { setSelectedApplicationIds(selectedIds); }, [selectedIds, setSelectedApplicationIds]);
 
   useEffect(() => {
     let active = true;
@@ -201,8 +195,6 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
   const currentPage = Math.min(page, pages);
   const start = (currentPage - 1) * pageSize;
   const visibleResults = ranked.slice(start, start + pageSize);
-  const pageNumbers = pages <= 7 ? Array.from({ length: pages }, (_, index) => index + 1)
-    : [1, ...Array.from({ length: 3 }, (_, index) => Math.max(2, Math.min(currentPage - 1, pages - 3)) + index), pages];
   useEffect(() => { setPage(1); }, [run?.id, jobId]);
   useEffect(() => { setPage(value => Math.min(value, pages)); }, [pages]);
 
@@ -240,9 +232,8 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
       {run && categories.some(category => weightUnits(weights[category]) !== weightUnits(run.configuration.category_weights[category])) ? <p className="mt-3 text-sm text-amber-800">Select “Rank candidates” to apply your changes. Current results use {categories.map(category => categoryLabels[category].toLowerCase() + " " + run.configuration.category_weights[category] + "%").join(", ")}.</p> : null}
       {run && proposal && (run.requirement_version !== proposal.requirement_version || run.formula_version !== proposal.formula_version) ? <p className="mt-3 text-sm text-amber-800">The job requirements or scoring rules have changed. Rank candidates again to update these results.</p> : null}
       {ranked.length ? <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Select</th><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
+        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
         <tbody>{visibleResults.map((result) => <tr key={result.id} className="border-b border-slate-100 last:border-0">
-          <td className="px-2 py-4"><input type="checkbox" aria-label={`Select ${result.candidate_name} for interview`} disabled={busy || processing || result.rank === null} checked={selectedIds.includes(result.application_id)} onChange={() => setSelectedIds((ids) => ids.includes(result.application_id) ? ids.filter((id) => id !== result.application_id) : [...ids, result.application_id])} /></td>
           <td className="px-2 py-4 font-semibold">{result.rank ?? "—"}</td><td className="px-2 py-4 font-medium">{result.candidate_name}</td>
           <td className="whitespace-nowrap px-2 py-4 font-semibold text-blue-700">{result.display_score + "%"}</td>
           <td className="px-2 py-4 text-right"><button type="button" id={"inspect-score-" + result.id} onClick={event => { evidenceTrigger.current = event.currentTarget; setEvidence(result); }}
@@ -251,31 +242,10 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
       </table></div> : <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
         {loading ? "Loading candidate ranking…" : processing ? "Your ranking is being prepared." : !applicationCount ? "Candidates will appear here after their applications are collected." : "Choose your weights, then select “Rank candidates” to see the results."}
       </p>}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-        <p aria-live="polite">{ranked.length ? `${start + 1}–${Math.min(start + pageSize, ranked.length)} of ${ranked.length} candidates` : "0 candidates"}{selectedIds.length ? ` · ${selectedIds.length} selected` : ""}</p>
-        <label htmlFor="ranking-page-size" className="flex items-center gap-2 text-slate-600">Candidates per page
-          <select id="ranking-page-size" value={pageSize} disabled={loading} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-medium outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-            {[5, 10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </label>
-        <nav aria-label="Ranking pages" className="flex flex-wrap items-center gap-2">
-          <span className="mr-1">Page {currentPage} of {pages}</span>
-          <button type="button" disabled={loading || currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          {pageNumbers.map((number, index) => <span key={number} className="hidden items-center gap-2 sm:inline-flex">
-            {index > 0 && number - pageNumbers[index - 1] > 1 ? <span aria-hidden="true" className="px-1">…</span> : null}
-            <button type="button" aria-label={`Go to ranking page ${number}`} aria-current={number === currentPage ? "page" : undefined} disabled={loading} onClick={() => setPage(number)}
-              className={`min-w-8 rounded-lg border px-2 py-2 font-semibold ${number === currentPage ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>{number}</button>
-          </span>)}
-          <button type="button" disabled={loading || currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-        </nav>
-      </div>
+      <RankingPagination count={ranked.length} page={currentPage} pageSize={pageSize} loading={loading} onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1); }} />
       {run ? <p className="mt-3 text-xs text-slate-400">Last updated {new Date(run.created_at).toLocaleString()} · Scores reflect the CV, not a final hiring decision.</p> : null}
       </div>
     </section>
-    {run ? <details className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-blue-700">Schedule interview{selectedIds.length ? ` (${selectedIds.length} selected)` : ""}</summary>
-      <InterviewSchedulingPanel jobId={jobId} rankingRunId={run.id} selectedIds={selectedIds} />
-    </details> : null}
     {evidence ? <EvidenceModal key={evidence.id} result={evidence} restoreFocus={evidenceTrigger.current} onClose={closeEvidence} /> : null}
   </>;
 }

@@ -50,7 +50,7 @@ export function useSupervisor() {
 export function SupervisorProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const page = pathname.endsWith("/candidates") ? "candidates"
-    : pathname.endsWith("/interviews") ? "interviews"
+    : pathname.endsWith("/interviews") || pathname.endsWith("/schedule-interviews") ? "interviews"
     : pathname.endsWith("/assessments") ? "assessments"
       : pathname.endsWith("/jobs") ? "jobs" : "other";
   const [open, setOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
@@ -208,13 +208,13 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
         phaseLabel={batch && ["queued", "processing"].includes(batch.status)
           ? `Screening ${batch.processed_applications}/${batch.total_applications}`
           : phase.startsWith("interview_") ? phaseLabels[phase]
-          : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : phaseLabels[phase]}
+          : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : page === "interviews" ? "Interview scheduling" : phaseLabels[phase]}
         messages={messages}
         assessmentLinks={response?.assessment_links}
         loading={loading}
         input={input}
         placeholder={page === "candidates" ? "e.g. Sync responses…"
-          : page === "assessments" ? "Screen candidates for a job…" : "Message HireSense assistant…"}
+          : page === "assessments" ? "Screen candidates for a job…" : page === "interviews" ? "Schedule or reschedule interviews…" : "Message HireSense assistant…"}
         requirementContextVisible={phase.startsWith("requirement")}
         requirementSources={requirement?.source_references ?? []}
         missingFields={requirement?.missing_fields ?? []}

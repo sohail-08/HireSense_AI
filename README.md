@@ -405,8 +405,15 @@ An active conversational batch can be restored after reloading the page.
    loads the latest ranking. Closing the modal returns focus to its Inspect button.
    Rankings show 10 candidates per page by default, with 5/10/20/50 row options,
    numbered pages and Previous/Next controls. Rank values stay unchanged across
-   pages, and interview selections persist across pages. A new ranking returns
-   to page one and clears the previous interview selection.
+   pages. A new ranking returns to page one. Interview selection and scheduling
+   are available separately under **Schedule Interviews**, immediately after
+   **CV Screening** in the navbar.
+5. Open **Schedule Interviews**, choose a job, and select candidates from its
+   latest CV ranking. Selections persist across pages. Use the scheduling form
+   to choose checked candidates, the highest-ranked candidates, or candidates
+   above a score. Preview recipients, times and email before confirming delivery.
+   The shared assistant receives the selected job and candidates on this page.
+   **Interview** remains the page for meeting details, delivery and rescheduling.
 
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported

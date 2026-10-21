@@ -101,11 +101,11 @@ it("validates totals and keeps saving and ranking behavior intact", async () => 
   expect(apiRequest).toHaveBeenCalledWith("/scoring/jobs/1/runs", { method: "POST", body: JSON.stringify({ configuration_id: 4 }) });
 });
 
-it("preserves candidate selection for interview scheduling", async () => {
+it("keeps interview scheduling and selection out of CV screening", async () => {
   render(<CandidateScoringPanel {...defaultProps} />);
-  fireEvent.click(await screen.findByRole("checkbox", { name: "Select Synthetic Candidate for interview" }));
-  expect(screen.getByText("Interview selection: 7")).toBeTruthy();
-  await waitFor(() => expect(supervisor.setSelectedApplicationIds).toHaveBeenLastCalledWith([7]));
+  await screen.findByText("Synthetic Candidate");
+  expect(screen.queryByRole("checkbox")).toBeNull();
+  expect(screen.queryByText(/Schedule interview|Interview selection/)).toBeNull();
 });
 
 it("queues pending CV screening after saving weights and prevents duplicate actions", async () => {
@@ -125,8 +125,8 @@ it("paginates the complete sorted ranking without changing saved ranks or scores
   expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(11);
   fireEvent.click(screen.getByRole("button", { name: "Go to ranking page 2" }));
   const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
-  expect(firstRow.children[1].textContent).toBe("11");
-  expect(firstRow.children[3].textContent).toBe("90%");
+  expect(firstRow.children[0].textContent).toBe("11");
+  expect(firstRow.children[2].textContent).toBe("90%");
   expect(screen.getByText("11–20 of 23 candidates")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   expect(screen.getByText("21–23 of 23 candidates")).toBeTruthy();
@@ -134,13 +134,11 @@ it("paginates the complete sorted ranking without changing saved ranks or scores
   expect(screen.getByRole("button", { name: "Go to ranking page 3" }).getAttribute("aria-current")).toBe("page");
 });
 
-it("preserves interview selections and opens the right evidence on later pages", async () => {
+it("opens the right evidence and restores the current page", async () => {
   results = makeResults(12);
   render(<CandidateScoringPanel {...defaultProps} />);
-  fireEvent.click(await screen.findByRole("checkbox", { name: "Select Applicant 1 for interview" }));
+  await screen.findByText("Applicant 1");
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }));
-  expect(screen.getByText("Interview selection: 1,11")).toBeTruthy();
   const trigger = screen.getByRole("button", { name: "Inspect evidence for Applicant 11" });
   trigger.focus(); fireEvent.click(trigger);
   expect(screen.getByRole("dialog", { name: "Applicant 11" })).toBeTruthy();
@@ -148,22 +146,20 @@ it("preserves interview selections and opens the right evidence on later pages",
   expect(document.activeElement).toBe(trigger);
   expect(screen.getByText("Page 2 of 2")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Previous" }));
-  expect((screen.getByRole("checkbox", { name: "Select Applicant 1 for interview" }) as HTMLInputElement).checked).toBe(true);
+  expect(screen.getByText("Applicant 1")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Candidates per page"), { target: { value: "20" } });
   expect(screen.getByText("Page 1 of 1")).toBeTruthy();
-  expect((screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }) as HTMLInputElement).checked).toBe(true);
+  expect(screen.getByText("Applicant 11")).toBeTruthy();
 });
 
-it("resets to page one and clears interview selection when ranking is updated", async () => {
+it("resets to page one when ranking is updated", async () => {
   results = makeResults(12);
   render(<CandidateScoringPanel {...defaultProps} />);
   await screen.findByText("Applicant 1");
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Select Applicant 11 for interview" }));
   fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
   await screen.findByText("Ranking updated.");
   expect(screen.getByText("Page 1 of 2")).toBeTruthy();
-  expect(screen.getByText("Interview selection:")).toBeTruthy();
   expect(screen.queryByText("Applicant 11")).toBeNull();
 });
 

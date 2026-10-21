@@ -44,7 +44,8 @@ export function InterviewsPage() {
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold">Interviews</h1>
       <Link className="mt-2 inline-block text-sm text-blue-700 underline" to="/interviewer/reports">View consolidated assessment reports</Link>
-      <p className="mt-2 text-sm text-slate-600">Schedules, delivery and rescheduling. Select ranked candidates on Assessments to schedule new interviews.</p>
+      <p className="mt-2 text-sm text-slate-600">View meeting details, invitation delivery and rescheduling.</p>
+      <Link to="/interviewer/schedule-interviews" className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Schedule interviews</Link>
       <ErrorMessage message={error} />
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         {loading ? <p>Loading interviews…</p> : !schedules.length ? (

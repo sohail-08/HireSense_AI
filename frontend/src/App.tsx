@@ -20,6 +20,7 @@ import { CandidateDashboard } from "./pages/CandidateDashboard";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewerDashboard } from "./pages/InterviewerDashboard";
 import { InterviewsPage } from "./pages/InterviewsPage";
+import { ScheduleInterviewsPage } from "./pages/ScheduleInterviewsPage";
 const CandidateInterviewPage = lazy(() => import("./pages/CandidateInterviewPage").then((module) => ({ default: module.CandidateInterviewPage })));
 const InterviewerConsolePage = lazy(() => import("./pages/InterviewerConsolePage").then((module) => ({ default: module.InterviewerConsolePage })));
 import { JobDescriptionPage } from "./pages/JobDescriptionPage";
@@ -102,6 +103,7 @@ export default function App() {
             path="interviews"
             element={<InterviewsPage />}
           />
+          <Route path="schedule-interviews" element={<ScheduleInterviewsPage />} />
 
           <Route
             path="assessments"

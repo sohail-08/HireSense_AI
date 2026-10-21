@@ -16,6 +16,7 @@ export function Navbar() {
           { page: "jobs", label: "Jobs" },
           { page: "candidates", label: "Candidates" },
           { page: "assessments", label: "CV Screening" },
+          { page: "schedule-interviews", label: "Schedule Interviews" },
           { page: "interviews", label: "Interview" },
           { page: "reports", label: "Assessment" },
         ]

@@ -14,9 +14,9 @@ it("shows the requested interviewer navigation order with existing destinations"
   render(<MemoryRouter initialEntries={["/interviewer/assessments"]}><Navbar /></MemoryRouter>);
   const nav = within(screen.getByRole("navigation", { name: "Main navigation" }));
   const links = nav.getAllByRole("link");
-  expect(links.map(link => link.textContent)).toEqual(["Jobs", "Candidates", "CV Screening", "Interview", "Assessment"]);
+  expect(links.map(link => link.textContent)).toEqual(["Jobs", "Candidates", "CV Screening", "Schedule Interviews", "Interview", "Assessment"]);
   expect(links.map(link => link.getAttribute("href"))).toEqual([
-    "/interviewer/jobs", "/interviewer/candidates", "/interviewer/assessments", "/interviewer/interviews", "/interviewer/reports",
+    "/interviewer/jobs", "/interviewer/candidates", "/interviewer/assessments", "/interviewer/schedule-interviews", "/interviewer/interviews", "/interviewer/reports",
   ]);
   expect(nav.queryByRole("link", { name: "Dashboard" })).toBeNull();
   expect(nav.getByRole("link", { name: "CV Screening" }).getAttribute("aria-current")).toBe("page");
