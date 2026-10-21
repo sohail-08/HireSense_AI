@@ -23,8 +23,7 @@ candidate captions. Interim text never enters the analysis workflow.
    segments/subparts. Candidate clarification and interviewer acknowledgements remain
    context. A new substantive question closes the prior exchange. A pause or final
    STT event does not. Use **Score this answer now** for an explicit boundary.
-   Overlap, uncertain turns, low confidence and session gaps remain available in
-   **Evidence & details**. Unanswered questions receive 0;
+   Transcript gaps and analysis failures remain visible. Unanswered questions receive 0;
    procedural/excluded conversation and unfinished answers are not scored.
 5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
    accuracy, completeness and quality each weigh 25%. Met earns 1, partially met 0.5,
@@ -34,11 +33,11 @@ candidate captions. Interim text never enters the analysis workflow.
    (an answer guide for completeness). A missing reference does not prove a personal
    claim false; the explanation records the missing support. No result is placed in
    a "needs review" queue. Provider failures remain retryable errors, not candidate scores.
-6. Open **Evidence & details** for supporting passages, answer references, original
-   score explanations and evidence gaps. Shared passages and reference quotes are
-   listed once rather than repeated in each scoring category. Click a transcript
-   quote to open its exact immutable source with the cited characters highlighted.
-   There is no audio playback because the application does not record audio.
+6. Question cards show the question, candidate answer, percentage and brief category
+   explanations. The per-answer **Evidence & details** expander, cited passages,
+   reference quotes and full explanations are no longer rendered here. Saved evidence,
+   references and original score explanations remain intact in backend records.
+   Citation verification in requirement coverage and other views is unchanged.
 7. **Job requirements covered** distinguishes an undiscussed requirement from one
    that was assessed as unmet. Source gaps, errors and outdated inputs remain visible.
 
@@ -51,7 +50,7 @@ analysis and question tools are also unchanged.
 
 Known missing-evidence boilerplate is shortened for display without changing scores
 or claiming that missing support proves an answer wrong. Original wording remains
-under **Evidence & details**. Met earns 1, partially met 0.5, unmet 0, with equal weights.
+in saved records. Met earns 1, partially met 0.5, unmet 0, with equal weights.
 
 ## Actual graph and background execution
 

@@ -47,7 +47,6 @@ describe("simplified interviewer answer analysis", () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
     await screen.findByText("Questions & answers");
     fireEvent.click(screen.getByText("Scoring options"));
-    fireEvent.click(screen.getByText("Evidence & details"));
     for (const name of [/Correct pairing/i, /merge/i, /split/i, /Save review/i, /Mark used/i, /Dismiss/i, /Link spoken question/i]) expect(screen.queryByRole("button", { name })).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
@@ -55,21 +54,19 @@ describe("simplified interviewer answer analysis", () => {
     expect(screen.queryByText(/needs review/i)).toBeNull();
   });
 
-  it("shows each shared evidence passage once, with a verified link to its original snapshot", async () => {
+  it("removes per-answer evidence and detailed explanations while keeping the question, answer and score", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
     await screen.findByText("Questions & answers");
-    expect(screen.getByText("Evidence & details").closest("details")?.open).toBe(false);
-    fireEvent.click(screen.getByText("Evidence & details"));
-    const evidence = screen.getByRole("region", { name: "Transcript evidence" });
-    expect(within(evidence).getByText("relevance · accuracy · completeness · quality")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Candidate · 00:03/ })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: /Candidate · 00:03/ }));
-    await screen.findByRole("dialog", { name: "Transcript source passage" });
-    expect(document.querySelector("mark")?.textContent).toBe("commit changes");
-    expect(analysisApi.read).toHaveBeenLastCalledWith(1, 10);
+    for (const text of ["Evidence & details", "Cited transcript passages", "Full score explanations", "Answer guide points"]) expect(screen.queryByText(text)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Transcript evidence" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Scoring details" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Candidate · 00:03/ })).toBeNull();
+    expect(screen.getByText("Explain transactions")).toBeTruthy();
+    expect(screen.getByText("Transactions commit changes atomically.")).toBeTruthy();
+    expect(screen.getByLabelText("Answer score 75%")).toBeTruthy();
   });
 
-  it("shortens missing-evidence boilerplate while retaining original reasons and scores in details", async () => {
+  it("shortens missing-evidence boilerplate without changing saved reasons or scores", async () => {
     const data = fixture(); const pair = data.run!.result.pairs![0];
     const transcriptReason = "The available transcript evidence does not establish this criterion. No credit is awarded for unsupported evidence.";
     const referenceReason = "Accuracy is not established by a relevant cited answer guide or technical reference. No credit is awarded for missing support.";
@@ -81,10 +78,8 @@ describe("simplified interviewer answer analysis", () => {
     await screen.findByText("Questions & answers");
     expect(within(screen.getByRole("region", { name: "relevance score" })).getByText("Not enough supporting evidence in the transcript.")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "accuracy score" })).getByText("No supporting guide or reference was available.")).toBeTruthy();
-    fireEvent.click(screen.getByText("Evidence & details"));
-    const details = screen.getByRole("region", { name: "Scoring details" });
-    expect(within(details).getByText(transcriptReason)).toBeTruthy();
-    expect(within(details).getByText(referenceReason)).toBeTruthy();
+    expect(screen.queryByText(transcriptReason)).toBeNull();
+    expect(screen.queryByText(referenceReason)).toBeNull();
     expect(JSON.stringify(data)).toBe(original);
   });
 
@@ -101,15 +96,17 @@ describe("simplified interviewer answer analysis", () => {
     expect(css).toContain("grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr))");
   });
 
-  it("deduplicates answer references without dropping their source or quote", async () => {
+  it("removes answer references from the question card without deleting saved reference data", async () => {
     const data = fixture(); const assessment = data.run!.result.pairs![0].assessment!;
     const ref = { reference_id: "ref", title: "Transactions guide", quote: "Commit changes atomically.", version: "v1" };
     assessment.accuracy.references = [ref]; assessment.completeness.references = [ref];
+    const original = JSON.stringify(data);
     vi.mocked(analysisApi.read).mockResolvedValue(data);
     render(<InterviewAnalysisPanel interviewId={1} />);
-    await screen.findByText("Questions & answers"); fireEvent.click(screen.getByText("Evidence & details"));
-    expect(screen.getAllByText("Transactions guide")).toHaveLength(1);
-    expect(screen.getByText("Commit changes atomically.")).toBeTruthy();
+    await screen.findByText("Questions & answers");
+    expect(screen.queryByText("Transactions guide")).toBeNull();
+    expect(screen.queryByText("Commit changes atomically.")).toBeNull();
+    expect(JSON.stringify(data)).toBe(original);
   });
 
   it("keeps undisclosed requirements distinct from failing requirements", async () => {

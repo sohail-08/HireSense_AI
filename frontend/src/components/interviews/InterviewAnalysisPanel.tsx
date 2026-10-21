@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { analysisApi, type AnalysisState, type Citation, type Pair } from "./analysisApi";
+import { analysisApi, type AnalysisState, type Citation } from "./analysisApi";
 import { TranscriptCitation } from "./TranscriptCitation";
 import { transcriptTime } from "./transcriptionApi";
 
@@ -12,48 +12,13 @@ const scoreLabel = (status: string) => ({ met: "Met", partially_met: "Partially 
 const scoreStyle = (status: string) => ({ met: "border-emerald-200 bg-emerald-50 text-emerald-800", partially_met: "border-amber-200 bg-amber-50 text-amber-800", unmet: "border-rose-200 bg-rose-50 text-rose-800" }[status] || "border-slate-200 bg-slate-50 text-slate-600");
 const coverageLabel = (status: string) => ({ supporting_evidence: "Supported by the interview", partial_supporting_evidence: "Partly supported", contradictory_evidence: "Conflicting evidence", insufficient_evidence: "Not enough evidence", not_assessed: "Not discussed" }[status] || label(status));
 
-// Condense known boilerplate, not scores or evidence. Keep the original wording
-// in the expandable details, including why an unsupported answer earned no credit.
+// Condense known boilerplate for display, without changing saved reasons or scores.
 function shortReason(reason: string) {
   const text = reason.trim();
   if (/not established by a relevant cited answer guide or technical reference/i.test(text)) return "No supporting guide or reference was available.";
   if (/available transcript evidence does not establish|available transcript and answer guide do not establish/i.test(text)) return "Not enough supporting evidence in the transcript.";
   if (/accuracy is not established by the answer guide/i.test(text)) return "The answer guide does not confirm this.";
   return text.replace(/\s*No credit is awarded for (?:unsupported evidence|missing support)\./gi, "");
-}
-
-function evidenceFor(pair: Pair) {
-  const unique = new Map<string, { citation: Citation; dimensions: string[] }>();
-  for (const dimension of dimensions) for (const citation of pair.assessment?.[dimension].citations || []) {
-    const key = JSON.stringify([citation.interview_id, citation.session_id, citation.segment_id, citation.revision, citation.char_start, citation.char_end, citation.quote]);
-    const previous = unique.get(key);
-    if (previous) { if (!previous.dimensions.includes(dimension)) previous.dimensions.push(dimension); }
-    else unique.set(key, { citation, dimensions: [dimension] });
-  }
-  return [...unique.values()];
-}
-
-function EvidenceDetails({ pair, interviewId, runId }: { pair: Pair; interviewId: number; runId: number }) {
-  const evidence = evidenceFor(pair);
-  const references = [...new Map(dimensions.flatMap(d => pair.assessment?.[d].references || []).map(ref => [JSON.stringify([ref.reference_id, ref.version, ref.quote]), ref])).values()];
-  const transcriptNotes = [...new Set(pair.flags.map(label))];
-  return <details className="hiresense-analysis-evidence mt-4 border-t border-slate-100 pt-3">
-    <summary className="cursor-pointer text-sm font-semibold text-blue-700">Evidence & details{evidence.length ? <span className="ml-2 text-xs font-normal text-slate-500">{evidence.length} {evidence.length === 1 ? "passage" : "passages"}</span> : null}</summary>
-    <div className="mt-3 space-y-4">
-      <section aria-label="Transcript evidence"><h5 className="text-xs font-semibold text-slate-500">Cited transcript passages</h5>
-        {evidence.length ? evidence.map(({ citation, dimensions: names }, index) => <div key={index} className="mt-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3"><p className="text-xs capitalize text-slate-500">{names.join(" · ")}</p><TranscriptCitation citation={citation} runId={runId} interviewId={interviewId} /></div>) : <p className="mt-2 text-sm text-slate-500">No supporting passages are available.</p>}
-      </section>
-      {references.length ? <section aria-label="Answer references"><h5 className="text-xs font-semibold text-slate-500">Answer references</h5>{references.map((ref, index) => <blockquote key={index} className="mt-2 rounded-xl bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-700">{ref.title}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">{ref.quote}</p></blockquote>)}</section> : null}
-      <section aria-label="Scoring details"><h5 className="text-xs font-semibold text-slate-500">Full score explanations</h5><dl className="mt-2 space-y-3">{dimensions.map(dimension => {
-        const item = pair.assessment?.[dimension];
-        const reason = pair.score?.breakdown[dimension]?.reason || item?.justification;
-        const notes = [...new Set([...(item?.evidence_gaps || []), ...(item?.flags || []).map(label)])];
-        return reason || notes.length ? <div key={dimension}><dt className="text-sm font-semibold capitalize text-slate-700">{dimension}</dt>{reason ? <dd className="mt-1 text-sm leading-6 text-slate-600">{reason}</dd> : null}{notes.map((note, index) => <dd key={index} className="mt-1 text-xs leading-5 text-slate-500">{note}</dd>)}</div> : null;
-      })}</dl></section>
-      {pair.assessment?.expected_elements.length ? <section><h5 className="text-xs font-semibold text-slate-500">Answer guide points <span className="font-normal">({label(pair.assessment.expected_elements_basis)})</span></h5><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">{pair.assessment.expected_elements.map((item, index) => <li key={index}>{item}</li>)}</ul></section> : null}
-      {transcriptNotes.length ? <p className="text-xs leading-5 text-slate-500">Transcript notes: {transcriptNotes.join(" · ")}</p> : null}
-    </div>
-  </details>;
 }
 
 export function InterviewAnalysisPanel({ interviewId }: { interviewId: number }) {
@@ -123,7 +88,6 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
               const reason = points?.reason || item?.justification || "No score explanation is available yet.";
               return <section aria-label={`${dimension} score`} key={dimension} className="min-w-0 rounded-xl border border-slate-100 bg-white p-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold capitalize text-slate-700">{dimension}</h4><span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${scoreStyle(points?.status || "")}`}>{scoreLabel(points?.status || "")}</span></div><p className="mt-2 text-xs leading-6 text-slate-600">{shortReason(reason)}</p></section>;
             })}</div> : null}
-            <EvidenceDetails pair={pair} interviewId={interviewId} runId={run.id} />
           </div>
         </details>;
       })}</div>
