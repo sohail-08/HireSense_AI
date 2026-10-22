@@ -16,11 +16,11 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest<T>(
+async function requestResponse(
   path: string,
   options: RequestInit = {},
   authenticated = true,
-): Promise<T> {
+): Promise<Response> {
   const headers = new Headers(options.headers);
 
   if (options.body && !(options.body instanceof FormData)) {
@@ -49,9 +49,8 @@ export async function apiRequest<T>(
     );
   }
 
-  const data = await response.json().catch(() => null);
-
   if (!response.ok) {
+    const data = await response.json().catch(() => null);
     if (response.status === 401 && token) {
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(EXPIRY_KEY);
@@ -75,5 +74,15 @@ export async function apiRequest<T>(
     throw new ApiError(message, response.status);
   }
 
-  return data as T;
+  return response;
+}
+
+export async function apiRequest<T>(path: string, options: RequestInit = {}, authenticated = true): Promise<T> {
+  const response = await requestResponse(path, options, authenticated);
+  return await response.json().catch(() => null) as T;
+}
+
+export async function apiBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  const response = await requestResponse(path, { ...options, cache: "no-store" }, true);
+  return response.blob();
 }

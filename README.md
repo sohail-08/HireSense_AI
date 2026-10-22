@@ -46,8 +46,8 @@ and LiveKit captions are documented in [live transcription](docs/live-transcript
 
 ## Requirements
 
-Deterministic technical/experience/qualification scoring is available on Assessments.
-Select a job, set three category weights, and choose **Save weights & rank candidates**.
+Deterministic technical/experience/qualification scoring is available on CV Screening.
+Select a job, set three category weights, and choose **Rank candidates**.
 Pending CVs are processed automatically; evidence is available only when requested.
 See [scoring formulas, immutable snapshots and reviewer steps](docs/deterministic-candidate-scoring.md).
 
@@ -150,27 +150,30 @@ confidential company material through the unpaid tier.
 ## Job-description workflow
 
 1. Sign in as the Interviewer and open **Jobs**.
-2. Expand **Add previous job description**, select an approved historical job
+2. Open **Reference documents**, select an approved historical job
    description PDF, and upload it. The PDF must contain selectable text; scanned
    image-only documents need OCR before upload. The default limits are 15 MB and
    100 pages and can be changed with `KNOWLEDGE_PDF_MAX_FILE_SIZE_MB` and
    `KNOWLEDGE_PDF_MAX_PAGES`.
 3. Use the central supervisor chat and describe the role, for example: `I want to hire a
    backend engineer.`
-4. HireSense retrieves related previous job descriptions and proposes a complete
-   requirement profile. Choose **Use it** at the bottom-left of the requirement profile or
-   describe changes.
-5. Tell the supervisor to **generate the job description**. Request edits in
+4. HireSense checks the knowledge base and drafts the job description directly from
+   relevant sources. If no suitable reference is found, it asks for the skills and
+   duties needed, then drafts from your reply. There is no separate requirements
+   proposal, approval or generation step. Screening data is derived internally.
+5. Review the draft. Request edits in
    natural language, such as `Remove Kubernetes from preferred skills`, then
    explicitly tell it to **approve the job description**.
-6. Use **Created job descriptions** to reopen saved records after a reload.
+6. Use the saved job cards to reopen records after a reload. **Create job description manually**
+   remains available alongside the assistant without requiring AI or embeddings.
    Drafts can be edited directly; editing an approved JD creates a new draft
    version so the approved version remains unchanged.
 
 The supervisor uses Gemini's native tool calling via `ChatGoogleGenerativeAI`.
-`bind_tools()` exposes eight `@tool` definitions: requirements, JD generation,
-JD editing, JD approval, Discord posting, response syncing, candidate screening,
-and help. LangGraph's built-in `ToolNode` executes the selected tool and returns
+`bind_tools()` exposes JD drafting, JD editing, JD approval, Discord posting,
+response syncing, candidate screening and help, with interview/assessment tools
+when configured. There is no requirements-discovery tool in this supervisor.
+LangGraph's built-in `ToolNode` executes the selected tool and returns
 a `ToolMessage` to the supervisor before it produces its final answer.
 
 The graph is `START -> supervisor_agent -> tools -> capture_tool_result ->
@@ -183,7 +186,7 @@ message, and approval checks reject fabricated or absent approval instructions.
 See the [official Gemini integration documentation](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai#tool-calling).
 
 The existing `GEMINI_API_KEY` and `GEMINI_CHAT_MODEL` settings are reused. Its
-persistent session stores the requirement session, confirmed profile, active
+persistent session stores the drafting role, internal screening profile, active
 JD, active posting, current phase, and conversation history. The browser keeps
 the supervisor session ID in session storage so refreshing the page restores
 the same workflow.
@@ -327,6 +330,28 @@ Complete these one-time setup steps:
    `GOOGLE_FORMS_*_COLUMN` variables shown in `.env.example`.
 6. Restart the backend, open **Candidates**, and choose **Sync responses**.
 
+The Candidates page opens directly on a searchable table, with filters for each
+job posting and ten applications per page by default. Always-visible pagination
+includes Previous/Next, numbered page buttons on larger screens, and a choice of
+5, 10, 20 or 50 candidates per page. Search and job filters return to page one;
+row numbers continue across pages. Choose **Inspect** to see contact
+details, application information, and CV files in a keyboard-accessible modal.
+**Open CV** opens a PDF in a new tab; Word CVs download to open on your device.
+Rows are numbered, and each row offers **Inspect** and **Delete**. Choose
+**Select candidates** to show checkboxes and delete up to 100 selected applications
+with one confirmation. Selection continues across pages and clears when filters
+change. The table omits CV counts and collection setup notes; CVs remain available
+in the details modal, which only shows relevant contact fields. Sync remains available.
+Bulk deletion checks ownership of every selected application before changing any
+records, commits the changes together, and only then removes their private CV files.
+
+CV files are served through
+`GET /api/candidates/applications/{application_id}/cvs/{document_id}` with the
+interviewer's authorization header. The server checks posting ownership, both
+record IDs, private storage boundaries, file format and checksum. Responses are
+not cached; no public storage URL or token-bearing link is created. The frontend
+uses temporary blob URLs and retains the usual expired-login handling.
+
 The sync is idempotent: importing the same Sheet row into the same job posting
 again does not create a duplicate application. Every row is routed independently
 using its job value. Missing, unknown, inaccessible, or ambiguous job values are
@@ -367,19 +392,38 @@ An active conversational batch can be restored after reloading the page.
 
 1. Import applications and CVs with **Candidates → Sync responses** or the shared
    assistant. Syncing routes responses across all jobs using their Job Posting answers.
-   Assessments focuses on weights and ranking, without sync or application-list controls.
-2. Open **Assessments** and select the published job posting to assess. HireSense
+   CV Screening focuses on weights and ranking, without sync or application-list controls.
+2. Open **CV Screening** and select the job in the ranking section. HireSense
    uses only applications routed to that posting and requires its confirmed
    requirement profile and approved job description.
 3. Set the **Technical skills**, **Experience**, and **Qualifications** percentages
-   (total 100%). Choose **Save weights & rank candidates** to explicitly approve
+   (total 100%) in the compact weights row. Choose **Rank candidates** to explicitly approve
    them. Pending CVs are prepared in the background and scored after screening;
    existing screening results are reused when current.
 4. Read the single ranking table. Choose **Inspect evidence** only if you want
-   category scores, requirement outcomes, source quotations and PDF page/DOCX
-   block locations. All candidates receive a rank; processing/evidence issues are
-   disclosed inside the optional evidence view. Earlier results are tucked under
-   **Previous rankings**.
+   category scores, short explanations, focused CV quotations and PDF page/DOCX
+   block locations in a keyboard-accessible modal. Met is green, Partially met
+   is amber, and Unmet is red. Full-source expanders and the previous-ranking
+   selector are not shown; historical snapshots remain saved, and the page
+   loads the latest ranking. Closing the modal returns focus to its Inspect button.
+   Rankings show 10 candidates per page by default, with 5/10/20/50 row options,
+   numbered pages and Previous/Next controls. Rank values stay unchanged across
+   pages. A new ranking returns to page one. Interview selection and scheduling
+   are available separately under **Schedule Interviews**, immediately after
+   **CV Screening** in the navbar.
+5. Open **Schedule Interviews**, choose a job, and select candidates from its
+   latest CV ranking. Selections persist across pages. Use the scheduling form
+   to choose checked candidates, the highest-ranked candidates, or candidates
+   above a score. Preview recipients, times and email before confirming delivery.
+   The shared assistant receives the selected job and candidates on this page.
+   **Interview** remains the page for meeting details, delivery and rescheduling.
+
+Application dropdowns share rounded, viewport-aware menus with selected-state
+indicators and keyboard navigation (arrows, Home/End, Enter, Escape and type-ahead).
+Page-size controls stay compact. Transcript multi-selects support checking and
+unchecking passages without Ctrl/Cmd-click. Menus avoid clipped cards and remain
+inside the active dialog when opened there. LiveKit device controls retain their
+SDK-provided meeting theme.
 
 PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
 directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported

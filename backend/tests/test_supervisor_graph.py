@@ -25,7 +25,7 @@ def _graph(model, calls, user_message="Sync responses"):
         }
 
     callbacks = SupervisorToolCallbacks(
-        requirements=callback, generate_job_description=callback,
+        generate_job_description=callback,
         edit_job_description=callback, approve_job_description=callback,
         job_posting=callback, help=callback, sync_responses=callback,
         screen_candidates=lambda message, request: callback(message),
@@ -51,7 +51,7 @@ def test_supervisor_binds_native_tools_and_receives_tool_message():
     assert model.bindings[0]["tool_choice"] == "any"
     assert model.bindings[1]["tool_choice"] == "none"
     assert set(model.bindings[0]["names"]) == {
-        "requirements", "generate_job_description", "edit_job_description",
+        "generate_job_description", "edit_job_description",
         "approve_job_description", "job_posting", "help",
         "sync_responses", "screen_candidates",
     }

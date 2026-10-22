@@ -8,6 +8,7 @@ from app.rag.embeddings import OllamaEmbeddingProvider
 from app.rag.service import KnowledgeBaseService
 from app.schemas.job import (
     JobDescriptionGenerateRequest,
+    JobDescriptionManualCreate,
     JobDescriptionResponse,
     JobDescriptionUpdateRequest,
 )
@@ -25,6 +26,17 @@ def _service() -> JobDescriptionService:
     return JobDescriptionService(
         GeminiJobDescriptionModel(),
         KnowledgeBaseService(OllamaEmbeddingProvider()),
+    )
+
+
+@router.post("/manual", response_model=JobDescriptionResponse, status_code=status.HTTP_201_CREATED)
+def create_manual_job_description(
+    data: JobDescriptionManualCreate,
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
+):
+    return JobDescriptionService.create_manual(
+        db, data=data, interviewer_user_id=interviewer.id,
     )
 
 

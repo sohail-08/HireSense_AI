@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { apiRequest } from "../../api/apiClient";
 import { ErrorMessage } from "../common/ErrorMessage";
-import { useSupervisor } from "../assistant/SupervisorProvider";
-import { InterviewSchedulingPanel } from "../interviews/InterviewSchedulingPanel";
+import { RankingPagination } from "./RankingPagination";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
 import { RequirementEvidence, type EvidenceRequirement } from "./RequirementEvidence";
+import { formatDateTime } from "../../utils/dateTime";
 
 type Category = "technical" | "experience" | "qualification";
 type Weights = Record<Category, string>;
@@ -35,54 +36,60 @@ type Result = {
 type Run = Summary & { configuration_id: number; configuration: ConfigurationSnapshot; results: Result[] };
 
 const categoryLabels: Record<Category, string> = { technical: "Technical skills", experience: "Experience", qualification: "Qualifications" };
+const categoryStyles: Record<Category, string> = { technical: "border-sky-100 bg-sky-50/70 text-sky-800", experience: "border-violet-100 bg-violet-50/70 text-violet-800", qualification: "border-amber-100 bg-amber-50/70 text-amber-800" };
 const categories = Object.keys(categoryLabels) as Category[];
 
-function EvidencePanel({ result, onClose }: { result: Result; onClose: () => void }) {
-  const panelRef = useRef<HTMLElement>(null);
+function EvidenceModal({ result, onClose, restoreFocus }: { result: Result; onClose: () => void; restoreFocus: HTMLElement | null }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    panelRef.current?.focus({ preventScroll: true });
-    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [result.id]);
+    const element = dialog.current;
+    const overflow = document.body.style.overflow;
+    element?.showModal(); document.body.style.overflow = "hidden";
+    return () => {
+      element?.close(); document.body.style.overflow = overflow;
+      if (restoreFocus?.isConnected) restoreFocus.focus();
+      else document.getElementById("screening-job")?.focus();
+    };
+  }, [restoreFocus]);
   const requirements = scoredEvidenceRequirements(result.breakdown.requirements);
-  const unmetRequirements = requirements.filter((item) =>
-    item.classification === "required" && ["unmet", "unable_to_determine"].includes(item.status));
-  return <section id="scoring-evidence" ref={panelRef} tabIndex={-1} aria-labelledby="evidence-title"
-    className="mt-5 scroll-mt-5 rounded-2xl border border-blue-200 bg-white p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-    <div className="flex items-start justify-between gap-3">
-      <div><h3 id="evidence-title" className="text-lg font-semibold">{result.candidate_name + " — evidence"}</h3>
-        <p className="mt-1 text-sm text-slate-500">See which job requirements are supported by this CV. Missing or rejected evidence receives zero credit.</p>
+  return createPortal(<dialog id="scoring-evidence" ref={dialog} aria-modal="true" aria-labelledby="evidence-title" aria-describedby="evidence-description"
+    onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+    className="fixed inset-0 m-auto max-h-[90dvh] w-[94vw] max-w-3xl overflow-hidden rounded-2xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-sm">
+    <div className="flex max-h-[90dvh] flex-col">
+    <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+      <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">CV evidence · {result.display_score}%</p><h2 id="evidence-title" className="mt-1 break-words text-xl font-bold">{result.candidate_name}</h2>
+        <p id="evidence-description" className="mt-1 text-sm text-slate-500">How this CV matches the job requirements.</p>
       </div>
-      <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Close</button>
-    </div>
+      <button type="button" autoFocus aria-label="Close evidence" onClick={onClose} className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-blue-600">Close</button>
+    </header>
+    <div className="overflow-y-auto px-5 pb-5 sm:px-6">
     {result.breakdown.review_flags.length ? <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-      Some CV content or evidence could not be used. Unsupported requirements are scored as Unmet (0); this is not proof the candidate lacks those capabilities.
+      Some CV details could not be confirmed. Requirements without supporting evidence are marked Unmet; this does not mean the candidate lacks the skill.
     </p> : null}
     <div className="mt-4 grid gap-3 sm:grid-cols-3">{categories.map((category) =>
       <div key={category} className="rounded-xl bg-slate-50 p-3 text-sm"><p>{categoryLabels[category]}</p>
-        <strong className="mt-1 block text-lg">{displayPercent(result.breakdown.categories[category].score)}</strong>
+        <strong className="mt-1 block text-lg">{result.breakdown.categories[category].score === null ? "Not scored" : displayPercent(result.breakdown.categories[category].score)}</strong>
       </div>)}</div>
-    {unmetRequirements.length ? <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">
-      Unmet requirements: {unmetRequirements.map((item) => item.name).join(", ")}.
-    </p> : null}
     <div className="mt-4 space-y-3">{requirements.map((item) =>
       <RequirementEvidence key={item.requirement_id} requirement={item} />)}</div>
-    {!requirements.length ? <p className="mt-4 text-sm text-slate-500">No scored requirements to display.</p> : null}
-  </section>;
+    {!requirements.length ? <p className="mt-4 text-sm text-slate-500">No requirement details are available for this result.</p> : null}
+    </div></div>
+  </dialog>, document.body);
 }
 
 type Props = {
   jobId: number; refreshToken: string; applicationCount: number; pendingCount: number;
   processing: boolean; ready: boolean; progress?: string; processingError?: string;
   onScreenPending: () => Promise<boolean>;
+  jobSelector: ReactNode;
 };
 
-export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, onScreenPending }: Props) {
-  const { setSelectedApplicationIds } = useSupervisor();
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, onScreenPending, jobSelector }: Props) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [proposal, setProposal] = useState<Proposal>();
   const [weights, setWeights] = useState<Weights>({ technical: "50", experience: "30", qualification: "20" });
   const [requirements, setRequirements] = useState<Requirement[]>([]);
-  const [runs, setRuns] = useState<Summary[]>([]);
   const [run, setRun] = useState<Run>();
   const [evidence, setEvidence] = useState<Result>();
   const [loading, setLoading] = useState(true);
@@ -94,9 +101,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
   const requestVersion = useRef(0);
   const actionBusy = useRef(false);
   const waitingForConfiguration = useRef<number | undefined>(undefined);
-
-  useEffect(() => { setSelectedIds([]); setSelectedApplicationIds([]); }, [run?.id, jobId, setSelectedApplicationIds]);
-  useEffect(() => { setSelectedApplicationIds(selectedIds); }, [selectedIds, setSelectedApplicationIds]);
+  const evidenceTrigger = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -115,7 +120,6 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         draftChanged.current = false;
       }
       draftVersion.current = value.requirement_version;
-      setRuns(history);
       if (history[0]) {
         const saved = await apiRequest<Run>("/scoring/runs/" + history[0].id);
         if (active && request === requestVersion.current) {
@@ -175,7 +179,6 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
           method: "POST", body: JSON.stringify({ configuration_id: approved.id }),
         });
         setRun(saved);
-        setRuns(await apiRequest<Summary[]>("/scoring/jobs/" + jobId + "/runs"));
         setNotice("Ranking updated.");
       }
     } catch (failure) {
@@ -186,87 +189,65 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
     finally { actionBusy.current = false; setBusy(false); }
   }
 
-  async function selectRun(id: number) {
-    if (actionBusy.current) return;
-    actionBusy.current = true;
-    ++requestVersion.current;
-    setBusy(true); setError(undefined); setEvidence(undefined); setNotice(undefined);
-    try { setRun(await apiRequest<Run>("/scoring/runs/" + id)); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load the previous ranking."); }
-    finally { actionBusy.current = false; setBusy(false); }
-  }
-
-  function closeEvidence() {
-    const id = evidence?.id;
-    setEvidence(undefined);
-    if (id) document.getElementById("inspect-score-" + id)?.focus();
-  }
+  const closeEvidence = useCallback(() => setEvidence(undefined), []);
 
   const ranked = run?.results.slice()
     .sort((left, right) => (left.rank ?? Infinity) - (right.rank ?? Infinity) || left.application_id - right.application_id) ?? [];
+  const pages = Math.max(1, Math.ceil(ranked.length / pageSize));
+  const currentPage = Math.min(page, pages);
+  const start = (currentPage - 1) * pageSize;
+  const visibleResults = ranked.slice(start, start + pageSize);
+  useEffect(() => { setPage(1); }, [run?.id, jobId]);
+  useEffect(() => { setPage(value => Math.min(value, pages)); }, [pages]);
 
   return <>
-    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="font-semibold text-slate-900">Scoring weights</h2>
-      <p className="mt-1 text-sm text-slate-500">Choose how much each category matters. The total must be 100%.</p>
+    <section aria-labelledby="ranking-title" className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <div><h2 id="ranking-title" className="text-lg font-semibold text-slate-900">Candidate ranking</h2>
+          <p className="mt-1 text-sm text-slate-500">See how closely each CV matches the job.</p></div>
+        <div className="w-full sm:w-80">{jobSelector}</div>
+      </div>
+      <div className="px-4 pb-4 sm:px-5">
       <ErrorMessage message={error ?? processingError} />
       {loading ? <p className="mt-4 text-sm text-slate-500">Loading scoring weights…</p> : proposal ? <>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">{categories.map((category) =>
-          <label key={category} className="text-sm font-medium text-slate-800">{categoryLabels[category]} (%)
+        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+          <div className="self-center"><h3 className="text-sm font-semibold text-slate-800">Scoring weights</h3>
+            <p aria-live="polite" className={"mt-1 text-xs " + (valid ? "text-emerald-700" : "text-red-700")}>{"Total: " + total + "%"}</p></div>
+          <div className="grid min-w-0 flex-1 basis-64 grid-cols-3 gap-2">{categories.map((category) =>
+          <label key={category} className={`flex flex-col justify-end rounded-lg border p-2 text-xs font-medium ${categoryStyles[category]}`}>{categoryLabels[category]} (%)
             <input type="number" min="0" max="100" step="0.01" value={weights[category]} disabled={busy || processing}
               onChange={(event) => { draftChanged.current = true; setNotice(undefined); setWeights({ ...weights, [category]: event.target.value }); }}
-              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
           </label>)}</div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className={"text-sm " + (valid ? "text-emerald-700" : "text-red-700")}>{"Total: " + total + "%"}</p>
           <button type="button" onClick={() => void saveAndRank()} disabled={!valid || !ready || !applicationCount || busy || processing}
-            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-            {busy || processing ? "Preparing ranking…" : "Save weights & rank candidates"}
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+            {busy || processing ? "Ranking…" : "Rank candidates"}
           </button>
         </div>
-        {missingCategories.length ? <p className="mt-2 text-sm text-amber-800">{missingCategories.map((category) => categoryLabels[category]).join(", ") + ": this job has no scored requirements in this category. Set its weight to 0% and redistribute the percentage."}</p> : null}
-        {!applicationCount ? <p className="mt-3 text-sm text-slate-500">No applications have been collected for this job yet.</p> : null}
+        {!valid && !missingCategories.length ? <p className="mt-2 text-sm text-red-700">Enter percentages from 0 to 100 that add up to 100%.</p> : null}
+        {missingCategories.length ? <p className="mt-2 text-sm text-amber-800">{missingCategories.map((category) => categoryLabels[category]).join(", ") + ": no matching job requirements. Set this weight to 0% and add the difference to the other categories."}</p> : null}
+        {!applicationCount ? <p className="mt-3 text-sm text-slate-500">No candidates have applied for this job yet.</p> : null}
       </> : null}
       {processing ? <p role="status" className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{progress ?? "Preparing candidate CVs and ranking…"}</p>
         : notice ? <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p> : null}
-    </section>
-
-    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold text-slate-900">Candidate ranking</h2>
-        {run ? <span className="text-xs text-slate-500">{new Date(run.created_at).toLocaleString()}</span> : null}
-      </div>
-      <p className="mt-1 text-sm text-slate-500">Scores show job-requirement coverage, not hiring-success probability.</p>
-      {run && pendingCount > 0 && !processing ? <p className="mt-2 text-sm text-amber-800">Some CVs need screening. Select “Save weights & rank candidates” to update these saved results.</p> : null}
-      {run ? <p className="mt-2 text-xs text-slate-500">{"Saved ranking weights: " + categories.map((category) => categoryLabels[category] + " " + run.configuration.category_weights[category] + "%").join(" · ")}</p> : null}
-      {draftChanged.current && run ? <p className="mt-2 text-sm text-amber-800">Update the ranking to apply your changed weights.</p> : null}
-      {run && proposal && run.requirement_version !== proposal.requirement_version ? <p className="mt-2 text-sm text-amber-800">This is an earlier ranking. Update it for the current job requirements.</p> : null}
-      {run && proposal && run.formula_version !== proposal.formula_version ? <p className="mt-2 text-sm text-slate-600">This result uses an earlier scoring policy. Save weights and rank candidates to apply the current three-outcome policy.</p> : null}
+      {run && pendingCount > 0 && !processing ? <p className="mt-3 text-sm text-amber-800">New or updated CVs are waiting. Select “Rank candidates” to include them.</p> : null}
+      {run && categories.some(category => weightUnits(weights[category]) !== weightUnits(run.configuration.category_weights[category])) ? <p className="mt-3 text-sm text-amber-800">Select “Rank candidates” to apply your changes. Current results use {categories.map(category => categoryLabels[category].toLowerCase() + " " + run.configuration.category_weights[category] + "%").join(", ")}.</p> : null}
+      {run && proposal && (run.requirement_version !== proposal.requirement_version || run.formula_version !== proposal.formula_version) ? <p className="mt-3 text-sm text-amber-800">The job requirements or scoring rules have changed. Rank candidates again to update these results.</p> : null}
       {ranked.length ? <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Select</th><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
-        <tbody>{ranked.map((result) => <tr key={result.id} className="border-b border-slate-100 last:border-0">
-          <td className="px-2 py-4"><input type="checkbox" aria-label={`Select ${result.candidate_name} for interview`} disabled={busy || processing || result.rank === null} checked={selectedIds.includes(result.application_id)} onChange={() => setSelectedIds((ids) => ids.includes(result.application_id) ? ids.filter((id) => id !== result.application_id) : [...ids, result.application_id])} /></td>
+        <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
+        <tbody>{visibleResults.map((result) => <tr key={result.id} className="border-b border-slate-100 last:border-0">
           <td className="px-2 py-4 font-semibold">{result.rank ?? "—"}</td><td className="px-2 py-4 font-medium">{result.candidate_name}</td>
           <td className="whitespace-nowrap px-2 py-4 font-semibold text-blue-700">{result.display_score + "%"}</td>
-          <td className="px-2 py-4 text-right"><button type="button" id={"inspect-score-" + result.id} onClick={() => setEvidence(result)}
-            aria-expanded={evidence?.id === result.id} aria-controls="scoring-evidence" className="rounded-lg px-2 py-1.5 font-semibold text-blue-700 hover:bg-blue-50">Inspect evidence</button></td>
+          <td className="px-2 py-4 text-right"><button type="button" id={"inspect-score-" + result.id} onClick={event => { evidenceTrigger.current = event.currentTarget; setEvidence(result); }}
+            aria-label={`Inspect evidence for ${result.candidate_name}`} aria-haspopup="dialog" className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">Inspect evidence</button></td>
         </tr>)}</tbody>
       </table></div> : <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-        {processing ? "Your ranking is being prepared." : "Set your weights and select “Save weights & rank candidates” to see the results."}
+        {loading ? "Loading candidate ranking…" : processing ? "Your ranking is being prepared." : !applicationCount ? "Candidates will appear here after their applications are collected." : "Choose your weights, then select “Rank candidates” to see the results."}
       </p>}
-      {runs.length > 1 ? <details className="mt-5 border-t border-slate-200 pt-4">
-        <summary className="cursor-pointer text-sm font-medium text-slate-600">Previous rankings</summary>
-        <label className="mt-3 block text-sm text-slate-600">View an earlier result
-          <select aria-label="Previous ranking" value={run?.id ?? ""} disabled={busy || processing} onChange={(event) => void selectRun(Number(event.target.value))}
-            className="mt-2 w-full rounded-xl border border-slate-300 p-2.5">
-            {runs.map((saved) => <option key={saved.id} value={saved.id}>{new Date(saved.created_at).toLocaleString()}</option>)}
-          </select>
-        </label>
-      </details> : null}
+      <RankingPagination count={ranked.length} page={currentPage} pageSize={pageSize} loading={loading} onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1); }} />
+      {run ? <p className="mt-3 text-xs text-slate-400">Last updated {formatDateTime(run.created_at)} · Scores reflect the CV, not a final hiring decision.</p> : null}
+      </div>
     </section>
-    {run ? <details className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-blue-700">Schedule interview{selectedIds.length ? ` (${selectedIds.length} checked)` : ""}</summary>
-      <InterviewSchedulingPanel jobId={jobId} rankingRunId={run.id} selectedIds={selectedIds} />
-    </details> : null}
-    {evidence ? <EvidencePanel result={evidence} onClose={closeEvidence} /> : null}
+    {evidence ? <EvidenceModal key={evidence.id} result={evidence} restoreFocus={evidenceTrigger.current} onClose={closeEvidence} /> : null}
   </>;
 }

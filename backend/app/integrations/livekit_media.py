@@ -69,7 +69,7 @@ class LiveKitMedia:
             .with_grants(api.VideoGrants(room_join=True, room=room_name,
                 room_create=False, room_admin=False, room_list=False, room_record=False,
                 can_publish=True, can_subscribe=True, can_publish_data=False,
-                can_publish_sources=["camera", "microphone"], can_update_own_metadata=False,
+                can_publish_sources=["camera", "microphone"] + (["screen_share"] if role == "candidate" else []), can_update_own_metadata=False,
                 ingress_admin=False, recorder=False, agent=False)).to_jwt())
         return {"server_url": self.public_url, "participant_token": token,
             "expires_at": datetime.now(timezone.utc) + timedelta(seconds=ttl), "role": role}

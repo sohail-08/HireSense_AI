@@ -2,6 +2,7 @@ import json
 from typing import Protocol
 
 from app.config import get_settings
+from app.job_posting_branding import COMPANY_NAME
 from app.llm.gemini import GeminiStructuredClient
 from app.rag.service import RetrievedKnowledgeChunk
 from app.schemas.job import JobDescriptionDraft
@@ -59,13 +60,15 @@ class GeminiJobDescriptionModel:
 
         system_prompt = """You are HireSense's job-description writer.
 Generate a professional job-description draft from the structured requirement profile.
+The hiring company is supplied explicitly in the prompt. Never copy a reference
+document's employer into the introduction; write the job for the hiring company.
 Use the retrieved previous-job-description context only as supporting guidance. Do not invent
 requirements, benefits, compensation, legal claims, or constraints that are not present
 in the profile or context. Required skills and qualifications must remain required;
 preferred skills must remain preferred. Return only JSON matching the requested schema.
 """
         user_prompt = (
-            "Requirement profile:\n"
+            f"Hiring company: {COMPANY_NAME}\nRequirement profile:\n"
             + json.dumps(profile, ensure_ascii=False)
             + "\n\nRetrieved source context:\n"
             + evidence_text
@@ -136,31 +139,21 @@ matching the supplied schema.
 
 
 def render_job_description(draft: JobDescriptionDraft) -> str:
-    """Render a stable human-readable JD from the validated structured draft."""
-    lines = [
-        f"# {draft.title}",
-        "",
-        draft.summary,
-        "",
-        "## Responsibilities",
-        *[f"- {item}" for item in draft.responsibilities],
-        "",
-        "## Required Skills",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.required_skills],
-        "",
-        "## Preferred Skills",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.preferred_skills],
-        "",
-        "## Qualifications",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.qualifications],
-        "",
-        "## Experience",
-        draft.experience_requirement,
-        "",
-        "## Selection Process",
-        *[f"- {item}" for item in draft.selection_criteria],
+    """Render a stable JD, omitting optional sections that were not supplied."""
+    lines = [f"# {draft.title}", "", draft.summary]
+    sections = [
+        ("Responsibilities", draft.responsibilities),
+        ("Required Skills", [f"{item.name}: {item.details}" if item.details else item.name
+                            for item in draft.required_skills]),
+        ("Preferred Skills", [f"{item.name}: {item.details}" if item.details else item.name
+                             for item in draft.preferred_skills]),
+        ("Qualifications", [f"{item.name}: {item.details}" if item.details else item.name
+                            for item in draft.qualifications]),
     ]
+    for title, items in sections:
+        if items:
+            lines.extend(["", f"## {title}", *[f"- {item}" for item in items]])
+    lines.extend(["", "## Experience", draft.experience_requirement])
+    if draft.selection_criteria:
+        lines.extend(["", "## Selection Process", *[f"- {item}" for item in draft.selection_criteria]])
     return "\n".join(lines).strip() + "\n"

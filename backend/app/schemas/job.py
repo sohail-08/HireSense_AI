@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.job import (
     JobDescriptionStatus,
@@ -67,13 +67,29 @@ class JobDescriptionDraft(BaseModel):
     preferred_skills: list[RequirementItem] = Field(default_factory=list)
     qualifications: list[RequirementItem] = Field(default_factory=list)
     experience_requirement: str = Field(min_length=1, max_length=2000)
-    selection_criteria: list[str] = Field(min_length=1, max_length=20)
+    selection_criteria: list[str] = Field(default_factory=list, max_length=20)
 
 
 class JobDescriptionGenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requirement_profile_id: int = Field(gt=0)
+
+
+class JobDescriptionManualCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=2, max_length=200)
+    content: str = Field(min_length=1, max_length=50_000)
+    required_skills: list[RequirementItem] = Field(min_length=1, max_length=50)
+    preferred_skills: list[RequirementItem] = Field(default_factory=list, max_length=50)
+    qualifications: list[RequirementItem] = Field(default_factory=list, max_length=50)
+    min_years_experience: int | None = Field(default=None, ge=0, le=100, strict=True)
+
+    @field_validator("title", "content", mode="before")
+    @classmethod
+    def trim_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
 
 class JobDescriptionUpdateRequest(BaseModel):

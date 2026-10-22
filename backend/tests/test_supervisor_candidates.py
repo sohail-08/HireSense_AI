@@ -28,7 +28,7 @@ def scenario(tmp_path):
     settings = _settings(tmp_path / "storage")
     model = QueueToolModel()
     service = SupervisorService(
-        model=model, requirement_service=None, job_description_service=None,
+        model=model, job_description_service=None,
         job_edit_model=None, job_posting_service=None,
         candidate_intake_service=GoogleFormsIntakeService(FakeGoogleReader(), settings),
         screening_service=ScreeningService(settings),

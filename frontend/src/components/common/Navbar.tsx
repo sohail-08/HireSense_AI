@@ -13,14 +13,14 @@ export function Navbar() {
   const links =
     user.role === "interviewer"
       ? [
-          "dashboard",
-          "jobs",
-          "candidates",
-          "interviews",
-          "assessments",
-          "reports",
+          { page: "jobs", label: "Jobs" },
+          { page: "candidates", label: "Candidates" },
+          { page: "assessments", label: "CV Screening" },
+          { page: "schedule-interviews", label: "Schedule Interviews" },
+          { page: "interviews", label: "Interview" },
+          { page: "reports", label: "Assessment" },
         ]
-      : ["dashboard", "interviews"];
+      : [{ page: "dashboard", label: "Dashboard" }, { page: "interviews", label: "Interviews" }];
 
   function handleLogout() {
     logout();
@@ -28,7 +28,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="interviewer-navbar sticky top-0 z-30 border-b border-slate-200 bg-white">
+    <header className="interviewer-navbar sticky top-0 z-30 border-b border-blue-100 bg-white shadow-sm shadow-blue-900/5">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
         <NavLink
           to={`${prefix}/dashboard`}
@@ -41,21 +41,21 @@ export function Navbar() {
           aria-label="Main navigation"
           className="order-last flex w-full flex-wrap gap-2 lg:order-none lg:w-auto lg:flex-1"
         >
-          {links.map((page) => (
+          {links.map(({ page, label }) => (
             <NavLink
               key={page}
               to={`${prefix}/${page}`}
               className={({ isActive }) =>
                 [
-                  "rounded-lg px-3 py-2 text-sm font-medium transition",
+                  "rounded-xl border px-3 py-2 text-sm font-medium transition",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
                   isActive
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                    ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm shadow-blue-900/5"
+                    : "border-transparent text-slate-600 hover:border-blue-100 hover:bg-blue-50/60 hover:text-blue-800",
                 ].join(" ")
               }
             >
-              {page.charAt(0).toUpperCase() + page.slice(1)}
+              {label}
             </NavLink>
           ))}
         </nav>

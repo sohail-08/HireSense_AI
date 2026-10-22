@@ -1,9 +1,10 @@
 import React from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App";
 import { apiRequest } from "../../src/api/apiClient";
+import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: vi.fn(), API_URL: "/api", TOKEN_KEY: "hiresense_token", ApiError: class extends Error {} }));
 vi.mock("../../src/auth/AuthProvider", () => ({
@@ -42,9 +43,9 @@ beforeEach(() => {
   });
 });
 
-it("loads the full Reports route through the navbar with the real supervisor provider", async () => {
+it("loads the Assessment route through the navbar with the real supervisor provider", async () => {
   render(<MemoryRouter initialEntries={["/interviewer/dashboard"]}><App /></MemoryRouter>);
-  fireEvent.click(screen.getByRole("link", { name: "Reports" }));
+  fireEvent.click(screen.getByRole("link", { name: "Assessment", exact: true }));
   expect(await screen.findByRole("heading", { name: "Candidate ranking" })).toBeTruthy();
   expect(await screen.findByText("Synthetic Candidate")).toBeTruthy();
   expect(await screen.findByRole("button", { name: "Calculate final ranking" })).toBeTruthy();
@@ -103,11 +104,73 @@ it("opens an existing report containing PostgreSQL scientific-notation zero scor
     throw new Error(`Unexpected test API request: ${path}`);
   });
   render(<MemoryRouter initialEntries={["/interviewer/dashboard"]}><App /></MemoryRouter>);
-  fireEvent.click(screen.getByRole("link", { name: "Reports" }));
+  fireEvent.click(screen.getByRole("link", { name: "Assessment", exact: true }));
   fireEvent.click(await screen.findByRole("button", { name: "View details for Synthetic Candidate" }));
+  expect(await screen.findByRole("dialog", { name: "Candidate assessment" })).toBeTruthy();
   expect(await screen.findByRole("article", { name: "Consolidated candidate assessment" })).toBeTruthy();
   expect(screen.getByText("0.00%")).toBeTruthy();
   expect(screen.getAllByText("25.00%")).toHaveLength(2);
+});
+
+it("closes candidate details without losing the ranking search or keyboard focus", async () => {
+  vi.mocked(apiRequest).mockImplementation(async path => {
+    if (path === "/screening/jobs") return [{ id: 1, title: "Synthetic Engineer" }];
+    if (path === "/assessments/jobs/1/ranking") return ranking;
+    if (path === "/assessments/runs/1") return savedReport;
+    throw new Error(`Unexpected test API request: ${path}`);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/reports"]}><App /></MemoryRouter>);
+  const search = await screen.findByRole("searchbox", { name: "Search candidates" });
+  fireEvent.change(search, { target: { value: "Synthetic" } });
+  const open = screen.getByRole("button", { name: "View details for Synthetic Candidate" }); open.focus(); fireEvent.click(open);
+  const modal = await screen.findByRole("dialog", { name: "Candidate assessment" });
+  await screen.findByRole("article", { name: "Consolidated candidate assessment" });
+  fireEvent.click(within(modal).getByRole("button", { name: "Close preview" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("Synthetic");
+  expect(document.activeElement).toBe(open);
+});
+
+it("offers an in-modal retry if candidate details fail to load", async () => {
+  let attempts = 0;
+  vi.mocked(apiRequest).mockImplementation(async path => {
+    if (path === "/screening/jobs") return [{ id: 1, title: "Synthetic Engineer" }];
+    if (path === "/assessments/jobs/1/ranking") return ranking;
+    if (path === "/assessments/runs/1") { if (++attempts === 1) throw new Error("Details unavailable."); return savedReport; }
+    throw new Error(`Unexpected test API request: ${path}`);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/reports"]}><App /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "View details for Synthetic Candidate" }));
+  const modal = await screen.findByRole("dialog", { name: "Candidate assessment" });
+  expect((await within(modal).findByRole("alert")).textContent).toContain("Details unavailable.");
+  fireEvent.click(within(modal).getByRole("button", { name: "Try again" }));
+  expect(await screen.findByRole("article", { name: "Consolidated candidate assessment" })).toBeTruthy();
+  expect(attempts).toBe(2);
+});
+
+it("handles no job postings without leaving a permanent loading state", async () => {
+  vi.mocked(apiRequest).mockImplementation(async path => { if (path === "/screening/jobs") return []; throw new Error(`Unexpected test API request: ${path}`); });
+  render(<MemoryRouter initialEntries={["/interviewer/reports"]}><App /></MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "No job postings yet" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Go to jobs" }).getAttribute("href")).toBe("/interviewer/jobs");
+  expect(screen.queryByText("Loading candidates…")).toBeNull();
+  expect((screen.getByRole("button", { name: "Calculate final ranking" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("resets candidate search when changing jobs without calculating either ranking", async () => {
+  vi.mocked(apiRequest).mockImplementation(async path => {
+    if (path === "/screening/jobs") return [{ id: 1, title: "Synthetic Engineer" }, { id: 2, title: "Second job" }];
+    if (path === "/assessments/jobs/1/ranking") return ranking;
+    if (path === "/assessments/jobs/2/ranking") return { ...ranking, candidates: [{ ...ranking.candidates[0], candidate_name: "Second Candidate" }] };
+    throw new Error(`Unexpected test API request: ${path}`);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/reports"]}><App /></MemoryRouter>);
+  const search = await screen.findByRole("searchbox", { name: "Search candidates" });
+  fireEvent.change(search, { target: { value: "Synthetic" } });
+  selectOption("Job posting", /Second job/);
+  expect(await screen.findByText("Second Candidate")).toBeTruthy();
+  expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("");
+  expect(vi.mocked(apiRequest).mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
 it("keeps navigation visible and offers recovery after an unexpected report render error", async () => {

@@ -5,6 +5,7 @@ from app.agents.interview_commands import GeminiInterviewCommandModel
 from app.integrations.interview_mcp import InterviewMCPClient
 from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRequest
 from app.services.interview_links import redact_join_links
+from app.services.date_time_display import format_time_range
 
 
 class InterviewAssistantService:
@@ -198,5 +199,5 @@ class InterviewAssistantService:
         rows = [f"Exact invitation preview — {preview['recipient_count']} recipient(s).",
             f"From: {preview['sender']['from_email']} | Reply-to: {preview['sender']['reply_to']}"]
         for item in preview["recipients"]:
-            rows.append(f"\n{item['name']} — {item['masked_email']}\n{item['local_start']} → {item['local_end']} ({item['timezone']})\nSubject: {item['subject']}\n{item['body']}\nAttachment: interview.ics (METHOD:REQUEST)")
+            rows.append(f"\n{item['name']} — {item['masked_email']}\n{format_time_range(item['local_start'], item['local_end'], item['timezone'])}\nSubject: {item['subject']}\n{item['body']}\nAttachment: interview.ics (METHOD:REQUEST)")
         return "\n".join(rows)

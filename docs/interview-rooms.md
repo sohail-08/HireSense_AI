@@ -22,7 +22,84 @@ Confirmed End → durable access barrier → revoke both Cloud identities
 
 MCP carries authorized business operations, never media or LiveKit API secrets.
 Candidates use `/interview/join/:token`; assigned interviewers use
-`/interviews/:interviewId/console`. Neither room page has a central chatbot.
+`/interviews/:interviewId/console`. The interviewer has private candidate information
+and the central assistant's interview tools; neither is rendered in the candidate UI.
+
+## Meeting layout and candidate screen sharing
+
+The interviewer console occupies one `100dvh` viewport. Candidate admission and
+invitation actions share the compact page header instead of taking a separate
+full-width row; **Candidate link** groups Copy/Generate/Update, Replace and Revoke.
+Video and meeting controls fill the left column. All other tools share the right
+column, using a **Transcript & analysis / Candidate & assistant** segmented tab
+switch. Each group retains its own inner tabs and scrollable content. Camera
+height comes from the available grid space, not an additional viewport-sized card.
+Device preview and the Join button fit the same area. Closed interviews switch to
+normal document scrolling: transcript, analysis, candidate information and assistant
+history expand with their content instead of using nested scrolling panes. Only
+the group switch and active group's inner tab row are sticky; the page header and
+closed-room notice scroll away. The inner row's offset follows the measured group
+bar height, including when labels wrap on smaller screens. Saved transcript restore
+and tab changes do not auto-scroll the review content. At narrow
+widths the video and tools stack within the viewport. Switching groups or inner
+tabs never unmounts either pane or the media connection.
+The candidate-facing page keeps its existing responsive layout.
+
+Transcript segments use conversation cards with blue interviewer and amber candidate
+backgrounds, matching avatars and accent borders. Speaker names are not repeated
+above each message; accessible segment labels still identify the speaker. Elapsed
+timestamps and readable wrapped text remain visible.
+Compact bubbles fit short messages instead of stretching across the page. Small
+avatars and inline timestamps reduce row height; long messages still wrap within
+the available width, without changing segment boundaries or saved text.
+Only interim text has a
+visible **Live draft** badge; final status remains in each segment's accessible
+label without repeating it visually. Wide review pages limit the conversation's
+reading width. Failure notices remain visible, with diagnostic codes under
+**Technical details**. These changes do not alter captions, storage or scrolling.
+
+The interview assistant shares its identity header, message bubbles, composer,
+and working indicator with the central chatbot through `AssistantChatUI.tsx`.
+User messages are right-aligned dark-blue bubbles; assistant replies are white,
+left-aligned bubbles on the same soft conversation background. A compact header
+identifies private interview support without adding recruitment controls or a
+new-workflow action. The auto-growing input and icon send button stay on one row;
+Enter sends and Shift+Enter inserts a new line (IME composition does not send).
+The conversation still uses the available panel height and remains page-scrollable
+in closed-interview review mode. Interviewer-only access, scoped API requests,
+knowledge sources, transcript citations, failure recovery and draft retention are
+unchanged; opening the panel never generates a model request automatically.
+
+Job requirements appear as a grouped card: minimum experience, required-skill tags,
+optional nice-to-have tags, qualifications and selection criteria. Values still
+come from the saved job profile; the styling does not add or score requirements.
+
+- The console keeps the meeting stage and labeled microphone/camera/leave controls
+  together, with **Live transcript** and **Answer analysis** tabs on the right. The
+  **Candidate info** and **Assistant** tabs are interviewer-only. Tabs keep their
+  contents mounted, preserving drafts, captions, analysis and the live connection.
+- Device preview, waiting room and live video use bounded frames. Camera videos
+  use `object-fit: contain`, explicit grid rows and a stable `svh`-based stage height,
+  so a remote phone's portrait video cannot stretch the desktop console. On small
+  screens panels stack and controls wrap; short landscape viewports get a smaller
+  stage without horizontal overflow. Browser resizing/orientation changes remain
+  responsive rather than fixing the page to a desktop width.
+- Candidates can select **Share screen** in supported browsers, choose a tab,
+  window or display in the browser's own permission prompt, then **Stop sharing
+  screen** (or the browser's Stop control). Capture never starts on page load or
+  admission. Shared screens take the main stage while both cameras remain visible.
+  Leaving/ending disconnects the room and stops its local tracks.
+- Browser screen capture requires a secure context and user activation. Mobile
+  browser support is limited; runtime capability detection disables sharing with
+  guidance when `getDisplayMedia` is unavailable, without blocking audio/video.
+  Candidates can still view and join on those devices; use a supported desktop
+  browser to present. See [browser requirements](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia).
+- Screen sharing sends video only, not tab/system audio. The transcription worker
+  still subscribes only to the two authenticated microphone tracks, never screen
+  video or screen audio. There is no recording or new storage of shared content.
+- Ending, replacing or revoking access still requires explicit confirmation. End
+  is disabled after completion/cancellation; closed-room details and transcripts
+  remain accessible to the assigned interviewer.
 
 ## Credentials and privacy
 
@@ -39,13 +116,16 @@ Candidates use `/interview/join/:token`; assigned interviewers use
   link paths are not logged/cached by Nginx; SDK diagnostics are silenced. Do not
   add analytics, URL/body logging or token-bearing screenshots to these pages.
 - Participant JWTs authorize only an exact room and opaque role identity, camera,
-  microphone and subscription. Data, screen sharing, admin, recording and own
-  metadata updates are disabled. Rooms have two participants maximum and names
+  microphone and subscription. Only candidate JWTs additionally allow the
+  `screen_share` video source; interviewer JWTs remain camera/microphone-only.
+  Screen audio, data publishing, admin, recording and own metadata updates are
+  disabled. Rooms have two human participants maximum and names
   containing no candidate PII.
 - Transport encryption is provided by LiveKit. Additional end-to-end encryption
-  is not currently enabled. No recording, transcription or agent dispatch is
-  enabled by HireSense. Do not add automatic egress/dispatch in the Cloud project
-  without reviewing privacy requirements.
+  is not currently enabled. Recording is disabled. Optional [live transcription](live-transcription.md)
+  uses a separate authenticated worker only after both participants consent; the
+  room redesign and screen-sharing feature do not start it automatically. Do not
+  add automatic recording/egress in the Cloud project.
 
 ## Lifecycle and access
 
@@ -87,6 +167,7 @@ media room is retired before new credentials are issued.
 | Persistent state/API | `backend/app/models/interview.py`, `routes/interview_rooms.py`, `schemas/interview_room.py` |
 | Interview pages | `frontend/src/pages/CandidateInterviewPage.tsx`, `InterviewerConsolePage.tsx` |
 | Devices, media and typed requests | `frontend/src/components/interviews/DeviceCheck.tsx`, `InterviewMediaRoom.tsx`, `roomApi.ts`, `roomState.ts` |
+| Responsive workspace and tabs | `frontend/src/index.css`, `MeetingTabs.tsx`, `MeetingIcon.tsx`, `InterviewCopilotPanel.tsx` |
 | Website proxy/tunnel helpers | `frontend/nginx.conf`, `scripts/*cloudflare-demo*.ps1` |
 
 Existing Alembic room/session migrations remain required. Removing a local media
@@ -112,7 +193,10 @@ configuration/authentication, not real media. Real synthetic RTC tests are opt-i
 with `LIVEKIT_CLOUD_INTEGRATION=1` and `backend/requirements-room-test.txt`; they
 consume Cloud usage but use no candidate data or business database. Before the
 supervisor demo, test two devices on different networks, both directions of
-audio/video, mic/camera controls, leave/rejoin, and rejection after End.
+audio/video, portrait/landscape phone cameras, mic/camera controls, candidate screen
+capture/denial/Stop, remote shared-screen viewing, leave/rejoin, and rejection after
+End. Test native browser screen capture manually; component tests use synthetic
+tracks and do not constitute a real two-device screen-sharing call.
 
 References: [Room Service API](https://docs.livekit.io/reference/other/roomservice-api/),
 [token revocation](https://docs.livekit.io/frontends/reference/tokens-grants/),

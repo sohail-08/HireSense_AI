@@ -69,6 +69,7 @@ class DiscordPostingAssistantRequest(BaseModel):
 
 
 class DiscordPostDefaultsResponse(BaseModel):
+    job_description_content: str | None = None
     heading: str
     application_url: str | None
     contact_email: EmailStr | None

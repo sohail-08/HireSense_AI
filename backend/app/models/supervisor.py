@@ -36,7 +36,7 @@ class SupervisorSession(Base):
         ForeignKey("job_postings.id"),
         nullable=True,
     )
-    phase: Mapped[str] = mapped_column(String(50), default="requirements")
+    phase: Mapped[str] = mapped_column(String(50), default="job_details")
     state_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

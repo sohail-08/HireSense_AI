@@ -2,19 +2,31 @@
 
 ## Interviewer workflow
 
-1. In **Assessments**, select a job, choose the CV scoring weights, and rank CVs.
+1. In **CV Screening**, select a job, choose the CV scoring weights, and rank CVs.
 2. Conduct the interviews and save the transcripts.
-3. In **Reports**, select the job and click **Calculate final ranking**.
+3. In **Assessment**, select the job and click **Calculate final ranking**.
 4. Read the table: rank, candidate, CV score, interview score, final score.
-5. Open **View details** to see question scores. Expand a question and
-   **Why this score? View evidence** to read the answer and exact source quotes.
-6. Download the ranking or a candidate report if needed. HTML/print remains
-   available if PDF preparation fails.
+5. Search candidates by name and use the pagination controls for larger lists.
+   Filtering and paging never renumber the saved ranks or recalculate scores.
+6. Open the **View details** button to inspect question scores in a modal. The
+   ranking stays in place behind it, with search/page state preserved. Closing
+   restores focus to the triggering button; loading failures can be retried inside
+   the modal. Existing report/comparison deep links also open there. Expand a question and
+   **Why this score?** to read the score explanations. Each answer is displayed
+   once, without transcript source details or extra quoted passages beneath the
+   explanations. Saved evidence and the separate CV evidence section are unchanged.
+7. Click **Download this report** in candidate details to prepare and download
+   a PDF in one step. The button shows progress and can be retried if preparation
+   or download fails. Ranking/comparison exports retain their existing formats.
 
 The main screen does not expose source hashes, requirement matrices, review
 checkboxes, version selectors, or a multi-step comparison form. Evidence is optional
 to inspect, not a gate that blocks the ranking. The existing CV Assessments page
-and its approved category weights are unchanged.
+and its approved category weights are unchanged. The job selector and calculation
+action share a compact card with CV/interview weight chips. Table score bars are
+decorative: exact decimal formatting and server-provided ranks remain authoritative.
+Missing scores remain dashes, and zero scores remain zero. No model work or export
+is started by opening, searching, paging or inspecting the ranking.
 
 ## Scoring
 
@@ -77,6 +89,8 @@ are never relabelled with an invented final score.
 - `backend/app/services/assessment_service.py`: versioned reports and comparisons.
 - `backend/app/routes/assessments.py`: authenticated progress/calculation routes.
 - `frontend/src/pages/ConsolidatedAssessmentsPage.tsx`: simple ranking page.
+- `frontend/src/components/assessments/FinalRankingTable.tsx`: searchable, paginated
+  ranking table, score comparisons and explicit report actions.
 - `frontend/src/components/assessments/AssessmentView.tsx`: scores and optional evidence.
 - `backend/app/assessments/templates/report.html`: concise private HTML/PDF layout.
 

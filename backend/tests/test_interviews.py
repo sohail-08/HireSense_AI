@@ -82,6 +82,7 @@ def test_top_n_ties_and_manual_order(setup):
     assert preview["tie_at_boundary"] is True
     assert preview["recipient_count"] == 2
     assert all("***@" in item["masked_email"] for item in preview["selected"])
+    assert [item["email"] for item in preview["selected"]] == [db.get(Candidate, app.candidate_id).email for app in apps[:2]]
     manual = select_preview(setup, mode="manual", application_ids=[apps[2].id, apps[0].id])
     assert [item["application_id"] for item in manual["selected"]] == [apps[0].id, apps[2].id]
     assert sender.calls == []
@@ -158,6 +159,34 @@ def test_preview_then_confirm_is_atomic_and_idempotent(setup):
     assert all("meeting link" not in call[2] for call in sender.calls)
 
 
+def test_legacy_previews_show_email_without_rewriting_signed_snapshots(setup):
+    db, owner, _, _, apps, _, service, _ = setup
+    preview = prepared(setup, count=1)
+    batch = db.get(InterviewBatch, preview["id"])
+    legacy = deepcopy(batch.snapshot)
+    for item in legacy["recipients"]:
+        item.pop("email", None)
+    batch.snapshot = legacy
+    db.commit()
+    snapshot, seal = deepcopy(batch.snapshot), batch.confirmation_hash
+    result = service.batch(db, owner.id, batch.id)
+    assert result["recipients"][0]["email"] == db.get(Candidate, apps[0].candidate_id).email
+    assert batch.snapshot == snapshot and batch.confirmation_hash == seal
+
+
+def test_confirmed_preview_uses_actual_delivery_email_after_profile_changes(setup):
+    db, owner, _, _, apps, _, service, _ = setup
+    preview = prepared(setup, count=1)
+    original = db.get(Candidate, apps[0].candidate_id).email
+    assert preview["recipients"][0]["email"] == original
+    service.confirm(db, owner.id, preview["id"], confirm_data(preview))
+    db.get(Candidate, apps[0].candidate_id).email = "changed@example.com"
+    db.commit()
+    result = service.batch(db, owner.id, preview["id"])
+    assert result["recipients"][0]["email"] == original
+    assert result["deliveries"][0]["email"] == original
+
+
 def test_stale_ranking_recipient_and_draft_are_rejected(setup):
     db, owner, _, _, apps, _, service, _ = setup
     preview = prepared(setup)
@@ -204,6 +233,7 @@ def test_reschedule_keeps_uid_increases_sequence_preserves_history_and_failed_no
     request = RescheduleRequest.model_validate({**schedule_data("placeholder-token").model_dump(exclude={"selection_token"}),
         "schedule_ids": [schedule.id], "date": date.today() + timedelta(days=21), "reason": "Availability changed"})
     preview = service.preview_reschedule(db, owner.id, request)
+    assert preview["recipients"][0]["email"] == db.get(Candidate, db.get(CandidateApplication, schedule.application_id).candidate_id).email
     assert schedule.local_start == old_local
     sender.statuses = ["failed"]
     updated = service.confirm_reschedule(db, owner.id, confirm_data(preview, "reschedule"))
@@ -276,12 +306,16 @@ def test_api_authorization_confirmation_and_mocked_background_delivery(setup, mo
         assert client.get("/api/interviews/schedules").status_code == 401
         denied = {"Authorization": "Bearer " + create_access_token(other.id)}
         assert client.get("/api/interviews/schedules", headers=denied).status_code == 403
+        assert client.post("/api/interviews/selection/preview", headers=denied, json={"job_posting_id": posting.id, "mode": "top_n", "top_n": 1}).status_code == 403
         headers = {"Authorization": "Bearer " + create_access_token(owner.id)}
         selection = client.post("/api/interviews/selection/preview", headers=headers, json={"job_posting_id": posting.id, "mode": "top_n", "top_n": 1}).json()
+        assert selection["selected"][0]["email"] and "***" not in selection["selected"][0]["email"]
         data = schedule_data(selection["selection_token"])
         rejected = client.post("/api/interviews/invitations/prepare", headers=headers, json={**data.model_dump(mode="json"), "mode": "shared"})
         assert rejected.status_code == 422 and not sender.calls
         preview = client.post("/api/interviews/invitations/prepare", headers=headers, json=data.model_dump(mode="json")).json()
+        assert preview["recipients"][0]["email"] == selection["selected"][0]["email"]
+        assert client.get(f"/api/interviews/batches/{preview['id']}", headers=denied).status_code == 403
         assert sender.calls == []
         response = client.post(f"/api/interviews/batches/{preview['id']}/confirm", headers=headers, json={"confirmed": False, "confirmation_token": preview["confirmation_token"], "idempotency_key": "api"})
         assert response.status_code == 422

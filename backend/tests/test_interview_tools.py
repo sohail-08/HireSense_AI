@@ -65,8 +65,27 @@ def test_email_template_validation_and_omission_of_meeting_links(setup):
         render_email(service.settings, {"name": "A"}, "Backend", "technical", slot, data.model_copy(update={"subject_template": "a\nb"}))
     custom = render_email(service.settings, {"name": "A"}, "Backend", "technical", slot,
         data.model_copy(update={"body_template": "Hello {candidate_name}!", "instructions": "Bring a laptop."}))
-    assert "Hello A!" in custom["body"] and "Asia/Dhaka" in custom["body"]
+    assert "Hello A!" in custom["body"] and "Dhaka time" in custom["body"]
+    assert "Start time: 10:00 AM" in custom["body"]
     assert "Bring a laptop." in custom["body"] and "Stage: technical" in custom["body"]
+
+
+def test_email_and_chat_previews_use_readable_times_without_changing_calendar_instants(setup):
+    _, _, _, _, _, _, service, _ = setup
+    data = schedule_data("placeholder-token", date="2030-10-22", start_time="17:05")
+    slot = allocate_slots(data, 1)[0]
+    original = dict(slot)
+    old = {"local_start": "2030-10-21T08:00:00+06:00", "timezone": "Asia/Dhaka"}
+    email = render_email(service.settings, {"name": "A"}, "Backend", "technical", slot, data, old)
+    assert "Time: 5:05 PM (Dhaka time)" in email["body"]
+    assert "Previous schedule: 21 Oct 2030 at 8:00 AM (Dhaka time)" in email["body"]
+    assert "New schedule: 22 Oct 2030 at 5:05 PM (Dhaka time)" in email["body"]
+    assert slot == original and slot["start_utc"] == "2030-10-22T11:05:00+00:00"
+    preview = {"recipient_count": 1, "sender": {"from_email": "sender@example.test", "reply_to": "reply@example.test"},
+        "recipients": [{**slot, **email, "name": "A", "masked_email": "a***@example.test"}]}
+    text = InterviewAssistantService.preview_text(preview)
+    assert "22 Oct 2030, 5:05 PM – 5:35 PM (Dhaka time)" in text
+    assert slot["local_start"] not in text and old["local_start"] not in text
 
 
 def test_restart_recovery_never_retries_uncertain_attempts(setup):
@@ -254,7 +273,7 @@ def test_chat_threshold_operator_and_named_job_are_grounded(setup):
 
 def test_native_toolnode_binds_interview_workflow_without_recipient_or_identity_arguments():
     callback = lambda message: {"phase": "interview_selection", "outcome": "info", "assistant_message": "Please select a job.", "refresh_required": False}
-    callbacks = SupervisorToolCallbacks(callback, callback, callback, callback, callback, callback, callback, lambda m, d: callback(m), interviews=callback)
+    callbacks = SupervisorToolCallbacks(callback, callback, callback, callback, callback, callback, lambda m, d: callback(m), interviews=callback)
     tools = build_supervisor_tools(callbacks, user_message="schedule top 5")
     tool = next(item for item in tools if item.name == "interviews")
     assert set(tool.args) == {"message"}

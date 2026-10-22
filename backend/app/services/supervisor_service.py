@@ -30,8 +30,8 @@ from app.models.screening import ScreeningBatch, ScreeningBatchStatus
 from app.schemas.job import JobDescriptionUpdateRequest
 from app.schemas.requirements import RequirementProfileDraft
 from app.services.job_description_service import JobDescriptionService
+from app.services.direct_job_description_service import DirectJobDescriptionService
 from app.services.job_posting_assistant_service import JobPostingAssistantService
-from app.services.requirement_discovery_service import RequirementDiscoveryService
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 from app.services.screening_service import ScreeningService
 from app.services.interview_assistant_service import InterviewAssistantService
@@ -63,7 +63,7 @@ class SupervisorService:
         self,
         *,
         model: SupervisorChatModel,
-        requirement_service: RequirementDiscoveryService,
+        direct_job_service: DirectJobDescriptionService | None = None,
         job_description_service: JobDescriptionService,
         job_edit_model: JobDescriptionEditModel,
         job_posting_service: JobPostingAssistantService,
@@ -73,7 +73,7 @@ class SupervisorService:
         interview_service: InterviewAssistantService | None = None,
     ):
         self.model = model
-        self.requirement_service = requirement_service
+        self.direct_job_service = direct_job_service
         self.job_description_service = job_description_service
         self.job_edit_model = job_edit_model
         self.job_posting_service = job_posting_service
@@ -124,15 +124,6 @@ class SupervisorService:
                 db, supervisor, interviewer_user_id, text,
                 self.screening_service.list_jobs(db, interviewer_user_id=interviewer_user_id) if self.screening_service else [],
                 selected_job_posting_id, selected_application_ids or []), preserve_phase=True) if self.interview_service else None,
-            requirements=self._safe_tool(
-                supervisor,
-                lambda text: self._requirements_tool(
-                    db,
-                    supervisor,
-                    interviewer_user_id,
-                    text,
-                ),
-            ),
             generate_job_description=self._safe_tool(
                 supervisor,
                 lambda text: self._generate_tool(
@@ -198,8 +189,9 @@ class SupervisorService:
             "refresh_required": False,
         }
         assistant_message = graph_state.get("final_response") or result["assistant_message"]
-        if graph_state.get("tool_name") in {"interviews", "candidate_assessments"}:
-            # Do not let response generation omit recipients, slots or exact email previews.
+        if graph_state.get("tool_name") in {"interviews", "candidate_assessments", "generate_job_description"}:
+            # Preserve exact scheduling previews and direct-drafting questions;
+            # prose generation must not reintroduce a requirements approval step.
             assistant_message = result["assistant_message"]
 
         supervisor.phase = result.get("phase", supervisor.phase)
@@ -338,7 +330,7 @@ class SupervisorService:
 
         supervisor = SupervisorSession(
             interviewer_user_id=interviewer_user_id,
-            phase="requirements",
+            phase="job_details",
             state_json={"messages": []},
         )
         db.add(supervisor)
@@ -390,78 +382,40 @@ class SupervisorService:
         else:
             supervisor.phase = "job_description_approved"
 
-    def _requirements_tool(
+    def _generate_tool(
         self,
         db: Session,
         supervisor: SupervisorSession,
         interviewer_user_id: int,
         message: str,
     ) -> dict[str, Any]:
-        requirement_session, result = self.requirement_service.chat(
-            db,
-            interviewer_user_id=interviewer_user_id,
-            message=message,
-            session_id=supervisor.requirement_session_id,
-        )
-        supervisor.requirement_session_id = requirement_session.id
-        supervisor.requirement_profile_id = requirement_session.requirement_profile_id
-
-        status = result["status"]
-        if status == "confirmed":
-            phase = "requirement_confirmed"
-        elif status == "awaiting_confirmation":
-            phase = "requirement_confirmation"
-        elif status == "error":
-            phase = "error"
-        else:
-            phase = "requirements"
-
-        return {
-            "phase": phase,
-            "outcome": "failure" if status == "error" else "info",
-            "assistant_message": result["assistant_message"],
-            "requirement_state": self._requirement_result(result),
-            "refresh_required": bool(requirement_session.requirement_profile_id),
-        }
-
-    def _generate_tool(
-        self,
-        db: Session,
-        supervisor: SupervisorSession,
-        interviewer_user_id: int,
-        _message: str,
-    ) -> dict[str, Any]:
-        if supervisor.requirement_profile_id is None:
-            return self._failure(
-                supervisor,
-                "Confirm the job requirements before generating a job description.",
-            )
-
         current = self._current_job(db, supervisor, interviewer_user_id)
-        if current is not None and current.requirement_profile_id == (
-            supervisor.requirement_profile_id
-        ):
-            return self._failure(
-                supervisor,
-                "A job description already exists for these requirements. "
-                "Ask me to edit it or approve the current draft.",
-            )
-
-        job = self.job_description_service.generate(
-            db,
-            requirement_profile_id=supervisor.requirement_profile_id,
-            interviewer_user_id=interviewer_user_id,
+        if current is not None:
+            return self._failure(supervisor,
+                "A job description is already open. Ask me to edit it, or start a new workflow for another role.")
+        if self.direct_job_service is None:
+            raise RuntimeError("Direct job drafting is unavailable. Please try again.")
+        state = dict(supervisor.state_json or {})
+        messages = list(state.get("messages", []))
+        messages.append({"role": "user", "content": message})
+        result = self.direct_job_service.draft(
+            db, interviewer_user_id=interviewer_user_id, messages=messages,
+            role_title=state.get("draft_role_title"),
         )
-        supervisor.job_description_id = job.id
-        supervisor.job_posting_id = None
+        state["draft_role_title"] = result["role_title"]
+        # Discard the obsolete proposal, including on restored older sessions.
+        state.pop("requirement_state", None)
+        supervisor.state_json = state
+        job = result["job"]
+        if job is not None:
+            supervisor.requirement_profile_id = job.requirement_profile_id
+            supervisor.job_description_id = job.id
+            supervisor.job_posting_id = None
         return {
-            "phase": "job_description_draft",
-            "outcome": "success",
-            "assistant_message": (
-                f"Generated job description “{job.title}” version {job.version}. "
-                "Review it, ask me for edits, or tell me to approve it."
-            ),
-            "refresh_required": True,
+            "phase": "job_description_draft" if job is not None else "job_details",
+            "outcome": "success" if job is not None else "info",
+            "assistant_message": result["assistant_message"],
+            "refresh_required": job is not None,
         }
 
     def _edit_tool(
@@ -604,12 +558,13 @@ class SupervisorService:
         _message: str,
     ) -> dict[str, Any]:
         guidance = {
+            "job_details": "Tell me the role you want to hire for. I'll check the knowledge base and draft the job description.",
             "requirements": "Tell me the role you want to hire for.",
             "requirement_confirmation": (
-                "Review the proposed requirements, request changes, or confirm them."
+                "Tell me to continue and I'll draft the job description directly from the knowledge base and your details."
             ),
             "requirement_confirmed": (
-                "Ask me to generate the job description."
+                "Tell me to continue with your job description. No requirements approval is needed."
             ),
             "job_description_draft": (
                 "Ask me to edit the current draft or approve it."
@@ -764,10 +719,6 @@ class SupervisorService:
             supervisor.interviewer_user_id,
         )
         posting = self._current_posting(db, supervisor)
-        requirement_state = (supervisor.state_json or {}).get(
-            "requirement_state",
-            {},
-        )
         return {
             "phase": supervisor.phase,
             "page_context": (supervisor.state_json or {}).get("page_context", "jobs"),
@@ -779,13 +730,7 @@ class SupervisorService:
             "available_screening_jobs": self.screening_service.list_jobs(
                 db, interviewer_user_id=supervisor.interviewer_user_id,
             ) if self.screening_service else [],
-            "requirement_profile_confirmed": (
-                supervisor.requirement_profile_id is not None
-            ),
-            "missing_requirement_fields": requirement_state.get(
-                "missing_fields",
-                [],
-            ),
+            "draft_role_title": (supervisor.state_json or {}).get("draft_role_title"),
             "job_description": (
                 {
                     "id": job.id,
@@ -881,19 +826,6 @@ class SupervisorService:
             ),
             "proposal_ready": True,
             "source_references": profile.source_references,
-        }
-
-    @staticmethod
-    def _requirement_result(result: dict[str, Any]) -> dict[str, Any]:
-        profile = result["profile"]
-        if isinstance(profile, RequirementProfileDraft):
-            profile = profile.model_dump(mode="json")
-        return {
-            "profile": profile,
-            "missing_fields": result["missing_fields"],
-            "knowledge_status": result["knowledge_status"],
-            "proposal_ready": result["proposal_ready"],
-            "source_references": result["source_references"],
         }
 
     @staticmethod

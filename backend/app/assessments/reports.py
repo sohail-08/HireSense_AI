@@ -8,8 +8,9 @@ import sys
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.agents.interview_analysis import digest
 from app.services.scoring_calculation import display_score
+from app.services.date_time_display import format_date_time
 
-TEMPLATE_VERSION = "assessment-report-simple-v2"
+TEMPLATE_VERSION = "assessment-report-simple-v3-readable-time"
 
 
 def render_html(payload):
@@ -18,6 +19,7 @@ def render_html(payload):
     env.filters["score"] = lambda value: display_score(str(value)) if value is not None else "Not available"
     env.filters["label"] = lambda value: str(value).replace("_", " ")
     env.filters["anchor"] = lambda value: digest(value)[:16]
+    env.filters["datetime"] = format_date_time
     content = env.get_template("report.html").render(payload=payload, template_version=TEMPLATE_VERSION)
     if len(content.encode("utf-8")) > 4_000_000: raise ValueError("Report exceeds the bounded export size")
     return content

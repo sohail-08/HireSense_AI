@@ -123,6 +123,7 @@ export type JobPostingStatus =
   | "uncertain";
 
 export interface DiscordPostDefaults {
+  job_description_content?: string | null;
   heading: string;
   application_url: string | null;
   contact_email: string | null;
@@ -172,6 +173,7 @@ export interface DiscordPostingAssistantResponse {
 }
 
 export type SupervisorPhase =
+  | "job_details"
   | "requirements"
   | "requirement_confirmation"
   | "requirement_confirmed"

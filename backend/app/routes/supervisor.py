@@ -6,7 +6,7 @@ from app.agents.job_description import (
     GeminiJobDescriptionModel,
 )
 from app.agents.job_posting import GeminiPostingCommandModel
-from app.agents.requirement_discovery import GeminiRequirementModel
+from app.agents.direct_job_description import GeminiDirectJobDescriptionModel
 from app.agents.supervisor import GeminiSupervisorModel
 from app.database import get_db
 from app.config import get_settings
@@ -22,7 +22,7 @@ from app.schemas.supervisor import (
 from app.security import require_interviewer
 from app.services.job_description_service import JobDescriptionService
 from app.services.job_posting_assistant_service import JobPostingAssistantService
-from app.services.requirement_discovery_service import RequirementDiscoveryService
+from app.services.direct_job_description_service import DirectJobDescriptionService
 from app.services.supervisor_service import SupervisorService
 from app.services.google_forms_intake_service import GoogleFormsIntakeService
 from app.services.screening_service import ScreeningService
@@ -36,8 +36,8 @@ def _service() -> SupervisorService:
     settings = get_settings()
     return SupervisorService(
         model=GeminiSupervisorModel(),
-        requirement_service=RequirementDiscoveryService(
-            GeminiRequirementModel(),
+        direct_job_service=DirectJobDescriptionService(
+            GeminiDirectJobDescriptionModel(),
             KnowledgeBaseService(OllamaEmbeddingProvider()),
         ),
         job_description_service=JobDescriptionService(

@@ -18,11 +18,65 @@ from app.models.job import (
 )
 from app.models.supervisor import SupervisorSession
 from app.rag.service import KnowledgeBaseService
-from app.schemas.job import JobDescriptionUpdateRequest
+from app.schemas.job import JobDescriptionManualCreate, JobDescriptionUpdateRequest
 from app.services.candidate_application_service import CandidateApplicationService
 
 
 class JobDescriptionService:
+    @staticmethod
+    def create_manual(
+        db: Session,
+        *,
+        data: JobDescriptionManualCreate,
+        interviewer_user_id: int,
+    ) -> JobDescription:
+        """Save the interviewer's text and explicit requirements without AI/RAG."""
+        required = [item.model_dump(mode="json") for item in data.required_skills]
+        preferred = [item.model_dump(mode="json") for item in data.preferred_skills]
+        qualifications = [item.model_dump(mode="json") for item in data.qualifications]
+        profile = RequirementProfile(
+            title=data.title,
+            summary=data.content,
+            required_skills=required,
+            preferred_skills=preferred,
+            qualifications=qualifications,
+            min_years_experience=data.min_years_experience,
+            selection_criteria=[],
+            source_references=[],
+            generation_metadata={"source": "manual", "model_used": False},
+            status=RequirementProfileStatus.CONFIRMED,
+            created_by_user_id=interviewer_user_id,
+        )
+        try:
+            db.add(profile)
+            db.flush()
+            job = JobDescription(
+                requirement_profile_id=profile.id,
+                title=data.title,
+                content=data.content,
+                structured_content={
+                    "title": data.title, "summary": data.content,
+                    "responsibilities": [], "required_skills": required,
+                    "preferred_skills": preferred, "qualifications": qualifications,
+                    "experience_requirement": (
+                        f"At least {data.min_years_experience} years of relevant experience."
+                        if data.min_years_experience is not None else "Not specified."
+                    ),
+                    "selection_criteria": [],
+                },
+                source_references=[],
+                version=1,
+                status=JobDescriptionStatus.DRAFT,
+                created_by_user_id=interviewer_user_id,
+            )
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            return job
+        except Exception:
+            db.rollback()
+            raise
+
     def __init__(
         self,
         model: JobDescriptionModel,

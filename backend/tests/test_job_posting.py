@@ -48,6 +48,56 @@ from app.services.job_posting_service import (
     StaleJobDescriptionError,
 )
 from app.services.job_posting_assistant_service import JobPostingAssistantService
+from app.job_posting_branding import CONTACT_EMAIL, COMPANY_ADDRESS, POST_HEADING, posting_description
+
+
+def test_company_details_are_fixed_and_legacy_employer_is_corrected_only_in_the_post():
+    engine, sessions = _database()
+    publisher = StubPublisher(DiscordPublishResult("333", "222", "111"))
+    service = DiscordJobPostingService(publisher=publisher)
+    with sessions() as db:
+        owner, candidate, job = _records(db)
+        original = "Northstar Digital is seeking a backend engineer.\n\n- Build APIs"
+        job.content = original; db.commit()
+        posting = service.preview(db, data=DiscordPostPreviewRequest(job_description_id=job.id,
+            heading="Unapproved heading", contact_email="old@example.com", location="Old office"), interviewer_user_id=owner.id)
+        assert posting.heading == POST_HEADING
+        assert posting.contact_email == "sohail.sh.ahmed@gmail.com"
+        assert posting.location == "House-5/B, Road-2/E, Block-J, Baridhara, Dhaka 1212"
+        assert posting.discord_payload["embeds"][0]["description"] == original.replace("Northstar Digital", "BJIT")
+        fields = {field["name"]: field["value"] for field in posting.discord_payload["embeds"][0]["fields"]}
+        assert fields["Contact email"] == CONTACT_EMAIL and fields["Address"] == COMPANY_ADDRESS
+        assert "Northstar" not in posting.reviewed_content
+        db.refresh(job)
+        assert job.content == original and job.status is JobDescriptionStatus.APPROVED
+        assert publisher.calls == []
+        with pytest.raises(LookupError):
+            service.preview(db, data=DiscordPostPreviewRequest(job_description_id=job.id), interviewer_user_id=candidate.id)
+    engine.dispose()
+
+
+def test_legacy_company_snapshot_must_be_saved_again_before_publish():
+    engine, sessions = _database()
+    publisher = StubPublisher(DiscordPublishResult("333", "222", "111"))
+    service = DiscordJobPostingService(publisher=publisher)
+    with sessions() as db:
+        owner, _, job = _records(db)
+        posting = service.preview(db, data=_preview_request(job.id), interviewer_user_id=owner.id)
+        posting.discord_payload = {**posting.discord_payload, "content": "Legacy heading"}
+        posting.heading = "Legacy heading"
+        db.commit()
+        with pytest.raises(StaleJobDescriptionError, match="Company posting details changed"):
+            service.publish(db, posting_id=posting.id, interviewer_user_id=owner.id)
+        assert publisher.calls == [] and posting.status is JobPostingStatus.DRAFT
+        saved = service.preview(db, data=DiscordPostPreviewRequest(job_description_id=job.id, posting_id=posting.id), interviewer_user_id=owner.id)
+        service.publish(db, posting_id=saved.id, interviewer_user_id=owner.id)
+        assert publisher.calls[0]["content"] == POST_HEADING
+        assert CONTACT_EMAIL in str(publisher.calls[0])
+    engine.dispose()
+
+
+def test_company_alias_correction_is_targeted_and_case_insensitive():
+    assert posting_description("NORTHSTAR Digital hires. Northstar Analytics is a client.") == "BJIT hires. Northstar Analytics is a client."
 
 
 class StubPublisher:
@@ -601,6 +651,12 @@ def test_job_posting_routes_require_interviewer_and_return_saved_status(monkeypa
         interviewer_headers = {
             "Authorization": f"Bearer {create_access_token(interviewer_id)}"
         }
+        defaults = api.get(f"/api/job-postings/discord/defaults?job_description_id={job_id}", headers=interviewer_headers)
+        assert defaults.status_code == 200
+        assert defaults.json()["contact_email"] == CONTACT_EMAIL
+        assert defaults.json()["location"] == COMPANY_ADDRESS
+        assert defaults.json()["job_description_content"] is not None
+        assert api.get("/api/job-postings/discord/defaults?job_description_id=99999", headers=interviewer_headers).status_code == 404
         preview_response = api.post(
             "/api/job-postings/discord/preview",
             headers=interviewer_headers,

@@ -1,10 +1,12 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TranscriptionProvider, TranscriptionPanel, TranscriptReceiver } from "../../src/components/interviews/TranscriptionPanel";
 import { mergeFinals, transcriptTime, trustedTranscriptEvent, verifyCaptionMessage, type TranscriptionStatus } from "../../src/components/interviews/transcriptionApi";
 import { webcrypto } from "node:crypto";
 import { TextDecoder, TextEncoder } from "node:util";
 import { transcriptionApi } from "../../src/components/interviews/transcriptionApi";
+import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
+import { readFileSync } from "node:fs";
 
 const room = vi.hoisted(() => ({ registerTextStreamHandler: vi.fn(), unregisterTextStreamHandler: vi.fn(), on: vi.fn(), off: vi.fn() }));
 vi.mock("@livekit/components-react", () => ({ useRoomContext: () => room }));
@@ -31,6 +33,134 @@ beforeEach(() => {
   vi.mocked(transcriptionApi.status).mockResolvedValue(initial);
   vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [], next_cursor: null });
   room.registerTextStreamHandler.mockClear();
+});
+
+it("uses the bounded bottom pane for transcript scrolling and respects manual reading position", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue(active);
+  render(<TranscriptionProvider interviewId={1}><TranscriptReceiver /><MeetingTabs fill label="Transcript tools" tabs={[{ id: "transcript", label: "Live transcript", content: <TranscriptionPanel panelScroll /> }]} /></TranscriptionProvider>);
+  await screen.findByText("Transcription active");
+  const panel = screen.getByRole("tabpanel", { name: "Live transcript" });
+  const segments = screen.getByLabelText("Transcript segments");
+  expect(segments.getAttribute("data-scroll-mode")).toBe("panel");
+  expect(segments.className).not.toContain("overflow-y-auto");
+  Object.defineProperties(panel, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 200 } });
+  panel.scrollTop = 100; fireEvent.scroll(panel);
+  await receive({ ...line, kind: "interim", text: "Reading previous text" });
+  expect(panel.scrollTop).toBe(100);
+  panel.scrollTop = 800; fireEvent.scroll(panel);
+  await receive({ ...line, kind: "interim", text: "Follow live text again" });
+  expect(panel.scrollTop).toBe(1000);
+});
+
+it("keeps consent controls at the top when saved transcript text exists but consent is not given", async () => {
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1}><MeetingTabs fill label="Transcript tools" tabs={[
+    { id: "transcript", label: "Live transcript", content: <TranscriptionPanel panelScroll /> },
+    { id: "analysis", label: "Analysis", content: <p>Analysis content</p> },
+  ]} /></TranscriptionProvider>);
+  await screen.findByText("A final answer");
+  const panel = screen.getByRole("tabpanel", { name: "Live transcript" });
+  Object.defineProperties(panel, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 200 } });
+  panel.scrollTop = 0;
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Live transcript" }));
+  expect(panel.scrollTop).toBe(0);
+  expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByRole("button", { name: "Start transcription" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("expands the saved transcript in review mode without auto-scrolling on history restore or tab changes", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue({ ...active, status: "completed" });
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1} closed><MeetingTabs pageScroll label="Review" tabs={[
+    { id: "transcript", label: "Transcript", content: <TranscriptionPanel closed pageScroll /> },
+    { id: "analysis", label: "Analysis", content: <p>Analysis</p> },
+  ]} /></TranscriptionProvider>);
+  await screen.findByText("A final answer");
+  const segments = screen.getByLabelText("Transcript segments");
+  expect(segments.getAttribute("data-scroll-mode")).toBe("page");
+  expect(segments.getAttribute("data-auto-follow")).toBe("false");
+  expect(segments.className).not.toContain("h-72");
+  expect(segments.className).not.toContain("overflow-y-auto");
+  const panel = screen.getByRole("tabpanel", { name: "Transcript" });
+  Object.defineProperty(panel, "scrollHeight", { configurable: true, value: 1000 });
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Transcript" }));
+  expect(panel.scrollTop).toBe(0);
+});
+
+it("renders messenger-style bubbles with distinct sides, exact times and no repeated role labels", async () => {
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [
+    { ...line, text: "First answer.\nSecond line with <script>not markup</script>." },
+    { ...line, id: "b".repeat(64), speaker: "INTERVIEWER", text: "Next question", start_offset_ms: 2300, end_offset_ms: 3200 },
+  ], next_cursor: null });
+  show();
+  const candidate = await screen.findByRole("article", { name: "Candidate · 00:01 · Final" });
+  const interviewer = screen.getByRole("article", { name: "Interviewer · 00:02 · Final" });
+  expect(candidate.getAttribute("data-speaker")).toBe("CANDIDATE");
+  expect(interviewer.getAttribute("data-speaker")).toBe("INTERVIEWER");
+  expect(within(candidate).queryByText("Candidate")).toBeNull();
+  expect(within(interviewer).queryByText("Interviewer")).toBeNull();
+  expect(within(candidate).getByText("00:01").getAttribute("title")).toContain("start of transcription");
+  expect(candidate.getAttribute("data-side")).toBe("incoming");
+  expect(interviewer.getAttribute("data-side")).toBe("outgoing");
+  expect(candidate.querySelector(".hiresense-transcript-avatar")).toBeNull();
+  expect(candidate.querySelector(".hiresense-transcript-copy")?.textContent).toBe("First answer.\nSecond line with <script>not markup</script>.");
+  expect(candidate.querySelector("script")).toBeNull();
+  const bubble = candidate.querySelector(".hiresense-transcript-bubble")!;
+  expect(bubble.firstElementChild?.className).toBe("hiresense-transcript-copy");
+  expect(bubble.nextElementSibling?.className).toBe("hiresense-transcript-meta");
+  expect(bubble.querySelector(".hiresense-transcript-time")).toBeNull();
+  expect(screen.queryByText("Final")).toBeNull();
+  const css = readFileSync("src/index.css", "utf8");
+  expect(css).toMatch(/\.hiresense-transcript-bubble \{[^}]*background: #e9f5f1;[^}]*color: #183d36/);
+  expect(css).toMatch(/\[data-side="outgoing"\] \.hiresense-transcript-bubble \{[^}]*background: var\(--color-blue-600\); color: white/);
+  expect(css).toContain('.hiresense-transcript-entry[data-side="outgoing"] { justify-content: flex-end; }');
+  expect(css).not.toContain("hiresense-transcript-speaker");
+  expect(css).toMatch(/\.hiresense-transcript-heading, \.hiresense-transcript-notice, \.hiresense-transcript-thread \{[^}]*max-width: 56rem/);
+  expect(css).toMatch(/\.hiresense-transcript-copy \{[^}]*overflow-wrap: anywhere; white-space: pre-wrap/);
+  expect(css).toMatch(/\.hiresense-transcript-message \{[^}]*width: fit-content; max-width: min\(82%, 40rem\)/);
+  expect(css).toContain(".hiresense-transcript-message { max-width: 90%; }");
+});
+
+it("puts the candidate's own live captions on the right without fetching saved history", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue(active);
+  vi.mocked(transcriptionApi.history).mockClear();
+  show(true); await screen.findByText("Transcription active");
+  await receive(line);
+  await receive({ ...line, id: "b".repeat(64), sequence: 2, speaker: "INTERVIEWER", text: "A live question", start_offset_ms: 2300, end_offset_ms: 3300 });
+  expect(screen.getByRole("article", { name: "Candidate · 00:01 · Final" }).getAttribute("data-side")).toBe("outgoing");
+  expect(screen.getByRole("article", { name: "Interviewer · 00:02 · Final" }).getAttribute("data-side")).toBe("incoming");
+  expect(transcriptionApi.history).not.toHaveBeenCalled();
+});
+
+it("visually groups consecutive speech without merging text or removing individual timestamps", async () => {
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line,
+    { ...line, id: "b".repeat(64), sequence: 2, text: "Another answer", start_offset_ms: 2600, end_offset_ms: 3600 },
+    { ...line, id: "c".repeat(64), sequence: 3, text: "After a longer pause", start_offset_ms: 90000, end_offset_ms: 91000 },
+  ], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1} closed><TranscriptionPanel closed pageScroll /></TranscriptionProvider>);
+  await screen.findByText("Another answer");
+  const entries = screen.getAllByRole("article");
+  expect(entries).toHaveLength(3);
+  expect(entries.map(entry => entry.getAttribute("data-continuation"))).toEqual(["false", "true", "false"]);
+  expect(within(entries[0]).getByText("00:01")).toBeTruthy();
+  expect(within(entries[1]).getByText("00:02")).toBeTruthy();
+  expect(within(entries[2]).getByText("01:30")).toBeTruthy();
+  expect(screen.getByLabelText("Transcript segments").getAttribute("data-scroll-mode")).toBe("page");
+});
+
+it("keeps a failed session visible with concise notice and expandable technical details", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue({ ...active, status: "failed", failure_code: "shutdown_timeout" });
+  render(<TranscriptionProvider interviewId={1} closed><TranscriptionPanel closed pageScroll /></TranscriptionProvider>);
+  await screen.findByText("Failed");
+  expect(screen.getByRole("alert").textContent).toContain("Audio/video is unaffected.");
+  expect(screen.getByText("Any saved transcript text remains available below.", { exact: false })).toBeTruthy();
+  const details = screen.getByText("shutdown timeout").closest("details")!;
+  expect(details.open).toBe(false);
+  fireEvent.click(screen.getByText("Technical details"));
+  expect(details.open).toBe(true);
+  expect(screen.getByText("Failed")).toBeTruthy();
 });
 
 describe("transcription controls and captions", () => {
@@ -63,9 +193,9 @@ describe("transcription controls and captions", () => {
     await receive(line);
     expect(screen.getAllByText("A final answer")).toHaveLength(1);
     expect(screen.queryByText("Revised draft")).toBeNull();
-    expect(screen.getByText("Candidate · 00:01 · Final")).toBeTruthy();
+    expect(screen.getByRole("article", { name: "Candidate · 00:01 · Final" })).toBeTruthy();
     await receive({ ...line, id: "b".repeat(64), speaker: "INTERVIEWER", text: "A question" });
-    expect(screen.getByText("Interviewer · 00:01 · Final")).toBeTruthy();
+    expect(screen.getByRole("article", { name: "Interviewer · 00:01 · Final" })).toBeTruthy();
     await receive({ ...line, text: "Spoofed" }, "candidate-name");
     expect(screen.queryByText("Spoofed")).toBeNull();
   });
@@ -141,7 +271,7 @@ it("shows signed captions from a hidden worker during speech, without stopping o
     await screen.findByText("Transcription active");
     await receive(await signedCaption({ ...line, event_index: 1, kind: "interim", text: "Appears while talking" }, pair.privateKey), "");
     expect(screen.getByText("Appears while talking")).toBeTruthy();
-    expect(screen.getByText("Candidate · 00:01 · Live draft")).toBeTruthy();
+    expect(screen.getByRole("article", { name: "Candidate · 00:01 · Live draft" })).toBeTruthy();
     await receive(await signedCaption({ ...line, event_index: 2 }, pair.privateKey), "");
     expect(screen.getByText("A final answer")).toBeTruthy();
     expect(screen.queryByText("Appears while talking")).toBeNull();

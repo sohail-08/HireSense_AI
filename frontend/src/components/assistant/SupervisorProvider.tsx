@@ -17,8 +17,8 @@ type AssistantContext = {
   loading: boolean;
   open: boolean;
   setOpen: (value: boolean) => void;
+  startNewWorkflow: () => void;
   sendMessage: (message: string) => Promise<void>;
-  addTaskMessage: (outcome: "success" | "failure", content: string) => void;
   setSelectedJobDescriptionId: (id: number | undefined) => void;
   setSelectedJobPostingId: (id: number | undefined) => void;
   setSelectedApplicationIds: (ids: number[]) => void;
@@ -28,9 +28,10 @@ type AssistantContext = {
 const Context = createContext<AssistantContext | null>(null);
 
 const phaseLabels: Record<SupervisorPhase, string> = {
-  requirements: "Requirement discovery",
-  requirement_confirmation: "Confirm requirements",
-  requirement_confirmed: "Ready to generate JD",
+  job_details: "Create a job",
+  requirements: "Create a job",
+  requirement_confirmation: "Create a job",
+  requirement_confirmed: "Create a job",
   job_description_draft: "JD review",
   job_description_approved: "Ready to post",
   posting_details: "Posting details",
@@ -50,7 +51,7 @@ export function useSupervisor() {
 export function SupervisorProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const page = pathname.endsWith("/candidates") ? "candidates"
-    : pathname.endsWith("/interviews") ? "interviews"
+    : pathname.endsWith("/interviews") || pathname.endsWith("/schedule-interviews") ? "interviews"
     : pathname.endsWith("/assessments") ? "assessments"
       : pathname.endsWith("/jobs") ? "jobs" : "other";
   const [open, setOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
@@ -197,10 +198,9 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
     setInput("");
   }
 
-  const phase = response?.phase ?? "requirements";
-  const requirement = response?.requirement_state;
+  const phase = response?.phase ?? "job_details";
   return (
-    <Context.Provider value={{ response, loading, open, setOpen, sendMessage, addTaskMessage,
+    <Context.Provider value={{ response, loading, open, setOpen, startNewWorkflow: newSession, sendMessage,
       setSelectedJobDescriptionId, setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion, batch }}>
       {children}
       <SupervisorChatPanel
@@ -208,16 +208,13 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
         phaseLabel={batch && ["queued", "processing"].includes(batch.status)
           ? `Screening ${batch.processed_applications}/${batch.total_applications}`
           : phase.startsWith("interview_") ? phaseLabels[phase]
-          : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : phaseLabels[phase]}
+          : page === "candidates" ? "Candidate collection" : page === "assessments" ? "CV screening and ranking" : page === "interviews" ? "Interview scheduling" : phaseLabels[phase]}
         messages={messages}
         assessmentLinks={response?.assessment_links}
         loading={loading}
         input={input}
         placeholder={page === "candidates" ? "e.g. Sync responses…"
-          : page === "assessments" ? "Screen candidates for a job…" : "Message HireSense assistant…"}
-        requirementContextVisible={phase.startsWith("requirement")}
-        requirementSources={requirement?.source_references ?? []}
-        missingFields={requirement?.missing_fields ?? []}
+          : page === "assessments" ? "Screen candidates for a job…" : page === "interviews" ? "Schedule or reschedule interviews…" : "Message HireSense assistant…"}
         onOpen={() => setOpen(true)}
         onClose={close}
         onInputChange={setInput}
