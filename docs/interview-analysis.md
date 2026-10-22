@@ -38,10 +38,12 @@ candidate captions. Interim text never enters the analysis workflow.
    reference quotes and full explanations are no longer rendered here. Saved evidence,
    references and original score explanations remain intact in backend records.
    Citation verification in other views is unchanged.
-7. **Other transcript passages** shows remaining conversation in compact, spaced
-   cards with readable text and small elapsed timestamps. Interviewer passages use
-   blue and candidate passages use amber. Long text
-   wraps within the panel. The **Job requirements covered** section is no longer
+7. **Other transcript passages** reuses the live transcript's messenger-style
+   conversation layout: interviewer speech on the right in dark blue and candidate
+   speech on the left in soft mint, with elapsed timestamps below each bubble.
+   Unknown speakers or unavailable sources use neutral styling; missing sources
+   never get invented text or timestamps. Long text wraps within the panel, and
+   each saved passage stays separate. The **Job requirements covered** section is no longer
    displayed; its saved mappings are unchanged. Source gaps, errors and outdated
    inputs remain visible.
 

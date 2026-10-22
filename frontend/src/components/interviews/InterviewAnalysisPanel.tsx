@@ -93,13 +93,17 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
           <span className="min-w-0 flex-1">Other transcript passages</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs tabular-nums text-slate-500">{run.result.unpaired.length}</span>
           <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
         </summary>
-        <ol aria-label="Other transcript passages" className="space-y-2 border-t border-slate-100 p-3 sm:p-4">{run.result.unpaired.map(item => {
+        <div className="border-t border-slate-100 p-3 sm:p-4"><ol aria-label="Other transcript passages" className="hiresense-transcript-thread">{run.result.unpaired.map(item => {
           const segment = segments.find(segment => segment.id === item.segment_id);
-          const style = segment?.speaker === "CANDIDATE" ? "border-amber-200 border-l-amber-500 bg-amber-50" : segment?.speaker === "INTERVIEWER" ? "border-blue-200 border-l-blue-500 bg-blue-50" : "border-slate-200 border-l-slate-400 bg-slate-50";
-          return <li key={item.segment_id} data-speaker={segment?.speaker} className={`min-w-0 rounded-xl border border-l-[3px] px-3 py-2.5 ${style}`}>
-            <div className="flex items-start gap-3"><p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{segment?.text || "Source unavailable"}</p>{segment ? <span aria-label={`At ${transcriptTime(segment.start_offset_ms)}`} className="shrink-0 pt-1 font-mono text-[11px] tabular-nums text-slate-500">{transcriptTime(segment.start_offset_ms)}</span> : null}</div>
+          const side = segment?.speaker === "INTERVIEWER" ? "outgoing" : segment?.speaker === "CANDIDATE" ? "incoming" : "neutral";
+          const speaker = segment?.speaker === "INTERVIEWER" ? "Interviewer" : segment?.speaker === "CANDIDATE" ? "Candidate" : "Unknown speaker";
+          return <li key={item.segment_id} data-speaker={segment?.speaker} data-side={side} aria-label={segment ? `${speaker} · ${transcriptTime(segment.start_offset_ms)}` : "Unavailable passage"} className="hiresense-transcript-entry">
+            <div className="hiresense-transcript-message">
+              <div className="hiresense-transcript-bubble"><p className="hiresense-transcript-copy">{segment?.text || "Source unavailable"}</p></div>
+              {segment ? <div className="hiresense-transcript-meta"><span aria-label={`At ${transcriptTime(segment.start_offset_ms)}`} title="Time from the start of transcription" className="hiresense-transcript-time">{transcriptTime(segment.start_offset_ms)}</span></div> : null}
+            </div>
           </li>;
-        })}</ol>
+        })}</ol></div>
       </details> : null}
     </> : null}
   </section>;

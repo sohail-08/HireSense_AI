@@ -227,6 +227,7 @@ details[open] > .hiresense-console-link-options .hiresense-console-link-chevron 
 .hiresense-transcript-message { display: flex; flex-direction: column; gap: 0.25rem; width: fit-content; max-width: min(82%, 40rem); min-width: 0; }
 .hiresense-transcript-bubble { min-width: 0; border: 1px solid #cce7df; border-radius: 1.125rem 1.125rem 1.125rem 0.375rem; background: #e9f5f1; padding: 0.625rem 0.875rem; color: #183d36; box-shadow: 0 2px 5px #18213605; }
 .hiresense-transcript-entry[data-side="outgoing"] .hiresense-transcript-bubble { border-color: transparent; border-radius: 1.125rem 1.125rem 0.375rem 1.125rem; background: var(--color-blue-600); color: white; box-shadow: 0 2px 6px #40379515; }
+.hiresense-transcript-entry[data-side="neutral"] .hiresense-transcript-bubble { border-color: var(--color-slate-200); background: white; color: var(--color-slate-700); }
 .hiresense-transcript-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; padding: 0 0.25rem; font-style: normal; }
 .hiresense-transcript-entry[data-side="outgoing"] .hiresense-transcript-meta { justify-content: flex-end; }
 .hiresense-transcript-time { color: #626d85; font-size: 0.6875rem; line-height: 1.25; font-variant-numeric: tabular-nums; }

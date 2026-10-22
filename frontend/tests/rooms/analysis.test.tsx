@@ -121,7 +121,7 @@ describe("simplified interviewer answer analysis", () => {
     expect(JSON.stringify(data)).toBe(saved);
   });
 
-  it("styles other passages as compact, color-coded cards with readable text and timestamps", async () => {
+  it("matches the two-sided transcript bubbles without changing saved passages or timestamps", async () => {
     const data = fixture();
     const interviewerText = "Welcome.\nCan you hear me clearly?";
     const candidateText = "Yes, thank you. " + "long-text".repeat(30);
@@ -139,11 +139,17 @@ describe("simplified interviewer answer analysis", () => {
     expect(cards).toHaveLength(2);
     expect(cards[0].textContent).toContain(interviewerText);
     expect(cards[1].textContent).toContain(candidateText);
-    expect(cards[0].className).toContain("bg-blue-50");
-    expect(cards[1].className).toContain("bg-amber-50");
+    expect(list.className).toContain("hiresense-transcript-thread");
+    expect(cards[0].className).toBe("hiresense-transcript-entry");
+    expect(cards[0].getAttribute("data-side")).toBe("outgoing");
+    expect(cards[1].getAttribute("data-side")).toBe("incoming");
+    expect(cards[0].getAttribute("aria-label")).toBe("Interviewer · 01:01");
+    expect(cards[1].getAttribute("aria-label")).toBe("Candidate · 01:05");
     expect(within(cards[0]).getByLabelText("At 01:01")).toBeTruthy();
     expect(within(cards[1]).getByLabelText("At 01:05")).toBeTruthy();
-    expect(cards[1].querySelector("p")?.className).toContain("[overflow-wrap:anywhere]");
+    expect(cards[1].querySelector("p")?.className).toBe("hiresense-transcript-copy");
+    expect(cards[1].querySelector(".hiresense-transcript-bubble")?.nextElementSibling?.className).toBe("hiresense-transcript-meta");
+    expect(cards[1].querySelector(".hiresense-transcript-bubble .hiresense-transcript-time")).toBeNull();
     expect(JSON.stringify(data)).toBe(saved);
     expect(analysisApi.start).not.toHaveBeenCalled();
   });
@@ -164,7 +170,8 @@ describe("simplified interviewer answer analysis", () => {
     const cards = within(screen.getByRole("list", { name: "Other transcript passages" })).getAllByRole("listitem");
     expect(within(cards[0]).getByText("Source unavailable")).toBeTruthy();
     expect(cards[0].querySelector("[aria-label^='At ']")).toBeNull();
-    expect(cards[1].className).toContain("bg-slate-50");
+    expect(cards[0].getAttribute("data-side")).toBe("neutral");
+    expect(cards[1].getAttribute("data-side")).toBe("neutral");
     expect(within(cards[1]).getByText("A saved passage.")).toBeTruthy();
     expect(within(cards[1]).getByLabelText("At 00:10")).toBeTruthy();
   });
