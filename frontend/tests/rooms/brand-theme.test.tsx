@@ -40,12 +40,17 @@ it("keeps primary text, links and selected states above normal-text contrast req
   expect(contrast(color("blue-400"), "#ffffff")).toBeGreaterThanOrEqual(3);
 });
 
-it("uses shared primary colors in the console and LiveKit while preserving semantic speaker colors", () => {
+it("uses shared primary colors in the console and LiveKit with accessible messenger bubble colors", () => {
   expect(css).toContain("--lk-accent-bg: var(--color-blue-600)");
   expect(css).toMatch(/\.hiresense-console-back \{[^}]*color: var\(--color-blue-600\)/);
   expect(css).toMatch(/\[aria-selected="true"\] \{[^}]*color: var\(--color-blue-700\)/);
   expect(css).toContain(".hiresense-share-control[aria-pressed=\"true\"] { border-color: var(--color-blue-300); background: var(--color-blue-600)");
   expect(css).toMatch(/\.hiresense-end-control \{[^}]*background: #be123c/);
-  expect(css).toMatch(/\[data-speaker="INTERVIEWER"\] \.hiresense-transcript-bubble \{[^}]*background: #dbeafe/);
-  expect(css).toMatch(/\[data-speaker="CANDIDATE"\] \.hiresense-transcript-bubble \{[^}]*background: #fef3c7/);
+  expect(css).toMatch(/\[data-side="outgoing"\] \.hiresense-transcript-bubble \{[^}]*background: var\(--color-blue-600\); color: white/);
+  const incoming = css.match(/\.hiresense-transcript-bubble \{[^}]*background: (#[0-9a-f]{6});[^}]*color: (#[0-9a-f]{6})/)!;
+  expect(contrast(incoming[2], incoming[1])).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("#ffffff", color("blue-600"))).toBeGreaterThanOrEqual(4.5);
+  const thread = css.match(/\.hiresense-transcript-thread \{[^}]*background: (#[0-9a-f]{6})/)![1];
+  const timestamp = css.match(/\.hiresense-transcript-time \{[^}]*color: (#[0-9a-f]{6})/)![1];
+  expect(contrast(timestamp, thread)).toBeGreaterThanOrEqual(4.5);
 });

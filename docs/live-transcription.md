@@ -1,5 +1,21 @@
 # Live interview transcription
 
+## Transcript presentation
+
+Captions use a two-sided messenger layout: the viewer's speech appears on the
+right in dark blue; the other participant's speech appears on the left in soft
+mint. This switches with the viewer's role, including candidate live captions.
+Exact elapsed timestamps sit below the bubbles. Repeated initial badges and
+visible role labels are omitted; accessible article names still identify the
+speaker, elapsed time and draft/final state. Close consecutive segments from the
+same speaker have tighter spacing but are never merged or rewritten.
+
+Long messages wrap within the bubble, including unbroken text, with wider bubble
+limits on mobile. Live drafts retain their explicit marker. Consent, saved-text
+access, failure notices, source data and manual-scroll/auto-follow behavior are
+unchanged. Closed interviews still use page scrolling; live panels retain their
+existing bounded scrolling. Tests are synthetic; no interview is started for UI checks.
+
 ## Scope and trust boundaries
 
 The existing LiveKit Cloud video interview remains unchanged. A separately deployed,

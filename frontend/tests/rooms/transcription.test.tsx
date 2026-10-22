@@ -89,7 +89,7 @@ it("expands the saved transcript in review mode without auto-scrolling on histor
   expect(panel.scrollTop).toBe(0);
 });
 
-it("renders readable conversation cards with distinct speakers, exact times and no repeated final labels", async () => {
+it("renders messenger-style bubbles with distinct sides, exact times and no repeated role labels", async () => {
   vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [
     { ...line, text: "First answer.\nSecond line with <script>not markup</script>." },
     { ...line, id: "b".repeat(64), speaker: "INTERVIEWER", text: "Next question", start_offset_ms: 2300, end_offset_ms: 3200 },
@@ -102,21 +102,52 @@ it("renders readable conversation cards with distinct speakers, exact times and 
   expect(within(candidate).queryByText("Candidate")).toBeNull();
   expect(within(interviewer).queryByText("Interviewer")).toBeNull();
   expect(within(candidate).getByText("00:01").getAttribute("title")).toContain("start of transcription");
-  expect(candidate.querySelector(".hiresense-transcript-avatar")?.getAttribute("aria-hidden")).toBe("true");
+  expect(candidate.getAttribute("data-side")).toBe("incoming");
+  expect(interviewer.getAttribute("data-side")).toBe("outgoing");
+  expect(candidate.querySelector(".hiresense-transcript-avatar")).toBeNull();
   expect(candidate.querySelector(".hiresense-transcript-copy")?.textContent).toBe("First answer.\nSecond line with <script>not markup</script>.");
   expect(candidate.querySelector("script")).toBeNull();
   const bubble = candidate.querySelector(".hiresense-transcript-bubble")!;
   expect(bubble.firstElementChild?.className).toBe("hiresense-transcript-copy");
-  expect(bubble.lastElementChild?.className).toBe("hiresense-transcript-meta");
+  expect(bubble.nextElementSibling?.className).toBe("hiresense-transcript-meta");
+  expect(bubble.querySelector(".hiresense-transcript-time")).toBeNull();
   expect(screen.queryByText("Final")).toBeNull();
   const css = readFileSync("src/index.css", "utf8");
-  expect(css).toContain('.hiresense-transcript-entry[data-speaker="INTERVIEWER"] .hiresense-transcript-bubble { border-color: #93c5fd; border-left: 3px solid #2563eb; background: #dbeafe; }');
-  expect(css).toContain('.hiresense-transcript-entry[data-speaker="CANDIDATE"] .hiresense-transcript-bubble { border-color: #fcd34d; border-left: 3px solid #d97706; background: #fef3c7; }');
+  expect(css).toMatch(/\.hiresense-transcript-bubble \{[^}]*background: #e9f5f1;[^}]*color: #183d36/);
+  expect(css).toMatch(/\[data-side="outgoing"\] \.hiresense-transcript-bubble \{[^}]*background: var\(--color-blue-600\); color: white/);
+  expect(css).toContain('.hiresense-transcript-entry[data-side="outgoing"] { justify-content: flex-end; }');
   expect(css).not.toContain("hiresense-transcript-speaker");
-  expect(css).toMatch(/\.hiresense-transcript-heading, \.hiresense-transcript-notice, \.hiresense-transcript-thread \{[^}]*max-width: 64rem/);
+  expect(css).toMatch(/\.hiresense-transcript-heading, \.hiresense-transcript-notice, \.hiresense-transcript-thread \{[^}]*max-width: 56rem/);
   expect(css).toMatch(/\.hiresense-transcript-copy \{[^}]*overflow-wrap: anywhere; white-space: pre-wrap/);
-  expect(css).toMatch(/\.hiresense-transcript-bubble \{ display: flex;[^}]*justify-self: start;[^}]*width: fit-content; max-width: 100%;[^}]*padding: 0.5rem 0.75rem/);
-  expect(css).toMatch(/\.hiresense-transcript-avatar \{[^}]*width: 1.5rem; height: 1.5rem/);
+  expect(css).toMatch(/\.hiresense-transcript-message \{[^}]*width: fit-content; max-width: min\(82%, 40rem\)/);
+  expect(css).toContain(".hiresense-transcript-message { max-width: 90%; }");
+});
+
+it("puts the candidate's own live captions on the right without fetching saved history", async () => {
+  vi.mocked(transcriptionApi.status).mockResolvedValue(active);
+  vi.mocked(transcriptionApi.history).mockClear();
+  show(true); await screen.findByText("Transcription active");
+  await receive(line);
+  await receive({ ...line, id: "b".repeat(64), sequence: 2, speaker: "INTERVIEWER", text: "A live question", start_offset_ms: 2300, end_offset_ms: 3300 });
+  expect(screen.getByRole("article", { name: "Candidate · 00:01 · Final" }).getAttribute("data-side")).toBe("outgoing");
+  expect(screen.getByRole("article", { name: "Interviewer · 00:02 · Final" }).getAttribute("data-side")).toBe("incoming");
+  expect(transcriptionApi.history).not.toHaveBeenCalled();
+});
+
+it("visually groups consecutive speech without merging text or removing individual timestamps", async () => {
+  vi.mocked(transcriptionApi.history).mockResolvedValue({ segments: [line,
+    { ...line, id: "b".repeat(64), sequence: 2, text: "Another answer", start_offset_ms: 2600, end_offset_ms: 3600 },
+    { ...line, id: "c".repeat(64), sequence: 3, text: "After a longer pause", start_offset_ms: 90000, end_offset_ms: 91000 },
+  ], next_cursor: null });
+  render(<TranscriptionProvider interviewId={1} closed><TranscriptionPanel closed pageScroll /></TranscriptionProvider>);
+  await screen.findByText("Another answer");
+  const entries = screen.getAllByRole("article");
+  expect(entries).toHaveLength(3);
+  expect(entries.map(entry => entry.getAttribute("data-continuation"))).toEqual(["false", "true", "false"]);
+  expect(within(entries[0]).getByText("00:01")).toBeTruthy();
+  expect(within(entries[1]).getByText("00:02")).toBeTruthy();
+  expect(within(entries[2]).getByText("01:30")).toBeTruthy();
+  expect(screen.getByLabelText("Transcript segments").getAttribute("data-scroll-mode")).toBe("page");
 });
 
 it("keeps a failed session visible with concise notice and expandable technical details", async () => {

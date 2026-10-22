@@ -176,13 +176,19 @@ export function TranscriptionPanel({ closed = false, panelScroll = false, pageSc
     {status.failure_code ? <div role="alert" className="hiresense-transcript-notice mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 p-3 text-amber-900"><svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg><div className="min-w-0"><p className="text-sm font-semibold">Transcription stopped</p><p className="mt-0.5 text-xs leading-5">Audio/video is unaffected. {closed ? "Any saved transcript text remains available below." : "Ask the interviewer to retry after checking configuration."}</p><details className="mt-1 text-xs"><summary className="w-fit font-medium text-amber-800">Technical details</summary><p className="mt-1 break-words">{status.failure_code.replaceAll("_", " ")}</p></details></div></div> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-amber-900">{error}</p> : null}
     <div ref={scroll} onScroll={() => { const el = scroll.current; if (el && !panelScroll) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
-      data-scroll-mode={pageScroll ? "page" : panelScroll ? "panel" : "segments"} data-has-lines={lines.length > 0} data-auto-follow={!pageScroll && (closed || status.consented)} className={`hiresense-transcript-thread ${panelScroll || pageScroll ? "mt-5 space-y-2" : "mt-5 h-72 space-y-2 overflow-y-auto overscroll-contain sm:h-80"}`} aria-label="Transcript segments" tabIndex={0}>
-      {!lines.length ? <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-5 py-8 text-center"><p className="text-sm leading-6 text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p></div> : lines.map(line => {
+      data-scroll-mode={pageScroll ? "page" : panelScroll ? "panel" : "segments"} data-has-lines={lines.length > 0} data-auto-follow={!pageScroll && (closed || status.consented)} className={`hiresense-transcript-thread ${panelScroll || pageScroll ? "mt-5" : "mt-5 h-72 overflow-y-auto overscroll-contain sm:h-80"}`} aria-label="Transcript segments" tabIndex={0}>
+      {!lines.length ? <div className="rounded-xl border border-dashed border-slate-200 bg-white/70 px-5 py-8 text-center"><p className="text-sm leading-6 text-slate-500">{closed ? "No saved transcript is available." : "Speech will appear here after both participants consent and transcription starts."}</p></div> : lines.map((line, index) => {
         const speaker = line.speaker === "INTERVIEWER" ? "Interviewer" : "Candidate";
         const draft = line.kind === "interim";
-        return <article key={line.id || `interim-${line.speaker}`} aria-label={`${speaker} · ${transcriptTime(line.start_offset_ms)} · ${draft ? "Live draft" : "Final"}`} data-speaker={line.speaker} data-kind={line.kind} className="hiresense-transcript-entry">
-          <span aria-hidden="true" className="hiresense-transcript-avatar">{speaker[0]}</span>
-          <div className={`hiresense-transcript-bubble ${draft ? "italic" : ""}`}><p className="hiresense-transcript-copy">{line.text}</p><div className="hiresense-transcript-meta">{draft ? <span className="hiresense-transcript-draft">Live draft</span> : null}<span className="hiresense-transcript-time" title="Time from the start of transcription">{transcriptTime(line.start_offset_ms)}</span></div></div>
+        const outgoing = line.speaker === (interviewer ? "INTERVIEWER" : "CANDIDATE");
+        const previous = lines[index - 1];
+        const continuation = previous?.speaker === line.speaker && previous.session_id === line.session_id
+          && line.start_offset_ms >= previous.start_offset_ms && line.start_offset_ms - previous.start_offset_ms <= 30000;
+        return <article key={line.id || `interim-${line.speaker}`} aria-label={`${speaker} · ${transcriptTime(line.start_offset_ms)} · ${draft ? "Live draft" : "Final"}`} data-speaker={line.speaker} data-side={outgoing ? "outgoing" : "incoming"} data-continuation={continuation} data-kind={line.kind} className="hiresense-transcript-entry">
+          <div className="hiresense-transcript-message">
+            <div className={`hiresense-transcript-bubble ${draft ? "italic" : ""}`}><p className="hiresense-transcript-copy">{line.text}</p></div>
+            <div className="hiresense-transcript-meta">{draft ? <span className="hiresense-transcript-draft">Live draft</span> : null}<span className="hiresense-transcript-time" title="Time from the start of transcription">{transcriptTime(line.start_offset_ms)}</span></div>
+          </div>
         </article>;
       })}
     </div>

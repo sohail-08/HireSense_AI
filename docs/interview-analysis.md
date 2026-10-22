@@ -40,7 +40,7 @@ candidate captions. Interim text never enters the analysis workflow.
    Citation verification in other views is unchanged.
 7. **Other transcript passages** shows remaining conversation in compact, spaced
    cards with readable text and small elapsed timestamps. Interviewer passages use
-   blue and candidate passages use amber, matching the live transcript. Long text
+   blue and candidate passages use amber. Long text
    wraps within the panel. The **Job requirements covered** section is no longer
    displayed; its saved mappings are unchanged. Source gaps, errors and outdated
    inputs remain visible.
