@@ -103,7 +103,7 @@ class FinalRankingService:
         self.owned_job(db, user_id, row.job_posting_id)
         snapshot = row.snapshot
         current_ids = list(db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == row.job_posting_id)))
-        stale = sorted(current_ids) != sorted(snapshot["selected_cohort_application_ids"]) or snapshot.get("scoring_policy") != self.scoring_policy()
+        stale = sorted(current_ids) != sorted(snapshot["selected_cohort_application_ids"]) or snapshot.get("scoring_policy") != self.scoring_policy() or snapshot.get("formula_version") != FORMULA_VERSION
         candidates = []
         saved = {r["application_id"]: r for r in snapshot.get("assessments", [])}
         service = AssessmentService(session_factory=self.factory)

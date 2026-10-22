@@ -5,8 +5,10 @@ import json
 import copy
 from app.agents.interview_analysis import score_pair
 
-FORMULA_VERSION = "cv50-interview50-v1"
-POLICY = "Final score = 50% CV score + 50% interview score. The interview score is the average of the scored questions."
+FORMULA_VERSION = "cv40-interview60-v2"
+CV_WEIGHT = 40
+INTERVIEW_WEIGHT = 60
+POLICY = f"Final score = {CV_WEIGHT}% CV score + {INTERVIEW_WEIGHT}% interview score. The interview score is the average of the scored questions."
 DIMENSIONS = ("relevance", "accuracy", "completeness", "quality")
 
 
@@ -29,7 +31,7 @@ def cv_value(cv):
 
 def score_summary(report, source):
     cv = report.get("cv")
-    result = {"formula_version": FORMULA_VERSION, "cv_weight": 50, "interview_weight": 50,
+    result = {"formula_version": FORMULA_VERSION, "cv_weight": CV_WEIGHT, "interview_weight": INTERVIEW_WEIGHT,
         "cv_score": cv.get("final_score") if cv else None, "interview_score": None, "final_score": None,
         "question_count": 0, "unanswered_count": 0, "ready": False, "reason": "Interview not scored yet", "policy": POLICY}
     if not cv or cv.get("final_score") is None or not cv.get("compatible"):
@@ -90,11 +92,11 @@ def score_summary(report, source):
         result["reason"] = "Score the interview answers using the same scoring rules first."
         return result
     interview_score = sum(scores, Fraction(0)) / len(scores)
-    final = (cv_value(cv) + interview_score) / 2
+    final = (cv_value(cv) * CV_WEIGHT + interview_score * INTERVIEW_WEIGHT) / 100
     result.update(interview_score=decimal(interview_score), final_score=decimal(final),
         exact_interview_score=exact(interview_score), exact_final_score=exact(final),
         question_count=len(scores), rubric_version=next(iter(rubrics)), ready=True,
-        reason="The final score gives equal weight to the CV score and the interview score.")
+        reason=f"The final score weights the CV score at {CV_WEIGHT}% and the interview score at {INTERVIEW_WEIGHT}%.")
     return result
 
 
@@ -118,7 +120,9 @@ def rank_reports(reports):
     ready = [r for r in reports if r["result"].get("score_summary", {}).get("ready") and not r.get("stale")]
     signatures = {(r["result"]["identification"]["requirement_version"],
         json.dumps(r["result"]["cv"]["configuration"], sort_keys=True),
-        r["result"]["cv"]["formula_version"], r["result"]["score_summary"]["rubric_version"]) for r in ready}
+        r["result"]["cv"]["formula_version"], r["result"]["score_summary"]["rubric_version"],
+        r["result"]["score_summary"].get("formula_version"), r["result"]["score_summary"].get("cv_weight"),
+        r["result"]["score_summary"].get("interview_weight")) for r in ready}
     issue = "The candidates used different scoring rules. Rank their CVs and score their interviews using the same rules first." if len(signatures) > 1 else None
     def value(r):
         v = r["result"]["score_summary"]["exact_final_score"]

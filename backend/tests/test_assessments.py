@@ -194,6 +194,38 @@ def test_idempotency_source_specific_staleness_notes_and_versions(consolidated):
     assert first["result"] == t.db.get(AssessmentRun, t.assessment_id).result
 
 
+def test_old_formula_report_stays_immutable_and_new_request_uses_current_weights(consolidated):
+    t = consolidated
+    row = t.db.get(AssessmentRun, t.assessment_id)
+    saved = copy.deepcopy(row.result)
+    saved["score_summary"].update(formula_version="cv50-interview50-v1", cv_weight=50, interview_weight=50)
+    row.result = saved
+    row.snapshot = {**copy.deepcopy(row.snapshot), "prompt_version": "consolidation-old-50-50"}
+    row.fingerprint = "synthetic-historical-weighted-report"
+    t.db.commit()
+    historical = t.assessments.read(t.db, t.owner.id, row.id)
+    assert historical["stale"] and historical["result"]["score_summary"]["cv_weight"] == 50
+    before = len(t.analysis.model.calls)
+    new = t.assessments.enqueue(t.db, t.owner.id, t.row.application_id, GenerateAssessment())
+    assert new.id != row.id
+    t.assessments.process(new.id)
+    t.db.expire_all()
+    current = t.assessments.read(t.db, t.owner.id, new.id)
+    assert not current["stale"]
+    assert current["result"]["score_summary"]["cv_weight"] == 40
+    assert current["result"]["score_summary"]["interview_weight"] == 60
+    assert t.db.get(AssessmentRun, row.id).result == saved
+    assert len(t.analysis.model.calls) == before
+
+
+@pytest.mark.parametrize("cv_weight,interview_weight", [(40, 60), (50, 50)])
+def test_export_formula_uses_saved_weights(cv_weight, interview_weight):
+    value = report()
+    value["score_summary"].update(ready=True, cv_weight=cv_weight, interview_weight=interview_weight)
+    html = render_html({"kind": "individual", "reports": [{"id": 1, "result": value, "created_at": "2026-10-22T00:00:00Z"}]})
+    assert f"CV {cv_weight}% + interview {interview_weight}%" in html
+
+
 def test_source_ownership_and_explicit_selection(consolidated):
     t = consolidated
     with pytest.raises(LookupError): t.assessments.read(t.db, t.other.id, t.assessment_id)

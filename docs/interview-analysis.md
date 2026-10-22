@@ -109,6 +109,9 @@ inputs remain compatible; completed unchanged exchanges reuse saved assessments.
 New finals, requirements, references, prompts, models or corrected associations produce
 new snapshots. Explicit reanalysis creates a new version even with identical inputs,
 but reuses accepted interpretation, grades and guide selection for unchanged exchanges.
+Deploying a different analysis prompt, pairing rule, rubric or model does not automatically
+reevaluate saved interviews. Their automatic-update settings are preserved, but an explicit
+analysis request is required to adopt the new policy before incremental updates resume.
 It retries failed assessments/mappings instead of rerolling accepted grades. The cache
 fingerprint includes source hashes, requirements/version, reference snapshots, provider,
 model, configuration, prompt, pairing and rubric versions. Deterministic retrieval ties
@@ -179,8 +182,9 @@ misrecognized speech from text alone; human clarification remains necessary in s
 Prompt `interview-analysis-v3-context-grounded` and rubric
 `answer-coverage-equal-dimensions-v3-validated` require an explicit new analysis for old
 inputs. Historical runs are not rewritten. Recalculate the final ranking afterwards to
-include the new validated scores and summary. The four equal weights and CV50/interview50
-formula have not changed. No database migration or new dependency is needed.
+include the new validated scores and summary. The four equal answer-dimension weights
+are unchanged. Final ranking uses CV40/interview60; see the consolidated assessment
+documentation for the versioned formula. No database migration or new dependency is needed.
 
 Follow-ups cite their triggering question/answer passages, name requirements and explain
 their purpose and priority. History is passed to generation and a normalized similarity

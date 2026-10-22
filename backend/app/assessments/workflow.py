@@ -6,8 +6,8 @@ from langgraph.graph import START, END, StateGraph
 from app.agents.interview_analysis import canonical_quote, digest, provider_schema
 from app.schemas.assessment import SummarySelection, ReportData
 
-PROMPT_VERSION = "consolidation-evidence-summary-v3"
-POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 50% + interview 50%."
+PROMPT_VERSION = "consolidation-evidence-summary-v4-cv40-interview60"
+POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 40% + interview 60%."
 
 
 class State(TypedDict, total=False):

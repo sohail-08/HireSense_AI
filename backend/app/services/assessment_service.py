@@ -73,7 +73,7 @@ class AssessmentService:
         row = self.owned_run(db, user_id, run_id)
         try:
             current = resolve_sources(db, user_id, row.application_id, GenerateAssessment.model_validate(row.snapshot["selection"]))
-            stale = current["source_key"] != row.snapshot["source_key"]
+            stale = current["source_key"] != row.snapshot["source_key"] or row.snapshot.get("prompt_version") != PROMPT_VERSION
         except (ValueError, LookupError):
             stale = True
         notes = [{"id": n.id, "note": n.note, "reviewed": n.reviewed, "author_id": n.created_by,

@@ -308,6 +308,14 @@ class InterviewAnalysisService:
                 control.checked_at = now()
                 db.commit()
                 if latest and latest.status in {"queued", "processing", "failed"}: continue
+                # A deployment is not permission to reevaluate saved answers under
+                # a different model or rubric. An explicit request upgrades the
+                # snapshot; normal incremental updates then resume unchanged.
+                if latest and any(latest.snapshot.get(key) != value for key, value in {
+                    "prompt_version": PROMPT_VERSION, "pairing_version": PAIRING_VERSION,
+                    "rubric_version": RUBRIC_VERSION, "model": get_settings().gemini_chat_model,
+                }.items()):
+                    continue
                 try:
                     self.enqueue(db, control.requested_by, control.interview_id, StartAnalysis())
                 except (LookupError, PermissionError, ValueError):

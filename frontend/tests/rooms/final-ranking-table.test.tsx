@@ -7,9 +7,9 @@ import { selectOption } from "./selectHelpers";
 
 vi.mock("../../src/components/assessments/assessmentApi", () => ({ assessmentApi: { export: vi.fn(), artifact: vi.fn(), blob: vi.fn() } }));
 function fixture(count = 12): FinalRanking {
-  return { id: 7, status: "completed", stage: "completed", policy: "CV 50% + interview 50%", stale: false, incompatibilities: [], candidates: Array.from({ length: count }, (_, index) => ({
+  return { id: 7, status: "completed", stage: "completed", policy: "CV 40% + interview 60%", stale: false, incompatibilities: [], candidates: Array.from({ length: count }, (_, index) => ({
     application_id: index + 1, assessment_id: index + 100, candidate_name: `Candidate ${index + 1}`, final_rank: index + 1,
-    cv_score: "80", interview_score: "60", final_score: "70", reason: "Equal weight",
+    cv_score: "80", interview_score: "60", final_score: "68", reason: "CV 40% + interview 60%",
   })) };
 }
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(assessmentApi.export).mockResolvedValue({ id: 10, status: "queued", format: "pdf" }); });

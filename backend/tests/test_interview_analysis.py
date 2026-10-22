@@ -522,6 +522,28 @@ def test_automatic_reconciliation_and_no_model_calls_on_refresh(saved):
     assert t.analysis.latest(t.db, t.row.id).result["reconciled"] is True
 
 
+@pytest.mark.parametrize("field", ["prompt_version", "pairing_version", "rubric_version", "model"])
+def test_deployment_does_not_automatically_regrade_saved_interviews(saved, field):
+    t = saved
+    run = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
+    t.analysis.process(run.id)
+    t.db.expire_all()
+    run = t.db.get(InterviewAnalysisRun, run.id)
+    run.snapshot = {**copy.deepcopy(run.snapshot), field: "previous-deployment"}
+    run.fingerprint = f"previous-{field}"
+    control = t.db.get(InterviewAnalysisControl, t.row.id)
+    control.checked_at = datetime.now(timezone.utc) - timedelta(seconds=25)
+    t.db.commit()
+    before = len(t.analysis.model.calls)
+    t.analysis.tick()
+    t.db.expire_all()
+    assert t.analysis.latest(t.db, t.row.id).id == run.id
+    assert len(t.analysis.model.calls) == before
+    assert t.db.get(InterviewAnalysisControl, t.row.id).automatic
+    explicit = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(reanalyze=True))
+    assert explicit.id != run.id and explicit.status == "queued"
+
+
 def test_chatbot_reads_saved_analysis_and_queues_only_when_stale(saved):
     from app.services.interview_copilot import InterviewCopilot
     t = saved

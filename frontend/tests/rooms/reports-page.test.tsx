@@ -17,8 +17,8 @@ const application = { application_id: 101, job_posting_id: 1,
   identification: { application_id: 101, job_posting_id: 1, candidate_name: "Synthetic Candidate", job_title: "Synthetic Engineer", requirement_version: "v1" },
   versions: [], interviews: [], missing: ["Completed interview"], selection_policy: "latest-completed" };
 
-const ranking = { id: 1, status: "completed", stage: "completed", policy: "CV 50% + interview 50%", stale: false, incompatibilities: [], candidates: [
-  { application_id: 101, candidate_name: "Synthetic Candidate", cv_score: "25.00000", interview_score: "0E-60", final_score: "12.5", final_rank: 1, assessment_id: 1, reason: "Equal weight" }
+const ranking = { id: 1, status: "completed", stage: "completed", policy: "CV 40% + interview 60%", stale: false, incompatibilities: [], candidates: [
+  { application_id: 101, candidate_name: "Synthetic Candidate", cv_score: "25.00000", interview_score: "0E-60", final_score: "10", final_rank: 1, assessment_id: 1, reason: "CV 40% + interview 60%" }
 ] };
 
 const savedReport = {
@@ -92,7 +92,9 @@ it("keeps saved scores visible and lets the user retry when calculation fails", 
   fireEvent.click(await screen.findByRole("button", { name: "Calculate final ranking" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   await waitFor(() => expect((screen.getByRole("button", { name: "Calculate final ranking" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(screen.getByText("12.50%")).toBeTruthy();
+  expect(screen.getByText("10.00%")).toBeTruthy();
+  expect(screen.getByText("CV 40%")).toBeTruthy();
+  expect(screen.getByText("Interview 60%")).toBeTruthy();
 });
 
 it("opens an existing report containing PostgreSQL scientific-notation zero scores", async () => {

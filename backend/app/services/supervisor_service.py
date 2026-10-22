@@ -241,7 +241,7 @@ class SupervisorService:
                 return {"outcome": "info", "assistant_message": "Select a job posting in Reports first.", "refresh_required": False}
             ranking = FinalRankingService().start(db, user_id, job_id)
             return {"outcome": "success", "assistant_message": "Final ranking is ready." if ranking["status"] == "completed" else
-                "I am scoring the saved interview answers and calculating the final ranking: CV 50% + interview 50%. Open Reports for progress.",
+                "I am scoring the saved interview answers and calculating the final ranking: CV 40% + interview 60%. Open Reports for progress.",
                 "assessment_links": [{"label": "Open final ranking", "path": f"/interviewer/reports?job={job_id}"}], "refresh_required": True}
         ids = request.application_ids or state.get("selected_application_ids", [])
         if not ids or len(ids) > 4 or len(ids) != len(set(ids)):
@@ -276,7 +276,7 @@ class SupervisorService:
                 totals = report["result"].get("score_summary", {})
                 name = report["result"]["identification"]["candidate_name"]
                 if totals.get("ready"):
-                    line = f"{name}: CV {display_score(totals['cv_score'])}%, interview {display_score(totals['interview_score'])}%, final {display_score(totals['final_score'])}% (CV 50% + interview 50%)."
+                    line = f"{name}: CV {display_score(totals['cv_score'])}%, interview {display_score(totals['interview_score'])}%, final {display_score(totals['final_score'])}% (CV {totals.get('cv_weight', 50)}% + interview {totals.get('interview_weight', 50)}%)."
                 else:
                     line = f"{name}: " + totals.get("reason", "Calculate the final ranking to add interview and final scores.")
                 if report["stale"]: line += " Scores have changed; calculate the final ranking again."

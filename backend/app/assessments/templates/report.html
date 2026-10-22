@@ -19,7 +19,7 @@ h1{font-size:24pt;margin:6px 0}h2{font-size:15pt;margin:24px 0 10px}h3{font-size
 <p class="brand">HireSense</p><h1>{{r.identification.candidate_name}}</h1><p>{{r.identification.job_title}}</p>
 <div class="cards"><div class="card"><span>CV score</span><strong>{{percent(s.get('cv_score',r.cv.final_score if r.cv else none))}}</strong></div><div class="card"><span>Interview score</span><strong>{{percent(s.get('interview_score'))}}</strong></div><div class="card"><span>Final score</span><strong>{{percent(s.get('final_score'))}}</strong></div></div>
 <p>{{s.get('reason','Calculate final ranking to add interview and final scores to this older report.')}}</p>
-{% if s.get('ready') %}<p class="muted">CV 50% + interview 50%. Interview score: average of {{s.question_count}} {{'question' if s.question_count == 1 else 'questions'}}{% if s.unanswered_count %}, including {{s.unanswered_count}} unanswered (zero){% endif %}.</p>{% endif %}
+{% if s.get('ready') %}<p class="muted">CV {{s.get('cv_weight',50)}}% + interview {{s.get('interview_weight',50)}}%. Interview score: average of {{s.question_count}} {{'question' if s.question_count == 1 else 'questions'}}{% if s.unanswered_count %}, including {{s.unanswered_count}} unanswered (zero){% endif %}.</p>{% endif %}
 {% if r.get('evidence_summary') %}
 <h2>Evidence summary</h2><p class="muted">Missing evidence is not a demonstrated weakness. Sources below identify the saved transcript, reference or requirement behind each finding.</p>
 {% for key,title in [('strengths','Strengths'),('weaknesses','Weaknesses'),('evidence_gaps','Evidence gaps'),('verification','Further verification')] %}<h3>{{title}}</h3>

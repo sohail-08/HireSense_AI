@@ -29,13 +29,13 @@ def result(source):
     return ConsolidatedAssessmentGraph().graph.invoke({"snapshot": source})["result"]
 
 
-def test_fixed_equal_weights_and_question_average_are_exact():
+def test_fixed_40_60_weights_and_question_average_are_exact():
     source = synthetic_source()
     summary = result(source)["score_summary"]
     assert summary["ready"]
     assert Fraction(summary["final_score"]) == 75
     assert Fraction(summary["interview_score"]) == 75
-    assert (summary["cv_weight"], summary["interview_weight"]) == (50, 50)
+    assert (summary["cv_weight"], summary["interview_weight"]) == (40, 60)
     analysis = source["interviews"][0]["analysis"]
     unanswered = copy.deepcopy(analysis["result"]["pairs"][0])
     unanswered.update(id="unanswered", state="unanswered", answer_ids=[], assessment=None, mappings=[])
@@ -45,7 +45,26 @@ def test_fixed_equal_weights_and_question_average_are_exact():
     summary = result(source)["score_summary"]
     assert summary["ready"] and summary["question_count"] == 2 and summary["unanswered_count"] == 1
     assert Fraction(summary["interview_score"]) == Fraction(75, 2)
-    assert Fraction(summary["final_score"]) == Fraction(225, 4)
+    assert Fraction(summary["final_score"]) == Fraction(105, 2)
+
+
+@pytest.mark.parametrize("cv,expected", [("80", Fraction(77)), ("0", Fraction(45)), ("100", Fraction(85)), ("2.675", Fraction(4607, 100))])
+def test_asymmetric_scores_use_exact_40_cv_60_interview_arithmetic(cv, expected):
+    source = synthetic_source()
+    source["cv"]["final_score"] = cv
+    value = Fraction(cv)
+    source["cv"]["breakdown"]["exact_final_score"] = {"numerator": value.numerator, "denominator": value.denominator}
+    summary = result(source)["score_summary"]
+    assert summary["ready"] and Fraction(summary["interview_score"]) == 75
+    assert Fraction(summary["final_score"]) == expected
+    assert Fraction(int(summary["exact_final_score"]["numerator"]), int(summary["exact_final_score"]["denominator"])) == expected
+
+
+def test_rankings_cannot_mix_saved_final_weighting_policies():
+    reports = [{"id": i, "application_id": i, "result": result(synthetic_source(i)), "stale": False} for i in (1, 2)]
+    reports[0]["result"]["score_summary"].update(formula_version="cv50-interview50-v1", cv_weight=50, interview_weight=50)
+    ordered, issue = rank_reports(reports)
+    assert issue and all(r.get("final_rank") is None for r in ordered)
 
 
 @pytest.mark.parametrize("mutation", ["no_cv", "no_interview", "open_transcript", "failed_analysis", "no_score", "outdated_transcript", "old_requirements", "unsupported", "forged_score", "missing_guide"])
@@ -149,6 +168,25 @@ def test_durable_job_ranking_reuses_sources_and_detects_new_transcript(consolida
     assert service.read(t.db, t.owner.id, t.row.job_posting_id)["stale"]
 
 
+def test_old_final_weighting_is_stale_and_recalculation_reuses_answer_analysis(consolidated):
+    t = consolidated
+    service = FinalRankingService(session_factory=t.assessments.factory)
+    first = service.start(t.db, t.owner.id, t.row.job_posting_id)
+    finish(t, service, first["id"])
+    row = t.db.get(AssessmentComparison, first["id"])
+    row.snapshot = {**copy.deepcopy(row.snapshot), "formula_version": "cv50-interview50-v1"}
+    row.fingerprint = "synthetic-historical-50-50-ranking"
+    t.db.commit()
+    assert service.read(t.db, t.owner.id, t.row.job_posting_id)["stale"]
+    before = len(t.analysis.model.calls)
+    second = service.start(t.db, t.owner.id, t.row.job_posting_id)
+    assert second["id"] != first["id"]
+    finish(t, service, second["id"])
+    current = service.read(t.db, t.owner.id, t.row.job_posting_id)
+    assert current["status"] == "completed" and not current["stale"]
+    assert len(t.analysis.model.calls) == before
+
+
 def test_missing_analysis_is_queued_once_then_joins_final_ranking(consolidated):
     t = consolidated
     # Expire the old source without removing immutable existing reports.
@@ -189,7 +227,7 @@ def test_central_assistant_can_start_fixed_weight_job_ranking(consolidated):
     supervisor = SimpleNamespace(state_json={"selected_screening_job_posting_id": t.row.job_posting_id})
     instance = object.__new__(SupervisorService)
     result = instance._assessments_tool(t.db, supervisor, t.owner.id, AssessmentToolRequest(operation="rank"))
-    assert result["refresh_required"] and "CV 50% + interview 50%" in result["assistant_message"]
+    assert result["refresh_required"] and "CV 40% + interview 60%" in result["assistant_message"]
     assert result["assessment_links"][0]["path"].endswith(f"job={t.row.job_posting_id}")
     with pytest.raises(LookupError):
         instance._assessments_tool(t.db, supervisor, t.other.id, AssessmentToolRequest(operation="rank"))
