@@ -58,10 +58,17 @@ label without repeating it visually. Wide review pages limit the conversation's
 reading width. Failure notices remain visible, with diagnostic codes under
 **Technical details**. These changes do not alter captions, storage or scrolling.
 
-The assistant gives the available panel height to its scrollable conversation.
-It has no duplicate heading or repeated privacy text, and the compact composer
-keeps the message input and Send button on the same row. Interviewer-only access,
-knowledge sources, citations and draft retention are unchanged.
+The interview assistant shares its identity header, message bubbles, composer,
+and working indicator with the central chatbot through `AssistantChatUI.tsx`.
+User messages are right-aligned dark-blue bubbles; assistant replies are white,
+left-aligned bubbles on the same soft conversation background. A compact header
+identifies private interview support without adding recruitment controls or a
+new-workflow action. The auto-growing input and icon send button stay on one row;
+Enter sends and Shift+Enter inserts a new line (IME composition does not send).
+The conversation still uses the available panel height and remains page-scrollable
+in closed-interview review mode. Interviewer-only access, scoped API requests,
+knowledge sources, transcript citations, failure recovery and draft retention are
+unchanged; opening the panel never generates a model request automatically.
 
 Job requirements appear as a grouped card: minimum experience, required-skill tags,
 optional nice-to-have tags, qualifications and selection criteria. Values still

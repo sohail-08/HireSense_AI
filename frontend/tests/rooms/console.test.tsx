@@ -30,7 +30,13 @@ test("shows a waiting candidate and admits them without joining media automatica
   const header = (await screen.findByRole("heading", { name: "Interview console" })).closest("header")!;
   expect(within(header).getByRole("region", { name: "Candidate admission" })).toBeTruthy();
   expect(within(header).getByRole("link", { name: "Back to interviews" })).toBeTruthy();
-  expect(within(header).getByLabelText("Candidate link options")).toBeTruthy();
+  const candidateLink = within(header).getByLabelText("Candidate link options");
+  expect(candidateLink.querySelector("span")?.textContent).toBe("Candidate link");
+  expect(candidateLink.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  expect(candidateLink.textContent).not.toContain("⌄");
+  const css = readFileSync("src/index.css", "utf8");
+  expect(css).toMatch(/\.hiresense-console-link-options \{[^}]*display: flex; align-items: center/);
+  expect(css).toContain(".hiresense-console-link-chevron { display: block; flex: 0 0 1rem; width: 1rem; height: 1rem; }");
   await user.click(await screen.findByRole("button", { name: "Admit candidate" }));
   await screen.findByText("Candidate admitted");
   expect(api.admit).toHaveBeenCalledWith(1); expect(api.interviewerMedia).not.toHaveBeenCalled();

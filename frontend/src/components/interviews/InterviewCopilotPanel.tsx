@@ -4,6 +4,7 @@ import { TranscriptCitation } from "./TranscriptCitation";
 import type { Citation } from "./analysisApi";
 import { MeetingTabs } from "./MeetingTabs";
 import { MeetingIcon } from "./MeetingIcon";
+import { AssistantBubble, AssistantComposer, AssistantIdentity, AssistantWorking, assistantChatStyles } from "../assistant/AssistantChatUI";
 
 type Question = { question: string; requirement: string; source_ids: number[] };
 type Message = { role: "user" | "assistant"; content: string; questions: Question[];
@@ -78,23 +79,20 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
       </details>
     </section>;
   const assistant = <section aria-label="Interview assistant" className="hiresense-interview-assistant flex min-w-0 flex-col">
-      <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className="h-[25rem] max-h-[60svh] min-h-48 space-y-3 overflow-y-auto overscroll-contain p-3">
-        {!context.messages.length ? <button disabled={busy} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button> : null}
-        {context.messages.map((item, index) => <article key={index} className={`min-w-0 rounded-xl p-3 text-sm ${item.role === "user" ? "ml-6 bg-blue-600 text-white" : "mr-2 bg-slate-50 text-slate-800"}`}>
-          <p className="mb-1 text-xs font-semibold">{item.role === "user" ? "You" : "Assistant"}</p>
+      <header className={assistantChatStyles.header}><div className="flex items-center gap-2.5"><AssistantIdentity subtitle="Private interview support" /></div></header>
+      <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className={`h-[25rem] max-h-[60svh] min-h-48 ${assistantChatStyles.conversation}`}>
+        {!context.messages.length ? <AssistantBubble role="assistant"><p>Ask for interview questions, follow-ups, or insights from this interview.</p><button type="button" disabled={busy} className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></AssistantBubble> : null}
+        {context.messages.map((item, index) => <AssistantBubble key={index} role={item.role} label={item.role === "user" ? "Your message" : "Assistant reply"}>
           <p className="whitespace-pre-wrap break-words leading-6">{item.content}</p>
           {item.analysis_run_id ? item.analysis_citations?.map((citation, i) => <TranscriptCitation key={i} citation={citation} runId={item.analysis_run_id!} interviewId={interviewId} />) : null}
           {item.questions.length ? <ol className="mt-3 list-decimal space-y-3 pl-5">{item.questions.map((question, i) => <li key={i}><p className="leading-6">{question.question}</p><p className="mt-1 text-xs text-slate-500">Job requirement: {question.requirement} · Sources: {question.source_ids.map((value) => `#${value}`).join(", ")}</p></li>)}</ol> : null}
           {item.sources.length ? <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-blue-700">Knowledge sources ({item.sources.length})</summary>{item.sources.map((source) => <blockquote key={source.chunk_id} className="mt-2 border-l-2 border-blue-200 pl-3"><p className="text-xs font-semibold">#{source.chunk_id} · {source.document_title}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">{source.excerpt}</p></blockquote>)}</details> : null}
-        </article>)}
-        {busy ? <p role="status" className="text-sm text-slate-500">Preparing a reply…</p> : null}
+        </AssistantBubble>)}
+        {busy ? <AssistantWorking /> : null}
       </div>
-      <form className="hiresense-assistant-composer border-t border-slate-100 bg-white p-3" onSubmit={(event) => { event.preventDefault(); void send(message); }}>
+      <AssistantComposer id="interview-assistant-message" label="Ask the interview assistant" value={message} onChange={setMessage} onSend={() => void send(message)} busy={busy} maxLength={2000} placeholder="Ask about this interview…" className="hiresense-assistant-composer">
         {error ? <div role="alert" className="mb-3 text-sm text-red-700">{error}<button type="button" className="ml-2 underline" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Reload conversation</button></div> : null}
-        <label htmlFor="interview-assistant-message" className="sr-only">Ask the interview assistant</label>
-        <div className="flex items-end gap-2"><textarea id="interview-assistant-message" rows={2} maxLength={2000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} placeholder="Ask a question…" className="min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm leading-5 text-slate-800 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-        <button type="submit" disabled={busy || !message.trim()} className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">Send</button></div>
-      </form>
+      </AssistantComposer>
     </section>;
   return <aside aria-label="Private interview assistance" className={`min-w-0 ${fill ? "hiresense-private-panel" : ""}`}>
     <MeetingTabs fill={fill} pageScroll={pageScroll} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
