@@ -35,7 +35,12 @@ beforeEach(() => {
   });
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  // Manual page actions must never inject chat replies or send assistant requests.
+  expect(supervisor.addTaskMessage).not.toHaveBeenCalled();
+  expect(supervisor.sendMessage).not.toHaveBeenCalled();
+  vi.restoreAllMocks();
+});
 
 it("puts full job titles and clear actions in cards without technical labels or empty work panels", async () => {
   render(<JobDescriptionPage />);

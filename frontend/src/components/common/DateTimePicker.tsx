@@ -94,10 +94,10 @@ function Calendar({ value, onChange }: { value: string; onChange: (value: string
     window.requestAnimationFrame(() => document.getElementById(target)?.focus());
   }
   return <>
-    <div className="mb-2 flex items-center justify-between rounded-xl bg-slate-50 p-1">
-      <button type="button" aria-label="Previous month" disabled={view.getUTCFullYear() === 1 && view.getUTCMonth() === 0} onClick={() => moveMonth(-1)} className={actionStyle}>‹</button>
-      <p aria-live="polite" className="text-sm font-semibold">{heading}</p>
-      <button type="button" aria-label="Next month" disabled={view.getUTCFullYear() === 9999 && view.getUTCMonth() === 11} onClick={() => moveMonth(1)} className={actionStyle}>›</button>
+    <div className="mb-3 flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 p-2">
+      <button type="button" aria-label="Previous month" disabled={view.getUTCFullYear() === 1 && view.getUTCMonth() === 0} onClick={() => moveMonth(-1)} className={`${actionStyle} bg-white text-xl shadow-sm disabled:opacity-40`}>‹</button>
+      <p aria-live="polite" className="text-sm font-semibold text-blue-900">{heading}</p>
+      <button type="button" aria-label="Next month" disabled={view.getUTCFullYear() === 9999 && view.getUTCMonth() === 11} onClick={() => moveMonth(1)} className={`${actionStyle} bg-white text-xl shadow-sm disabled:opacity-40`}>›</button>
     </div>
     <table role="grid" aria-label={heading} className="w-full table-fixed text-center text-sm">
       <thead><tr>{["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(day => <th key={day} scope="col" className="py-2 text-xs font-medium text-slate-400">{day}</th>)}</tr></thead>
@@ -106,7 +106,7 @@ function Calendar({ value, onChange }: { value: string; onChange: (value: string
         return <td key={key} className="p-0.5"><button id={`${uid}-${key}`} type="button" aria-label={dateLabel(date)} aria-pressed={selected} aria-current={isToday ? "date" : undefined}
           tabIndex={key === focused ? 0 : -1} autoFocus={key === focused} onKeyDown={event => keyDown(event, date)} onFocus={() => setFocused(key)} onClick={() => onChange(key)}
           disabled={date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999}
-          className={`h-9 w-full rounded-lg font-medium transition focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 ${selected ? "bg-blue-600 text-white shadow-sm" : `${date.getUTCMonth() === view.getUTCMonth() ? "text-slate-700" : "text-slate-300"} hover:bg-blue-50 hover:text-blue-700 ${isToday ? "ring-1 ring-inset ring-blue-300" : ""}`}`}>{date.getUTCDate()}</button></td>;
+          className={`h-10 w-full rounded-xl font-medium transition focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 ${selected ? "bg-blue-600 text-white shadow-md shadow-blue-200" : `${date.getUTCMonth() === view.getUTCMonth() ? "text-slate-700" : "text-slate-400"} hover:bg-blue-50 hover:text-blue-700 ${isToday ? "bg-blue-50 ring-1 ring-inset ring-blue-300" : ""}`}`}>{date.getUTCDate()}</button></td>;
       })}</tr>)}</tbody>
     </table>
     <div className="mt-3 border-t border-slate-100 pt-3"><label className="text-xs font-medium text-slate-500">Enter date (YYYY-MM-DD)<input type="text" value={draft} placeholder="YYYY-MM-DD" className={inputStyle} onChange={event => setDraft(event.target.value)} /></label>
@@ -132,7 +132,7 @@ function TimeChoices({ value, onChange }: { value: string; onChange: (value: str
   </>;
 }
 
-export function DateTimePicker({ label, kind, value, onChange, disabled }: { label: string; kind: "date" | "time"; value: string; onChange: (value: string) => void; disabled?: boolean }) {
+export function DateTimePicker({ label, kind, value, onChange, disabled, popupTitle }: { label: string; kind: "date" | "time"; value: string; onChange: (value: string) => void; disabled?: boolean; popupTitle?: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -142,7 +142,7 @@ export function DateTimePicker({ label, kind, value, onChange, disabled }: { lab
     className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm shadow-sm transition hover:border-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:opacity-50">
     <span className={value ? "font-medium text-slate-800" : "text-slate-400"}>{caption}</span>
     <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">{kind === "date" ? <><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 11h18"/></> : <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>}</svg>
-  </button>{open && !disabled ? <PickerPopup title={kind === "date" ? "Choose interview date" : "Choose start time"} trigger={trigger} onClose={() => setOpen(false)}>
+  </button>{open && !disabled ? <PickerPopup title={popupTitle ?? (kind === "date" ? "Choose interview date" : "Choose start time")} trigger={trigger} onClose={() => setOpen(false)}>
     {kind === "date" ? <Calendar value={value} onChange={next => { onChange(next); setOpen(false); }} /> : <TimeChoices value={value} onChange={next => { onChange(next); setOpen(false); }} />}
   </PickerPopup> : null}</div>;
 }

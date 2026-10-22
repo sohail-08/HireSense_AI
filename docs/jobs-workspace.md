@@ -41,6 +41,11 @@ draft panels. It keeps the existing indigo theme and central assistant workflow.
    Opening a job never creates or publishes a post. Removing a saved description
    requires confirmation and does not remove published Discord messages.
 
+Manual actions show success and error feedback on the page, not in the chatbot.
+Creating, editing, revising, approving or deleting a job does not append chat
+messages. The message-appending helper is internal to the assistant provider;
+chat-requested tasks and their progress notifications remain unchanged.
+
 ## Implementation and checks
 
 - `JobDescriptionPage.tsx`: selection, current workflow, saved edits and actions.
@@ -55,6 +60,8 @@ draft panels. It keeps the existing indigo theme and central assistant workflow.
   company details, not editable fields. The editor only collects the application
   link, deadline and optional instructions. The backend owns the fixed values in
   `backend/app/job_posting_branding.py`; clients cannot override them.
+  The deadline uses the shared styled calendar with month navigation, keyboard
+  controls, manual entry and Today/Clear actions; the saved value remains an ISO date.
   The contact email is `sohail.sh.ahmed@gmail.com` and the address is
   `House-5/B, Road-2/E, Block-J, Baridhara, Dhaka 1212`.
 - The defaults endpoint accepts an optional, owner-checked `job_description_id`

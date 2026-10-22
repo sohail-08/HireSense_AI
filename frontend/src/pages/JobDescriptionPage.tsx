@@ -12,7 +12,7 @@ const message = (failure: unknown) => failure instanceof Error ? failure.message
 
 export function JobDescriptionPage() {
   const { response, loading: chatLoading,
-    addTaskMessage, setSelectedJobDescriptionId, refreshVersion } = useSupervisor();
+    setSelectedJobDescriptionId, refreshVersion } = useSupervisor();
   const [jobs, setJobs] = useState<JobDescriptionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
@@ -103,7 +103,7 @@ export function JobDescriptionPage() {
       const saved = await apiRequest<JobDescriptionResponse>(`/job-descriptions/${job.id}`, {
         method: "PATCH", body: JSON.stringify({ title, content }),
       });
-      upsert(saved); setNotice("Changes saved."); addTaskMessage("success", "Job-description edits were saved.");
+      upsert(saved); setNotice("Changes saved.");
     } catch (failure) { setError(message(failure)); }
     finally { mutation.current = false; setBusy(false); }
   }
@@ -113,7 +113,6 @@ export function JobDescriptionPage() {
     try {
       const draft = await apiRequest<JobDescriptionResponse>(`/job-descriptions/${source.id}/revise`, { method: "POST" });
       upsert(draft); setCreating(false); setDetailsOpen(true); setEditing(true);
-      addTaskMessage("success", `Created editable version ${draft.version} of “${draft.title}”.`);
     } catch (failure) { setError(message(failure)); }
     finally { mutation.current = false; setBusy(false); }
   }
@@ -123,7 +122,6 @@ export function JobDescriptionPage() {
     try {
       const approved = await apiRequest<JobDescriptionResponse>(`/job-descriptions/${job.id}/approve`, { method: "POST" });
       upsert(approved); setNotice("Job description approved.");
-      addTaskMessage("success", `Approved “${approved.title}”.`);
     } catch (failure) { setError(message(failure)); }
     finally { mutation.current = false; setBusy(false); setApproving(false); }
   }
@@ -135,7 +133,7 @@ export function JobDescriptionPage() {
       listRequest.current++; setLoading(false);
       setJobs(items => items.filter(item => item.id !== source.id));
       if (job?.id === source.id) { setJob(undefined); setTitle(""); setContent(""); setDetailsOpen(false); }
-      setNotice(`Deleted “${source.title}”.`); addTaskMessage("success", `Deleted “${source.title}” version ${source.version}.`);
+      setNotice(`Deleted “${source.title}”.`);
     } catch (failure) { setError(message(failure)); }
     finally { mutation.current = false; setBusy(false); }
   }

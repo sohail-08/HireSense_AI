@@ -19,6 +19,8 @@ const post: DiscordJobPost = { id: 15, job_description_id: 7, platform: "discord
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value() { this.setAttribute("open", ""); } });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value() { this.removeAttribute("open"); } });
   vi.spyOn(window, "confirm").mockReturnValue(true);
   vi.mocked(apiRequest).mockImplementation(async (path, options) => {
     if (path === "/job-postings/discord/defaults?job_description_id=7") return { ...post, job_description_content: job.content.replace("Northstar Digital", "BJIT"), mcp_configured: true };
@@ -179,6 +181,7 @@ it("waits for saving and locks inputs and duplicate submissions until publicatio
   expect(window.confirm).toHaveBeenCalledTimes(1);
   expect((screen.getByRole("button", { name: "Saving…" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByLabelText("Application link") as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Application deadline" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByLabelText("Additional application instructions") as HTMLTextAreaElement).disabled).toBe(true);
   release(post);
   await screen.findByText("Job post published to Discord.");
@@ -303,4 +306,25 @@ it("does not show success or collapse for an unconfirmed publish response", asyn
   expect(screen.queryByText("Job post published to Discord.")).toBeNull();
   expect(screen.getByRole("article", { name: "Discord post preview" })).toBeTruthy();
   expect((screen.getByRole("button", { name: "Publish to Discord" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("uses the styled calendar for deadlines and saves the selected ISO date", async () => {
+  const { container } = render(<DiscordJobPostPanel jobDescription={job} />);
+  await readyPanel();
+  expect(container.querySelector('input[type="date"]')).toBeNull();
+  const trigger = screen.getByRole("button", { name: "Application deadline" });
+  expect(trigger.textContent).toContain("6 Nov 2026");
+  fireEvent.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "Choose application deadline" });
+  expect(dialog.parentElement).toBe(document.body);
+  expect(within(dialog).getByRole("button", { name: "November 6, 2026" }).getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(within(dialog).getByRole("button", { name: "November 10, 2026" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(trigger.textContent).toContain("10 Nov 2026");
+  expect(within(screen.getByRole("article")).getByText("10 Nov 2026")).toBeTruthy();
+  expect(mutations()).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "Publish to Discord" }));
+  await screen.findByText("Job post published to Discord.");
+  expect(JSON.parse(mutations()[0][1]!.body as string).application_deadline).toBe("2026-11-10");
 });

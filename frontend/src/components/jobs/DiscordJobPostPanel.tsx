@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, apiRequest } from "../../api/apiClient";
+import { DateTimePicker } from "../common/DateTimePicker";
 import { DiscordPostPreview } from "./DiscordPostPreview";
 import type {
   DiscordJobPost,
@@ -278,19 +279,9 @@ export function DiscordJobPostPanel({
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               />
             </div>
-            <div>
-              <label htmlFor="discord-deadline" className="text-sm font-medium text-slate-700">
-                Application deadline
-              </label>
-              <input
-                id="discord-deadline"
-                type="date"
-                disabled={publishing || loading}
-                value={form.applicationDeadline}
-                onChange={(event) => updateField("applicationDeadline", event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-              />
-            </div>
+            <DateTimePicker label="Application deadline" popupTitle="Choose application deadline" kind="date"
+              disabled={publishing || loading} value={form.applicationDeadline}
+              onChange={value => updateField("applicationDeadline", value)} />
             <div>
               <label htmlFor="discord-instructions" className="text-sm font-medium text-slate-700">
                 Additional application instructions

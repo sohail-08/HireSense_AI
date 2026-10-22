@@ -1,5 +1,5 @@
 import React from "react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App";
@@ -27,6 +27,38 @@ beforeEach(() => {
     if (path === "/job-descriptions/7/approve" && options?.method === "POST") return result.job_description;
     throw new Error(`Unexpected synthetic request: ${path}`);
   });
+});
+afterEach(() => vi.restoreAllMocks());
+
+it("keeps the chat unchanged when jobs are manually deleted, including failed deletes", async () => {
+  let jobs = [draft, { ...draft, id: 8, title: "Another frontend role" }];
+  let fail = true;
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+    if (path === "/job-descriptions") return jobs;
+    if (path === "/job-descriptions/7" && options?.method === "DELETE") {
+      if (fail) { fail = false; throw new Error("Synthetic delete unavailable."); }
+      jobs = jobs.filter(job => job.id !== 7); return undefined;
+    }
+    if (path === "/job-descriptions/8" && options?.method === "DELETE") { jobs = []; return undefined; }
+    throw new Error(`Unexpected synthetic request: ${path}`);
+  });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<MemoryRouter initialEntries={["/interviewer/jobs"]}><App /></MemoryRouter>);
+  await screen.findByRole("list", { name: "Saved job cards" });
+  fireEvent.click(screen.getByRole("button", { name: "Assistant", exact: true }));
+  const chat = screen.getByRole("dialog", { name: "HireSense supervisor" });
+  const before = chat.textContent;
+  fireEvent.click(screen.getByRole("button", { name: `Delete job: ${draft.title}` }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Synthetic delete unavailable.");
+  expect(chat.textContent).toBe(before);
+  fireEvent.click(screen.getByRole("button", { name: `Delete job: ${draft.title}` }));
+  await screen.findByText(`Deleted “${draft.title}”.`);
+  expect(chat.textContent).toBe(before);
+  expect(screen.queryByRole("button", { name: `Delete job: ${draft.title}` })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Delete job: Another frontend role" }));
+  await screen.findByText("Deleted “Another frontend role”.");
+  expect(chat.textContent).toBe(before);
+  expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path === "/supervisor/chat")).toBe(false);
 });
 
 it("keeps the shared assistant available without a dedicated creation button or automatic request", async () => {

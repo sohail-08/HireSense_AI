@@ -19,7 +19,6 @@ type AssistantContext = {
   setOpen: (value: boolean) => void;
   startNewWorkflow: () => void;
   sendMessage: (message: string) => Promise<void>;
-  addTaskMessage: (outcome: "success" | "failure", content: string) => void;
   setSelectedJobDescriptionId: (id: number | undefined) => void;
   setSelectedJobPostingId: (id: number | undefined) => void;
   setSelectedApplicationIds: (ids: number[]) => void;
@@ -201,7 +200,7 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
 
   const phase = response?.phase ?? "job_details";
   return (
-    <Context.Provider value={{ response, loading, open, setOpen, startNewWorkflow: newSession, sendMessage, addTaskMessage,
+    <Context.Provider value={{ response, loading, open, setOpen, startNewWorkflow: newSession, sendMessage,
       setSelectedJobDescriptionId, setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion, batch }}>
       {children}
       <SupervisorChatPanel

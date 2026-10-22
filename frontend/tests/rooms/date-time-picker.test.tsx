@@ -46,6 +46,25 @@ it("moves calendar focus across months with the keyboard", async () => {
   expect(screen.getByLabelText("Saved value").textContent).toBe("2028-03-01");
 });
 
+it("keeps the calendar inside a mobile viewport and cancels without changing the date", () => {
+  const width = Object.getOwnPropertyDescriptor(window, "innerWidth")!;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 320 });
+  try {
+    render(<Example />);
+    const trigger = screen.getByRole("button", { name: "Choose" });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({ left: 280, top: 100, bottom: 140, width: 300 } as DOMRect);
+    fireEvent.click(trigger);
+    const popup = screen.getByRole("dialog");
+    expect(popup.style.width).toBe("296px");
+    expect(Number.parseFloat(popup.style.left) + Number.parseFloat(popup.style.width)).toBeLessThanOrEqual(308);
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent(popup, new Event("cancel", { bubbles: true, cancelable: true }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByLabelText("Saved value").textContent).toBe("2028-02-28");
+    expect(document.activeElement).toBe(trigger);
+  } finally { Object.defineProperty(window, "innerWidth", width); vi.restoreAllMocks(); }
+});
+
 it.each([["AM", "00:07"], ["PM", "12:07"]])("converts 12 %s correctly and commits only after Use time", (period, raw) => {
   render(<Example kind="time" initial="08:00" />); fireEvent.click(screen.getByRole("button", { name: "Choose" }));
   selectOption("Hour", "12"); selectOption("Minute", "07"); selectOption("AM / PM", period);
