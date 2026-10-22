@@ -10,6 +10,7 @@ from app.schemas.screening import ScreeningBatchResponse
 
 
 SupervisorPhase = Literal[
+    "job_details",
     "requirements",
     "requirement_confirmation",
     "requirement_confirmed",

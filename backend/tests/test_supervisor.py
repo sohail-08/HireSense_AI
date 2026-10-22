@@ -10,25 +10,14 @@ from app.database import Base
 from app.integrations.discord_mcp import DiscordPublishResult
 from app.models import JobPostingStatus, SupervisorSession, User, UserRole
 from app.schemas.job import JobDescriptionDraft
-from app.schemas.requirements import (
-    RequirementExtraction,
-    RequirementItem,
-    RequirementProfileDraft,
-)
+from app.schemas.requirements import RequirementItem
 from app.schemas.supervisor import SupervisorChatResponse
 from app.services.job_description_service import JobDescriptionService
 from app.services.job_posting_assistant_service import JobPostingAssistantService
 from app.services.job_posting_service import DiscordJobPostingService
-from app.services.requirement_discovery_service import RequirementDiscoveryService
 from app.services.supervisor_service import SupervisorService
-
-
-class QueueRequirementModel:
-    def __init__(self, outcomes):
-        self.outcomes = list(outcomes)
-
-    def extract(self, **_kwargs):
-        return self.outcomes.pop(0)
+from app.services.direct_job_description_service import DirectJobDescriptionService
+from direct_job_fakes import FakeDirectModel, FakeKnowledgeBase
 
 
 class StaticJobDescriptionModel:
@@ -69,18 +58,6 @@ class StubPublisher:
         return DiscordPublishResult("333", "222", "111")
 
 
-def _requirement_profile():
-    return RequirementProfileDraft(
-        title="Backend Engineer",
-        summary="Build reliable backend services.",
-        required_skills=[RequirementItem(name="Python")],
-        preferred_skills=[RequirementItem(name="AWS")],
-        qualifications=[RequirementItem(name="Computer Science degree")],
-        min_years_experience=3,
-        selection_criteria=[RequirementItem(name="System design interview")],
-    )
-
-
 def _job_draft(title="Backend Engineer"):
     return JobDescriptionDraft(
         title=title,
@@ -101,8 +78,6 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
     publisher = StubPublisher()
     model = QueueToolModel(
         [
-            "requirements",
-            "requirements",
             "generate_job_description",
             "edit_job_description",
             "approve_job_description",
@@ -110,12 +85,6 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
             "job_posting",
             "job_posting",
         ]
-    )
-    requirement_service = RequirementDiscoveryService(
-        QueueRequirementModel(
-            [RequirementExtraction(profile=_requirement_profile())]
-        ),
-        EmptyKnowledgeBase(),
     )
     job_service = JobDescriptionService(
         StaticJobDescriptionModel(_job_draft()),
@@ -137,7 +106,7 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
     )
     service = SupervisorService(
         model=model,
-        requirement_service=requirement_service,
+        direct_job_service=DirectJobDescriptionService(FakeDirectModel(), FakeKnowledgeBase()),
         job_description_service=job_service,
         job_edit_model=StaticJobEditModel(
             _job_draft("Senior Backend Engineer")
@@ -161,29 +130,10 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
             message="I want to hire a backend engineer",
         )
         session_id = first["session_id"]
-        assert first["phase"] == "requirement_confirmation"
-        assert first["requirement_profile_id"] is None
-
-        confirmed = service.chat(
-            db,
-            interviewer_user_id=interviewer.id,
-            session_id=session_id,
-            message="Use it.",
-        )
-        assert confirmed["phase"] == "requirement_confirmed", confirmed[
-            "assistant_message"
-        ]
-        assert confirmed["requirement_profile_id"] is not None
-
-        generated = service.chat(
-            db,
-            interviewer_user_id=interviewer.id,
-            session_id=session_id,
-            message="Generate the job description",
-        )
-        assert generated["phase"] == "job_description_draft"
-        assert generated["outcome"] == "success"
-        assert generated["job_description"].title == "Backend Engineer"
+        assert first["phase"] == "job_description_draft"
+        assert first["requirement_profile_id"] is not None
+        assert first["outcome"] == "success"
+        assert first["job_description"].title == "Backend Engineer"
 
         edited = service.chat(
             db,
@@ -236,13 +186,13 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
         assert len(publisher.calls) == 1
 
         saved = db.get(SupervisorSession, session_id)
-        assert saved.requirement_profile_id == confirmed["requirement_profile_id"]
+        assert saved.requirement_profile_id == first["requirement_profile_id"]
         assert saved.job_description_id == edited["job_description"].id
         assert saved.job_posting_id == validated.job_posting.id
-        assert len(saved.state_json["messages"]) == 16
+        assert len(saved.state_json["messages"]) == 12
         assert saved.state_json["last_tool_call"]["name"] == "job_posting"
         assert saved.state_json["last_tool_call"]["args"]["message"] == "Approve the post"
-        assert len(model.tool_messages) == 8
+        assert len(model.tool_messages) == 6
         assert {binding["tool_choice"] for binding in model.bindings} == {"any", "none"}
 
         restored = service.get_session(
@@ -251,7 +201,7 @@ def test_supervisor_coordinates_complete_hiring_workflow(tmp_path):
             session_id=session_id,
         )
         assert restored["phase"] == "published"
-        assert len(restored["messages"]) == 16
+        assert len(restored["messages"]) == 12
 
         outsider = User(
             name="Other user",

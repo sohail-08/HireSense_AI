@@ -29,13 +29,14 @@ beforeEach(() => {
   });
 });
 
-it("opens job creation through the real shared assistant without sending an automatic request", async () => {
+it("keeps the shared assistant available without a dedicated creation button or automatic request", async () => {
   render(<MemoryRouter initialEntries={["/interviewer/jobs"]}><App /></MemoryRouter>);
   await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create with assistant", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Assistant", exact: true }));
   const chat = await screen.findByRole("dialog", { name: "HireSense supervisor" });
   expect(within(chat).getByRole("textbox", { name: "Message HireSense assistant" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "Current job workspace" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Current job workspace" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Create with assistant" })).toBeNull();
   expect(vi.mocked(apiRequest).mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
@@ -49,4 +50,61 @@ it("approves the specifically selected saved draft without requiring a chatbot r
   expect(await screen.findByRole("dialog", { name: "Job details" })).toBeTruthy();
   expect(within(screen.getByRole("dialog", { name: "Job details" })).getByText("Approved")).toBeTruthy();
   expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path.includes("publish"))).toBe(false);
+});
+
+it("shows the generated JD after one hiring request without requirements confirmation or a generate button", async () => {
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+    if (path === "/job-descriptions") return [draft];
+    if (path === "/supervisor/chat" && options?.method === "POST") return { ...result,
+      phase: "job_description_draft", route: "generate_job_description", job_description: draft,
+      messages: [{ role: "user", content: "I want to hire a frontend engineer", outcome: "info" },
+        { role: "assistant", content: "I drafted your job description. Review it when you are ready.", outcome: "success" }] };
+    throw new Error(`Unexpected synthetic request: ${path}`);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/jobs"]}><App /></MemoryRouter>);
+  await screen.findByRole("list", { name: "Saved job cards" });
+  fireEvent.click(screen.getByRole("button", { name: "Assistant", exact: true }));
+  const chat = screen.getByRole("dialog", { name: "HireSense supervisor" });
+  fireEvent.change(within(chat).getByRole("textbox", { name: "Message HireSense assistant" }), { target: { value: "I want to hire a frontend engineer" } });
+  fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  const workspace = await screen.findByRole("region", { name: "Current job workspace" });
+  await within(workspace).findByRole("heading", { name: "Review your job description" });
+  expect(within(workspace).getByRole("article", { name: "Job description preview" }).textContent).toContain(draft.content);
+  expect(within(workspace).queryByRole("textbox")).toBeNull();
+  expect(within(workspace).getByRole("button", { name: "Edit", exact: true })).toBeTruthy();
+  expect(within(workspace).getByRole("button", { name: "Approve job description" })).toBeTruthy();
+  expect(within(workspace).queryByRole("button", { name: /Open assistant|Continue with assistant/ })).toBeNull();
+  expect(screen.getByRole("dialog", { name: "HireSense supervisor" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Confirm requirements|Generate job description/ })).toBeNull();
+  expect(vi.mocked(apiRequest).mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1);
+});
+
+it("asks for missing role details and drafts on the reply without separate requirements or generation steps", async () => {
+  let turns = 0;
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+    if (path === "/job-descriptions") return [];
+    if (path === "/supervisor/chat" && options?.method === "POST") {
+      turns++;
+      return { ...result, route: "generate_job_description", phase: turns === 1 ? "job_details" : "job_description_draft",
+        job_description: turns === 1 ? null : draft,
+        messages: [{ role: "assistant", content: turns === 1 ? "No suitable reference found. What skills and duties should this job include?" : "Your draft is ready.", outcome: "info" }] };
+    }
+    throw new Error(`Unexpected synthetic request: ${path}`);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/jobs"]}><App /></MemoryRouter>);
+  await screen.findByRole("heading", { name: "Create your first job" });
+  fireEvent.click(screen.getByRole("button", { name: "Assistant", exact: true }));
+  const chat = screen.getByRole("dialog", { name: "HireSense supervisor" });
+  const input = within(chat).getByRole("textbox", { name: "Message HireSense assistant" });
+  fireEvent.change(input, { target: { value: "I want to hire a frontend engineer" } });
+  fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByText(/What skills and duties/);
+  expect(screen.queryByLabelText("Job description")).toBeNull();
+  fireEvent.change(input, { target: { value: "Use React to build accessible interfaces." } });
+  fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await screen.findByRole("heading", { name: "Review your job description" });
+  expect(turns).toBe(2);
+  expect(screen.queryByRole("button", { name: /Confirm requirements|Generate job description/ })).toBeNull();
+  const sent = vi.mocked(apiRequest).mock.calls.filter(([path]) => path === "/supervisor/chat");
+  expect(JSON.parse(sent[1][1]?.body as string).session_id).toBe("synthetic-session");
 });

@@ -357,7 +357,7 @@ def test_native_supervisor_report_tool_uses_selected_authorized_saved_results(co
     instance = object.__new__(SupervisorService)
     def callback(message, request): return instance._assessments_tool(t.db, supervisor, t.owner.id, request)
     def unsupported(*_): raise AssertionError("No upstream workflow may run")
-    callbacks = SupervisorToolCallbacks(requirements=unsupported, generate_job_description=unsupported,
+    callbacks = SupervisorToolCallbacks(generate_job_description=unsupported,
         edit_job_description=unsupported, approve_job_description=unsupported, job_posting=unsupported,
         help=unsupported, sync_responses=unsupported, screen_candidates=unsupported, assessments=callback)
     model = QueueToolModel(["candidate_assessments"])

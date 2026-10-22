@@ -69,7 +69,6 @@ class AssessmentToolArguments(AssessmentToolRequest):
 
 @dataclass(frozen=True)
 class SupervisorToolCallbacks:
-    requirements: ToolCallback
     generate_job_description: ToolCallback
     edit_job_description: ToolCallback
     approve_job_description: ToolCallback
@@ -90,21 +89,14 @@ def build_supervisor_tools(
         # Business services always receive the real message, never an LLM rewrite.
         return json.dumps(callback(user_message), ensure_ascii=False, default=str)
 
-    @tool("requirements")
-    def requirements(message: str) -> str:
-        """Discover, revise, or confirm hiring requirements using previous JDs.
-
-        Use for role discovery, changes to requirements, or confirming the
-        proposed requirement profile. Pass the complete interviewer message.
-        """
-        return result(callbacks.requirements)
-
     @tool("generate_job_description")
     def generate_job_description(message: str) -> str:
-        """Generate a JD when the interviewer requests it after confirming requirements.
+        """Draft a JD directly from relevant knowledge-base sources and the user's details.
 
-        Pass the complete interviewer message. Requirements must already be
-        confirmed before the service can generate a job description.
+        Use immediately for 'I want to hire an X' and follow-up job details when
+        there is no current JD. The service asks for details if knowledge is
+        missing. No separate requirements proposal or confirmation is needed.
+        Pass the complete interviewer message.
         """
         return result(callbacks.generate_job_description)
 
@@ -112,8 +104,8 @@ def build_supervisor_tools(
     def edit_job_description(message: str) -> str:
         """Edit the active JD from the interviewer's complete edit instruction.
 
-        Use for an existing JD; use requirements for changing the requirement
-        proposal. Editing an approved JD creates a new draft version.
+        Use for an existing JD. Before a JD exists, use generate_job_description
+        for additional details. Editing an approved JD creates a new draft version.
         """
         return result(callbacks.edit_job_description)
 
@@ -190,7 +182,7 @@ def build_supervisor_tools(
         return result(callbacks.interviews)
 
     tools = [
-        requirements, generate_job_description, edit_job_description,
+        generate_job_description, edit_job_description,
         approve_job_description, job_posting, sync_responses,
         screen_candidates, help_tool,
     ]

@@ -150,27 +150,30 @@ confidential company material through the unpaid tier.
 ## Job-description workflow
 
 1. Sign in as the Interviewer and open **Jobs**.
-2. Expand **Add previous job description**, select an approved historical job
+2. Open **Reference documents**, select an approved historical job
    description PDF, and upload it. The PDF must contain selectable text; scanned
    image-only documents need OCR before upload. The default limits are 15 MB and
    100 pages and can be changed with `KNOWLEDGE_PDF_MAX_FILE_SIZE_MB` and
    `KNOWLEDGE_PDF_MAX_PAGES`.
 3. Use the central supervisor chat and describe the role, for example: `I want to hire a
    backend engineer.`
-4. HireSense retrieves related previous job descriptions and proposes a complete
-   requirement profile. Choose **Use it** at the bottom-left of the requirement profile or
-   describe changes.
-5. Tell the supervisor to **generate the job description**. Request edits in
+4. HireSense checks the knowledge base and drafts the job description directly from
+   relevant sources. If no suitable reference is found, it asks for the skills and
+   duties needed, then drafts from your reply. There is no separate requirements
+   proposal, approval or generation step. Screening data is derived internally.
+5. Review the draft. Request edits in
    natural language, such as `Remove Kubernetes from preferred skills`, then
    explicitly tell it to **approve the job description**.
-6. Use **Created job descriptions** to reopen saved records after a reload.
+6. Use the saved job cards to reopen records after a reload. **Create job description manually**
+   remains available alongside the assistant without requiring AI or embeddings.
    Drafts can be edited directly; editing an approved JD creates a new draft
    version so the approved version remains unchanged.
 
 The supervisor uses Gemini's native tool calling via `ChatGoogleGenerativeAI`.
-`bind_tools()` exposes eight `@tool` definitions: requirements, JD generation,
-JD editing, JD approval, Discord posting, response syncing, candidate screening,
-and help. LangGraph's built-in `ToolNode` executes the selected tool and returns
+`bind_tools()` exposes JD drafting, JD editing, JD approval, Discord posting,
+response syncing, candidate screening and help, with interview/assessment tools
+when configured. There is no requirements-discovery tool in this supervisor.
+LangGraph's built-in `ToolNode` executes the selected tool and returns
 a `ToolMessage` to the supervisor before it produces its final answer.
 
 The graph is `START -> supervisor_agent -> tools -> capture_tool_result ->
@@ -183,7 +186,7 @@ message, and approval checks reject fabricated or absent approval instructions.
 See the [official Gemini integration documentation](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai#tool-calling).
 
 The existing `GEMINI_API_KEY` and `GEMINI_CHAT_MODEL` settings are reused. Its
-persistent session stores the requirement session, confirmed profile, active
+persistent session stores the drafting role, internal screening profile, active
 JD, active posting, current phase, and conversation history. The browser keeps
 the supervisor session ID in session storage so refreshing the page restores
 the same workflow.

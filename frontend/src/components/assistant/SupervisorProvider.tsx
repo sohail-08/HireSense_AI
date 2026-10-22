@@ -29,9 +29,10 @@ type AssistantContext = {
 const Context = createContext<AssistantContext | null>(null);
 
 const phaseLabels: Record<SupervisorPhase, string> = {
-  requirements: "Requirement discovery",
-  requirement_confirmation: "Confirm requirements",
-  requirement_confirmed: "Ready to generate JD",
+  job_details: "Create a job",
+  requirements: "Create a job",
+  requirement_confirmation: "Create a job",
+  requirement_confirmed: "Create a job",
   job_description_draft: "JD review",
   job_description_approved: "Ready to post",
   posting_details: "Posting details",
@@ -198,8 +199,7 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
     setInput("");
   }
 
-  const phase = response?.phase ?? "requirements";
-  const requirement = response?.requirement_state;
+  const phase = response?.phase ?? "job_details";
   return (
     <Context.Provider value={{ response, loading, open, setOpen, startNewWorkflow: newSession, sendMessage, addTaskMessage,
       setSelectedJobDescriptionId, setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion, batch }}>
@@ -216,9 +216,6 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
         input={input}
         placeholder={page === "candidates" ? "e.g. Sync responses…"
           : page === "assessments" ? "Screen candidates for a job…" : page === "interviews" ? "Schedule or reschedule interviews…" : "Message HireSense assistant…"}
-        requirementContextVisible={phase.startsWith("requirement")}
-        requirementSources={requirement?.source_references ?? []}
-        missingFields={requirement?.missing_fields ?? []}
         onOpen={() => setOpen(true)}
         onClose={close}
         onInputChange={setInput}

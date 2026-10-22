@@ -124,6 +124,8 @@ it("paginates the complete sorted ranking without changing saved ranks or scores
   expect(screen.getByText("1–10 of 23 candidates")).toBeTruthy();
   expect(screen.queryByText("Applicant 11")).toBeNull();
   expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(11);
+  // Rows can render before the request's finally handler enables pagination.
+  await waitFor(() => expect((screen.getByRole("button", { name: "Go to ranking page 2" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Go to ranking page 2" }));
   const firstRow = within(screen.getByRole("table")).getAllByRole("row")[1];
   expect(firstRow.children[0].textContent).toBe("11");

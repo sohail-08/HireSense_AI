@@ -136,31 +136,21 @@ matching the supplied schema.
 
 
 def render_job_description(draft: JobDescriptionDraft) -> str:
-    """Render a stable human-readable JD from the validated structured draft."""
-    lines = [
-        f"# {draft.title}",
-        "",
-        draft.summary,
-        "",
-        "## Responsibilities",
-        *[f"- {item}" for item in draft.responsibilities],
-        "",
-        "## Required Skills",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.required_skills],
-        "",
-        "## Preferred Skills",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.preferred_skills],
-        "",
-        "## Qualifications",
-        *[f"- {item.name}: {item.details}" if item.details else f"- {item.name}"
-          for item in draft.qualifications],
-        "",
-        "## Experience",
-        draft.experience_requirement,
-        "",
-        "## Selection Process",
-        *[f"- {item}" for item in draft.selection_criteria],
+    """Render a stable JD, omitting optional sections that were not supplied."""
+    lines = [f"# {draft.title}", "", draft.summary]
+    sections = [
+        ("Responsibilities", draft.responsibilities),
+        ("Required Skills", [f"{item.name}: {item.details}" if item.details else item.name
+                            for item in draft.required_skills]),
+        ("Preferred Skills", [f"{item.name}: {item.details}" if item.details else item.name
+                             for item in draft.preferred_skills]),
+        ("Qualifications", [f"{item.name}: {item.details}" if item.details else item.name
+                            for item in draft.qualifications]),
     ]
+    for title, items in sections:
+        if items:
+            lines.extend(["", f"## {title}", *[f"- {item}" for item in items]])
+    lines.extend(["", "## Experience", draft.experience_requirement])
+    if draft.selection_criteria:
+        lines.extend(["", "## Selection Process", *[f"- {item}" for item in draft.selection_criteria]])
     return "\n".join(lines).strip() + "\n"

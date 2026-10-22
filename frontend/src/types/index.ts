@@ -172,6 +172,7 @@ export interface DiscordPostingAssistantResponse {
 }
 
 export type SupervisorPhase =
+  | "job_details"
   | "requirements"
   | "requirement_confirmation"
   | "requirement_confirmed"

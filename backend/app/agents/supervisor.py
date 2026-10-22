@@ -37,9 +37,11 @@ Use the current workflow state and latest interviewer message to call exactly
 one of the supplied tools before answering.
 
 Tools:
-- requirements: discover, revise, or confirm role requirements using previous JDs.
-- generate_job_description: generate a JD after requirements are confirmed.
-- edit_job_description: revise an existing JD, not the requirement proposal.
+- generate_job_description: draft a JD directly using the knowledge base. Use
+  immediately for 'I want to hire an X' and subsequent job details before a JD
+  exists. The tool asks for details only when relevant knowledge is insufficient.
+  There is NO separate requirements generation, approval or 'generate' step.
+- edit_job_description: revise an existing JD.
 - approve_job_description: explicitly approve the active JD draft.
 - job_posting: start posting, collect link/deadline, revise/reject a preview,
   or explicitly approve a prepared Discord post.
@@ -62,8 +64,10 @@ Tools:
 Use the current phase and resources to choose a tool. Generic confirmation
 belongs to the pending confirmation step. Never select an approval tool without
 explicit interviewer approval. Posting approval belongs to job_posting.
-In requirement_confirmation, "Use it" confirms the current requirement profile
-through the requirements tool; it does not approve a JD or publish a job.
+For restored legacy requirements/requirement_confirmation/requirement_confirmed
+sessions with no JD, use generate_job_description to continue directly. Never
+ask for requirements approval. Only approve an actual existing JD draft, never
+interpret missing-role details as approval or publish as part of JD generation.
 Sync and screening are available on every interviewer page and at every phase.
 Do not screen candidates when the interviewer only asks to sync responses.
 

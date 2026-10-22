@@ -67,7 +67,7 @@ class JobDescriptionDraft(BaseModel):
     preferred_skills: list[RequirementItem] = Field(default_factory=list)
     qualifications: list[RequirementItem] = Field(default_factory=list)
     experience_requirement: str = Field(min_length=1, max_length=2000)
-    selection_criteria: list[str] = Field(min_length=1, max_length=20)
+    selection_criteria: list[str] = Field(default_factory=list, max_length=20)
 
 
 class JobDescriptionGenerateRequest(BaseModel):

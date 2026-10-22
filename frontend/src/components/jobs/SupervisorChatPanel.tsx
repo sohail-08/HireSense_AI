@@ -5,7 +5,6 @@ import {
   useRef,
 } from "react";
 
-import type { JobDescriptionEvidence } from "../../types";
 import { Link } from "react-router-dom";
 
 type ChatMessage = {
@@ -21,9 +20,6 @@ type SupervisorChatPanelProps = {
   loading: boolean;
   input: string;
   placeholder: string;
-  requirementContextVisible: boolean;
-  requirementSources: JobDescriptionEvidence[];
-  missingFields: string[];
   assessmentLinks?: { label: string; path: string }[];
   onOpen: () => void;
   onClose: () => void;
@@ -39,9 +35,6 @@ export function SupervisorChatPanel({
   loading,
   input,
   placeholder,
-  requirementContextVisible,
-  requirementSources,
-  missingFields,
   assessmentLinks = [],
   onOpen,
   onClose,
@@ -254,27 +247,6 @@ export function SupervisorChatPanel({
                 <span className="ml-2 text-xs text-slate-500">Working</span>
               </div>
             </div>
-          ) : null}
-          {requirementContextVisible && requirementSources.length ? (
-            <details className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-xs">
-              <summary className="cursor-pointer font-semibold text-blue-700">
-                {requirementSources.length} previous JD source
-                {requirementSources.length === 1 ? "" : "s"} used
-              </summary>
-              <ul className="mt-2 space-y-1.5 text-slate-600">
-                {requirementSources.map((source) => (
-                  <li key={`${source.document_id}-${source.chunk_id}`}>
-                    {source.document_title} · relevance {source.score.toFixed(2)}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-
-          {requirementContextVisible && missingFields.length ? (
-            <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-              Still needed: {missingFields.join(", ")}.
-            </p>
           ) : null}
         </div>
 

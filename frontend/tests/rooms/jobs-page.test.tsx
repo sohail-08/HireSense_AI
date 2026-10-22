@@ -149,23 +149,16 @@ it("requires confirmation before deleting and leaves published posts alone", asy
   expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path.includes("publish"))).toBe(false);
 });
 
-it("starts the assistant workflow without generating a job automatically", async () => {
+it("keeps assistant conversations available without a separate creation button", async () => {
+  supervisor.response = response();
   render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create with assistant", exact: true }));
-  expect(supervisor.startNewWorkflow).toHaveBeenCalledTimes(1);
-  expect(supervisor.setOpen).toHaveBeenCalledWith(true);
-  expect(screen.getByRole("region", { name: "Current job workspace" })).toBeTruthy();
-  expect(supervisor.sendMessage).not.toHaveBeenCalled();
-});
-
-it("does not reset an active conversation if the user cancels creating a job", async () => {
-  supervisor.response = response(); vi.mocked(window.confirm).mockReturnValue(false);
-  render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create with assistant", exact: true }));
+  expect(screen.queryByRole("button", { name: "Create with assistant" })).toBeNull();
   expect(supervisor.startNewWorkflow).not.toHaveBeenCalled();
-  expect(screen.getByText("React")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Confirm requirements" }));
-  expect(supervisor.sendMessage).toHaveBeenCalledWith("Use it.");
+  expect(screen.queryByText("React")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Confirm requirements" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Generate job description" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Open assistant|Continue with assistant/ })).toBeNull();
+  expect(supervisor.sendMessage).not.toHaveBeenCalled();
 });
 
 it("recovers from a failed job list request", async () => {
@@ -216,6 +209,56 @@ it("keeps failed saves retryable without losing typed edits", async () => {
   expect((screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
+it("previews a generated draft and opens manual editing only through Edit", async () => {
+  supervisor.response = { ...response(), phase: "job_description_draft", job_description: job(4, "draft") };
+  render(<JobDescriptionPage />);
+  const workspace = await screen.findByRole("region", { name: "Current job workspace" });
+  expect(within(workspace).getByRole("article", { name: "Job description preview" })).toBeTruthy();
+  expect(within(workspace).queryByRole("textbox")).toBeNull();
+  expect(within(workspace).queryByRole("button", { name: /Open assistant|Continue with assistant/ })).toBeNull();
+  fireEvent.click(within(workspace).getByRole("button", { name: "Edit", exact: true }));
+  expect((within(workspace).getByLabelText("Job title") as HTMLInputElement).value).toBe("Engineer 4");
+  expect(document.activeElement).toBe(within(workspace).getByLabelText("Job title"));
+  expect(within(workspace).getByRole("button", { name: "Cancel" })).toBeTruthy();
+  expect(supervisor.sendMessage).not.toHaveBeenCalled();
+});
+
+it("confirms cancelling unsaved edits, restores saved text and returns focus to Edit", async () => {
+  render(<JobDescriptionPage />); fireEvent.click(await screen.findByRole("button", { name: "Edit draft: Engineer 2" }));
+  fireEvent.change(screen.getByLabelText("Job title"), { target: { value: "Unsaved title" } });
+  fireEvent.change(screen.getByLabelText("Job description"), { target: { value: "Unsaved description" } });
+  vi.mocked(window.confirm).mockReturnValue(false);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect((screen.getByLabelText("Job title") as HTMLInputElement).value).toBe("Unsaved title");
+  vi.mocked(window.confirm).mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  const modal = screen.getByRole("dialog", { name: "Job details" });
+  expect(within(modal).queryByRole("textbox")).toBeNull();
+  expect(within(modal).getByText(/Saved description 2/).textContent).toBe(jobs[1].content);
+  expect(document.activeElement).toBe(within(modal).getByRole("button", { name: "Edit", exact: true }));
+  fireEvent.click(within(modal).getByRole("button", { name: "Edit", exact: true }));
+  expect((screen.getByLabelText("Job title") as HTMLInputElement).value).toBe("Engineer 2");
+  expect(vi.mocked(apiRequest).mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+
+it("returns to the updated formatted preview after saving and supports further edits", async () => {
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+    if (path === "/job-descriptions") return jobs;
+    if (path === "/job-descriptions/2" && options?.method === "PATCH") return { ...jobs[1], ...JSON.parse(options.body as string) };
+    throw new Error(`Unexpected synthetic request: ${path}`);
+  });
+  render(<JobDescriptionPage />); fireEvent.click(await screen.findByRole("button", { name: "Edit draft: Engineer 2" }));
+  fireEvent.change(screen.getByLabelText("Job description"), { target: { value: "## Responsibilities\n- Build accessible interfaces" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await screen.findByText("Changes saved.");
+  const modal = screen.getByRole("dialog", { name: "Job details" });
+  expect(within(modal).queryByRole("textbox")).toBeNull();
+  expect(within(modal).getByRole("heading", { name: "Responsibilities" })).toBeTruthy();
+  expect(within(modal).getByRole("listitem").textContent).toBe("Build accessible interfaces");
+  fireEvent.click(within(modal).getByRole("button", { name: "Edit", exact: true }));
+  expect((screen.getByLabelText("Job description") as HTMLTextAreaElement).value).toContain("## Responsibilities");
+});
+
 it("keeps archived jobs read-only and never offers revision or publishing controls", async () => {
   render(<JobDescriptionPage />);
   fireEvent.click(await screen.findByRole("button", { name: "View job: Engineer 3" }));
@@ -250,13 +293,13 @@ it("requires confirmation for reference removal and can recover from a failed re
   expect(apiRequest).toHaveBeenCalledWith("/knowledge/documents/9", { method: "DELETE" });
 });
 
-it("keeps card view with both manual and assistant creation options", async () => {
+it("keeps card view and only the clearly named manual creation button", async () => {
   render(<JobDescriptionPage />);
   const cards = await screen.findByRole("list", { name: "Saved job cards" });
   expect(within(cards).getAllByRole("article")).toHaveLength(3);
   expect(screen.queryByRole("table")).toBeNull();
-  expect(screen.getByRole("button", { name: "Create manually" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Create with assistant" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Create job description manually" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Create with assistant" })).toBeNull();
 });
 
 it("saves a manual job with screening requirements, then opens it for review without using the chatbot", async () => {
@@ -266,7 +309,7 @@ it("saves a manual job with screening requirements, then opens it for review wit
     throw new Error(`Unexpected synthetic request: ${path}`);
   });
   render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create manually" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create job description manually" }));
   const modal = screen.getByRole("dialog", { name: "Create job manually" });
   fireEvent.change(within(modal).getByLabelText(/Job title/), { target: { value: " Manual frontend role " } });
   fireEvent.change(within(modal).getByLabelText(/Job description/), { target: { value: "Build accessible React apps." } });
@@ -275,7 +318,7 @@ it("saves a manual job with screening requirements, then opens it for review wit
   fireEvent.change(within(modal).getByLabelText(/Minimum experience/), { target: { value: "3" } });
   const save = within(modal).getByRole("button", { name: "Save draft" });
   fireEvent.click(save); fireEvent.click(save);
-  await screen.findByRole("dialog", { name: "Edit job draft" });
+  await screen.findByRole("dialog", { name: "Job details" });
   expect(apiRequest).toHaveBeenCalledWith("/job-descriptions/manual", { method: "POST", body: JSON.stringify({
     title: "Manual frontend role", content: "Build accessible React apps.", required_skills: [{ name: "React", details: null }, { name: "TypeScript", details: null }],
     preferred_skills: [], qualifications: [{ name: "Computer Science degree", details: null }], min_years_experience: 3,
@@ -287,7 +330,7 @@ it("saves a manual job with screening requirements, then opens it for review wit
 
 it("keeps a failed manual creation retryable without losing text", async () => {
   render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create manually" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create job description manually" }));
   const modal = screen.getByRole("dialog", { name: "Create job manually" });
   const save = within(modal).getByRole("button", { name: "Save draft" });
   expect((save as HTMLButtonElement).disabled).toBe(true);
@@ -303,7 +346,7 @@ it("keeps a failed manual creation retryable without losing text", async () => {
 
 it("asks before discarding manual input and cancels without creating anything", async () => {
   render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
-  fireEvent.click(screen.getByRole("button", { name: "Create manually" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create job description manually" }));
   const modal = screen.getByRole("dialog", { name: "Create job manually" });
   fireEvent.change(within(modal).getByLabelText(/Job title/), { target: { value: "Unsaved manual role" } });
   vi.mocked(window.confirm).mockReturnValue(false);

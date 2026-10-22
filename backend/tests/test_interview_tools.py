@@ -273,7 +273,7 @@ def test_chat_threshold_operator_and_named_job_are_grounded(setup):
 
 def test_native_toolnode_binds_interview_workflow_without_recipient_or_identity_arguments():
     callback = lambda message: {"phase": "interview_selection", "outcome": "info", "assistant_message": "Please select a job.", "refresh_required": False}
-    callbacks = SupervisorToolCallbacks(callback, callback, callback, callback, callback, callback, callback, lambda m, d: callback(m), interviews=callback)
+    callbacks = SupervisorToolCallbacks(callback, callback, callback, callback, callback, callback, lambda m, d: callback(m), interviews=callback)
     tools = build_supervisor_tools(callbacks, user_message="schedule top 5")
     tool = next(item for item in tools if item.name == "interviews")
     assert set(tool.args) == {"message"}
