@@ -28,16 +28,21 @@ candidate captions. Interim text never enters the analysis workflow.
 5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
    accuracy, completeness and quality each weigh 25%. Met earns 1, partially met 0.5,
    and unmet 0. The percentage is `25 × (relevance + accuracy + completeness + quality)`.
-   Python calculates scores after quote and logical-support validation. Unsupported
-   evidence earns 0; accuracy and completeness additionally require a cited reference
-   (an answer guide for completeness). A missing reference does not prove a personal
-   claim false; the explanation records the missing support. No result is placed in
-   a "needs review" queue. Provider failures remain retryable errors, not candidate scores.
+   Python calculates scores after quote and logical-support validation. Every scored
+   criterion needs supported evidence; accuracy and completeness additionally require
+   a cited reference (an answer guide for completeness). A failed check, ambiguous
+   meaning or missing correctness reference leaves the answer **unscored**, not zero.
+   A supported negative finding or genuinely unanswered question can still earn zero.
+   Missing support does not prove a personal claim false. Provider failures remain
+   retryable errors; unclear speech is labelled **Wording needs verification**.
 6. Question cards show the question, candidate answer, percentage and brief category
    explanations. The per-answer **Evidence & details** expander, cited passages,
    reference quotes and full explanations are no longer rendered here. Saved evidence,
    references and original score explanations remain intact in backend records.
-   Citation verification in other views is unchanged.
+   A separate **Evidence summary** provides strengths, weaknesses, evidence gaps and
+   further verification. Findings link to exact saved passages, guide versions or
+   approved requirement/readiness checks. Missing evidence is not called a weakness.
+   The same four categories appear in consolidated assessments and PDF reports.
 7. **Other transcript passages** reuses the live transcript's messenger-style
    conversation layout: interviewer speech on the right in dark blue and candidate
    speech on the left in soft mint, with elapsed timestamps below each bubble.
@@ -50,7 +55,7 @@ candidate captions. Interim text never enters the analysis workflow.
 The panel always loads the latest analysis. Pairing/merge/split editing, manual review
 notes, suggested follow-ups and their annotation/linking controls, and analysis-version
 selection are no longer offered here. Their unused frontend request methods are
-removed. Backend records, historical snapshots and the analysis graph are unchanged;
+removed. Backend records and historical snapshots remain available;
 immutable run IDs remain necessary to verify evidence links. The central assistant's
 analysis and question tools are also unchanged.
 
@@ -102,7 +107,12 @@ watermark contains every source ID and content hash (current transcript rows hav
 mutable revision mechanism). A later run classifies only new segments when earlier
 inputs remain compatible; completed unchanged exchanges reuse saved assessments.
 New finals, requirements, references, prompts, models or corrected associations produce
-new snapshots. Explicit reanalysis creates a new version even with identical inputs.
+new snapshots. Explicit reanalysis creates a new version even with identical inputs,
+but reuses accepted interpretation, grades and guide selection for unchanged exchanges.
+It retries failed assessments/mappings instead of rerolling accepted grades. The cache
+fingerprint includes source hashes, requirements/version, reference snapshots, provider,
+model, configuration, prompt, pairing and rubric versions. Deterministic retrieval ties
+are ordered by reference ID. A changed scoring policy makes saved final rankings stale.
 After all transcription sessions finish flushing (`completed` or `failed`), the next
 automatic check reconciles the last exchange and unanswered questions. Failed or
 interrupted transcription is visibly marked incomplete. Final reconciliation requires
@@ -134,11 +144,43 @@ Assessment and mapping citations are restricted to the pair's candidate-answer
 segments. Technical citations must exist in the approved reference snapshot.
 
 A separate structured model call checks whether the validated quotations logically
-support the proposed assessment/mapping. Invalid or unsupported claims are downgraded
-to zero-credit criteria and evidence-gap explanations; they are not presented
+support the proposed interpretation/assessment/mapping. Each target must receive exactly
+one finding; missing, duplicate or foreign targets fail bounded output validation.
+Invalid or unsupported assessments are left unscored with evidence-gap explanations; they are not presented
 as established facts. This additional model check is fallible and is not external fact
 verification. Model confidence is never represented as verified truth. Candidate
 project claims without reference support remain unverified rather than false.
+
+### Contextual interpretation of imperfect transcription
+
+The assessment first distinguishes faithful meaning, context-supported interpretation,
+and uncertain meaning. It can ignore harmless fillers, split sentences and grammatical
+noise. Meaning-changing ASR interpretations must identify the original phrase, proposed
+reading, reason and exact supporting question/answer context. The separate evidence audit
+checks these readings as well as the grade labels. The original transcript, source hashes,
+timestamps and quoted errors remain unchanged; **Transcription interpretation** discloses
+accepted readings without pretending they are audio-verified corrections.
+
+The model must not repair genuine technical errors to match a guide, add unspoken facts,
+change numbers/negations, or supply missing examples from reference material. Competing
+readings that affect a grade require clarification and prevent a final ranking until
+resolved; unscored answers are not dropped from the average or replaced with zero.
+Low transcription confidence alone is not a scoring penalty. Quality measures a coherent
+answer appropriate to the question, not speaking style or unrequested examples/tradeoffs.
+
+Gemini is already called with temperature zero. This alone is not a guarantee of identical
+or correct judgments; accepted-result reuse provides repeatability for unchanged inputs.
+If a provider reports different model revisions within one run, that run fails rather than
+mixing judgments. Evidence summaries are generated deterministically from validated labels
+and source-owned citations, with no extra generative summary call. They distinguish known
+weaknesses from missing/uncertain evidence. No system can perfectly recover missing or
+misrecognized speech from text alone; human clarification remains necessary in such cases.
+
+Prompt `interview-analysis-v3-context-grounded` and rubric
+`answer-coverage-equal-dimensions-v3-validated` require an explicit new analysis for old
+inputs. Historical runs are not rewritten. Recalculate the final ranking afterwards to
+include the new validated scores and summary. The four equal weights and CV50/interview50
+formula have not changed. No database migration or new dependency is needed.
 
 Follow-ups cite their triggering question/answer passages, name requirements and explain
 their purpose and priority. History is passed to generation and a normalized similarity
@@ -253,6 +295,12 @@ evidence, follow-up use/link semantics, duplication, incremental/final reconcili
 version persistence, authorization, prompt-injection isolation, expiry/deletion, failed
 providers, restart recovery, and cancellation. Frontend tests cover restored results,
 exact passage highlighting, correction validation, approval and suggestion annotations.
+`tests/test_transcript_scoring_robustness.py` additionally covers repeatability on explicit
+reanalysis, changed-input invalidation, incomplete audits, ASR interpretation provenance,
+ambiguous negation, rejected repairs, mapping-only retries and model-revision drift.
+These tests mock AI judgments; they validate application rules, not live-model accuracy.
+The historical provider measurements below predate the v3 interpretation prompt and do
+not establish its semantic accuracy. No live provider benchmark was run for this update.
 
 Commands:
 

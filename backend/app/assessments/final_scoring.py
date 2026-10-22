@@ -69,8 +69,8 @@ def score_summary(report, source):
                     if value not in {Fraction(0), Fraction(1, 2), Fraction(1)} or weight != 25: raise ValueError()
                     if value != Fraction(str(expected[name]["value"])): raise ValueError()
                     dimension = verified["dimensions"].get(name, {})
-                    if value and not dimension.get("support_validated"): raise ValueError()
-                    if value and name in {"accuracy", "completeness"} and not any(
+                    if pair["state"] != "unanswered" and not dimension.get("support_validated"): raise ValueError()
+                    if pair["state"] != "unanswered" and name in {"accuracy", "completeness"} and not any(
                         report["evidence"][eid]["kind"] in ({"answer_guide", "technical_reference"} if name == "accuracy" else {"answer_guide"}) for eid in dimension.get("evidence_ids", [])):
                         raise ValueError()
                     earned += value

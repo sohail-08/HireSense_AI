@@ -31,6 +31,60 @@ function fixture(): AnalysisState {
 beforeEach(() => { vi.mocked(analysisApi.read).mockReset().mockResolvedValue(fixture()); vi.mocked(analysisApi.start).mockReset().mockResolvedValue({}); });
 
 describe("simplified interviewer answer analysis", () => {
+  it("shows four evidence categories with immutable source links without generating on read", async () => {
+    const data = fixture();
+    data.run!.result.evidence_summary = {
+      strengths: [{ id: "one", text: "The answer addresses transaction atomicity.", rule: "validated_dimension_labels", pair_id: "pair", citations: [citation], references: [], source: { kind: "exchange", state: "analyzed" } }],
+      weaknesses: [], evidence_gaps: [{ id: "two", text: "Testing was not explored.", rule: "requirement_not_explored", pair_id: null, citations: [], references: [], source: { kind: "requirement", requirement_id: "skill:1", version: "v1" } }], verification: [],
+    };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    const saved = JSON.stringify(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    const summary = await screen.findByRole("region", { name: "Evidence-based summary" });
+    for (const name of ["Strengths", "Weaknesses", "Evidence gaps", "Further verification"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
+    fireEvent.click(within(within(summary).getByRole("region", { name: "Strengths" })).getByText("View supporting evidence"));
+    fireEvent.click(within(summary).getByRole("button", { name: /Candidate · 00:03/ }));
+    expect(await screen.findByRole("dialog", { name: "Transcript source passage" })).toBeTruthy();
+    expect(analysisApi.read).toHaveBeenCalledWith(1, 10);
+    expect(analysisApi.start).not.toHaveBeenCalled();
+    expect(JSON.stringify(data)).toBe(saved);
+  });
+
+  it("discloses contextual ASR readings while leaving the original answer unchanged", async () => {
+    const data = fixture(), pair = data.run!.result.pairs![0];
+    pair.assessment!.interpretation = { status: "context_supported", support_status: "supported_by_check", meaning: "An interpreted answer.", notes: [{ original: citation, interpreted_as: "atomic commits", reason: "Supported by the adjacent explanation.", context: [citation] }] };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    fireEvent.click(await screen.findByText("Transcription interpretation"));
+    expect(screen.getByText("atomic commits")).toBeTruthy();
+    expect(screen.getByText("Transactions commit changes atomically.")).toBeTruthy();
+    expect(screen.getByText(/not verified against audio/)).toBeTruthy();
+  });
+
+  it("keeps ambiguous wording unscored and does not show unsupported judgments", async () => {
+    const data = fixture(), pair = data.run!.result.pairs![0];
+    delete pair.score;
+    pair.state = "needs_clarification";
+    pair.score_unavailable_reason = "Verify the unclear negation before scoring.";
+    pair.assessment!.interpretation = { status: "uncertain", support_status: "supported_by_check", meaning: "Unclear", notes: [] };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByText("Wording needs verification")).toBeTruthy();
+    expect(screen.queryByLabelText(/Answer score/)).toBeNull();
+    expect(screen.getAllByText("Not scored")).toHaveLength(4);
+    expect(screen.queryByText("The answer addresses transactions.")).toBeNull();
+    expect(screen.queryByText("Transcription interpretation")).toBeNull();
+  });
+
+  it("retries failed evidence checks without asking the API to reroll accepted grades", async () => {
+    const data = fixture(); data.run!.result.pairs![0].state = "analysis_failed";
+    delete data.run!.result.pairs![0].score;
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Analyze answers" }));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true, false, true));
+  });
+
   it("loads only the latest saved analysis without generating anything on page load", async () => {
     render(<InterviewAnalysisPanel interviewId={1} />);
     await screen.findByText("Questions & answers");
@@ -40,7 +94,7 @@ describe("simplified interviewer answer analysis", () => {
     expect(analysisApi.read).toHaveBeenCalledWith(1);
     expect(analysisApi.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Analyze answers" }));
-    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalledWith(1, true, false, false));
   });
 
   it("removes pairing corrections, reviews, follow-ups and analysis versions including their controls", async () => {

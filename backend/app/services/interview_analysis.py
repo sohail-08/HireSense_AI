@@ -146,8 +146,8 @@ class InterviewAnalysisService:
             db.commit()
             return existing
         old_watermark = previous.snapshot.get("watermark", {}) if previous else {}
-        compatible = previous and not request.reanalyze and all(snapshot["watermark"].get(i) == h for i, h in old_watermark.items()) and all(
-            snapshot[k] == previous.snapshot.get(k) for k in ("prompt_version", "pairing_version", "model"))
+        compatible = previous and all(snapshot["watermark"].get(i) == h for i, h in old_watermark.items()) and all(
+            snapshot[k] == previous.snapshot.get(k) for k in ("prompt_version", "pairing_version", "rubric_version", "provider", "model", "requirements", "requirement_version", "configuration"))
         old_result = previous.result if compatible and previous.status == "completed" else {}
         # A queued/failed run may still carry the last completed incremental state.
         if compatible and not old_result:
@@ -188,7 +188,7 @@ class InterviewAnalysisService:
             response["run"] = {"id": run.id, "version": run.version, "status": run.status, "stage": run.stage,
                 "error": run.error, "created_at": run.created_at.isoformat(), "stale": run.snapshot["input_key"] != self.input_key(current),
                 "snapshot": {k: v for k, v in run.snapshot.items() if k not in {"previous_pairs", "previous_turns", "past_suggestions"}},
-                "result": present_result(run.result), "reviews": reviews}
+                "result": present_result(run.result, run.snapshot), "reviews": reviews}
         return response
 
     def references(self, db, user_id, interview_id, request):

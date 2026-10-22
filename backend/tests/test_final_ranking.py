@@ -83,6 +83,19 @@ def test_zero_is_a_real_score_excluded_questions_are_not_in_average():
     assert summary["ready"] and Fraction(summary["final_score"]) == 0 and summary["question_count"] == 1
 
 
+def test_supported_negative_labels_are_zero_but_failed_reference_checks_are_unscored():
+    source = synthetic_source()
+    pair = source["interviews"][0]["analysis"]["result"]["pairs"][0]
+    for name, label in zip(("relevance", "accuracy", "completeness", "quality"), ("tangent", "contradicted", "incomplete", "limited")):
+        pair["assessment"][name]["label"] = label
+        pair["score"]["breakdown"][name]["value"] = 0
+    pair["score"].update(percentage=0, earned=0)
+    assert result(source)["score_summary"]["interview_score"] == "0"
+    pair["assessment"]["accuracy"]["references"][0]["quote"] = "Nonexistent reference quote"
+    checked = result(source)
+    assert not checked["score_summary"]["ready"] and checked["score_summary"]["final_score"] is None
+
+
 def test_exact_ties_and_final_score_order_not_cv_order():
     reports = []
     for app, cv, final in [(1, 90, Fraction(60)), (2, 70, Fraction(85)), (3, 70, Fraction(85)), (4, 90, Fraction(60) + Fraction(1, 10**40))]:

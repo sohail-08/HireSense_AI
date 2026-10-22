@@ -17,7 +17,7 @@ from app.models.assessment import AssessmentRun, AssessmentComparison, Assessmen
 from app.models.scoring import CandidateScore
 from app.models.transcription import TranscriptSegment
 from app.schemas.assessment import GenerateAssessment, ExportReport, ReviewAssessment
-from app.schemas.interview_analysis import StartAnalysis
+from app.schemas.interview_analysis import StartAnalysis, ReferenceUpdate
 from app.services.assessment_service import AssessmentService
 from app.services.report_service import ReportService
 from app.database import get_db
@@ -60,6 +60,53 @@ def test_saved_scores_and_evidence_survive_without_combined_score():
     assert not any(e["kind"] == "cv" for e in invalid["evidence"].values())
     source["cv"]["screening_requirement_version"] = "different-requirement-version"
     assert report(source)["matrix"][0]["cv_status"] == "missing_processing"
+
+
+def test_four_part_summary_is_deterministic_traceable_and_separates_missing_evidence():
+    source = synthetic_source()
+    before = copy.deepcopy(source)
+    result = report(source)
+    summary = result["evidence_summary"]
+    assert set(summary) == {"strengths", "weaknesses", "evidence_gaps", "verification"}
+    assert all(summary.values())
+    for category, findings in summary.items():
+        for finding in findings:
+            assert finding["evidence_ids"] and all(e in result["evidence"] for e in finding["evidence_ids"])
+            if category == "weaknesses":
+                assert any(result["evidence"][e]["kind"] == "transcript" for e in finding["evidence_ids"])
+                assert "Automated testing" not in finding["text"]  # Not explored, not a weakness.
+    assert report(source)["evidence_summary"] == summary and source == before
+    html = render_html({"kind": "individual", "reports": [{"id": 1, "result": result, "created_at": "2026-10-22T00:00:00Z"}]})
+    for heading in ("Strengths", "Weaknesses", "Evidence gaps", "Further verification"):
+        assert heading in html
+    assert "Source version" in html
+
+
+def test_uncertain_transcription_cannot_become_a_report_weakness_or_final_score():
+    source = synthetic_source()
+    pair = source["interviews"][0]["analysis"]["result"]["pairs"][0]
+    pair["state"] = "needs_clarification"
+    pair.pop("score")
+    pair["assessment"]["interpretation"] = {"status": "uncertain", "meaning": "Unclear negation.",
+        "citations": copy.deepcopy(pair["assessment"]["relevance"]["citations"]), "notes": [], "support_status": "supported_by_check"}
+    result = report(source)
+    assert not result["score_summary"]["ready"] and result["score_summary"]["final_score"] is None
+    assert not result["evidence_summary"]["weaknesses"]
+    assert not any(f.get("interview_id") for f in result["evidence_summary"]["strengths"])
+    assert result["evidence_summary"]["verification"]
+    assert result["matrix"][0]["interview_statuses"] == ["insufficient_evidence"]
+
+
+def test_summary_does_not_repair_tampered_provenance_into_a_supported_conclusion():
+    source = synthetic_source()
+    pair = source["interviews"][0]["analysis"]["result"]["pairs"][0]
+    for dim in pair["assessment"].values():
+        dim["citations"][0]["start_offset_ms"] += 1
+    result = report(source)
+    assert not any(f.get("interview_id") for f in result["evidence_summary"]["strengths"])
+    assert not result["evidence_summary"]["weaknesses"]
+    assert not result["score_summary"]["ready"]
+    assert result["interviews"][0]["pairs"][0]["score"] is None
 
 
 @pytest.mark.parametrize("field", ["revision", "speaker", "quote", "start_offset_ms", "session_id"])
@@ -114,6 +161,8 @@ def test_html_autoescaping_no_remote_assets_or_executable_candidate_content():
 @pytest.fixture
 def consolidated(saved, monkeypatch, tmp_path):
     t = saved
+    t.analysis.references(t.db, t.owner.id, t.row.id, ReferenceUpdate(revision=0, approved=True, references=[{
+        "id": "guide", "title": "Database transactions", "kind": "answer_guide", "content": "Transactions are atomic."}]))
     run = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
     t.analysis.process(run.id)
     t.db.expire_all()

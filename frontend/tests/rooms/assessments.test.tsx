@@ -20,6 +20,25 @@ function fixture(): Assessment {
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(assessmentApi.export).mockResolvedValue({ id: 5, status: "failed", format: "pdf", error: "PDF renderer unavailable." }); });
 
 describe("simple candidate details", () => {
+  it("replaces the old summary with four traceable categories in new reports", () => {
+    const report = fixture();
+    report.result.evidence_summary = {
+      strengths: [{ text: "Supported atomicity explanation.", evidence_ids: ["source", "source"] }], weaknesses: [],
+      evidence_gaps: [{ text: "Failure testing was not explored.", evidence_ids: ["source"] }],
+      verification: [{ text: "Confirm the contextual transcription reading.", evidence_ids: ["source"] }],
+    };
+    const saved = JSON.stringify(report);
+    render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
+    const summary = screen.getByRole("region", { name: "Evidence-based summary" });
+    for (const name of ["Strengths", "Weaknesses", "Evidence gaps", "Further verification"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
+    const strengths = within(summary).getByRole("region", { name: "Strengths" });
+    fireEvent.click(within(strengths).getByText("View supporting evidence"));
+    expect(strengths.querySelectorAll("blockquote")).toHaveLength(1);
+    expect(within(strengths).getByText(/Candidate · 00:03/)).toBeTruthy();
+    expect(screen.queryByText("Areas to improve")).toBeNull();
+    expect(JSON.stringify(report)).toBe(saved);
+    expect(assessmentApi.export).not.toHaveBeenCalled();
+  });
   it("formats scores exactly and keeps missing scores distinct from zero", () => {
     expect(score("2.675000")).toBe("2.68%");
     expect(score("0E-60")).toBe("0.00%");
@@ -130,7 +149,7 @@ describe("simple candidate details", () => {
     render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
     fireEvent.click(screen.getByText("CV evidence"));
     expect(screen.getByText("Built transaction tests.")).toBeTruthy();
-    expect(screen.getByText("CV page 1")).toBeTruthy();
+    expect(screen.getByText(/CV page 1 · Source version v1/)).toBeTruthy();
   });
   it("does not invent final scores for older saved reports", () => {
     const r = fixture(); delete r.result.score_summary;

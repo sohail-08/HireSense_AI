@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { assessmentApi, type Assessment, type Artifact, type Comparison } from "./assessmentApi";
 import { displayPercent } from "../candidates/scoringDisplay";
 import { ReportPdfDownload } from "./ReportPdfDownload";
+import { EvidenceSummary } from "./EvidenceSummary";
 
 export const text = (value: string) => value.replaceAll("_", " ");
 export const score = (value: string | number | null | undefined) => value === null || value === undefined ? "—" : displayPercent(String(value));
@@ -53,7 +54,7 @@ export function AssessmentView({ report }: { report: Assessment; onReviewed?: (r
   function refs(ids: string[]) {
     return [...new Set(ids)].map(id => {
       const evidence = r.evidence[id];
-      return evidence ? <figure key={id} className="mt-3 rounded-lg bg-slate-50 p-3"><blockquote className="whitespace-pre-wrap border-l-2 border-blue-400 pl-3">{evidence.quote}</blockquote><figcaption className="mt-2 text-xs text-slate-500">{evidence.locator}</figcaption></figure> : null;
+      return evidence ? <figure key={id} className="mt-3 rounded-lg bg-slate-50 p-3"><blockquote className="whitespace-pre-wrap border-l-2 border-blue-400 pl-3">{evidence.quote}</blockquote><figcaption className="mt-2 text-xs text-slate-500">{evidence.locator} · Source version {evidence.source_version.slice(0, 12)}</figcaption></figure> : null;
     });
   }
   return <article aria-label="Consolidated candidate assessment" className="min-w-0 rounded-2xl bg-white">
@@ -62,12 +63,14 @@ export function AssessmentView({ report }: { report: Assessment; onReviewed?: (r
     <div className="my-5 grid gap-3 sm:grid-cols-3">{[["CV score", totals?.cv_score ?? r.cv?.final_score], ["Interview score", totals?.interview_score], ["Final score", totals?.final_score]].map(([name,value]) => <div key={name} className={`rounded-2xl border p-4 ${name === "Final score" ? "border-blue-200 bg-blue-50" : name === "CV score" ? "border-teal-100 bg-teal-50/70" : "border-violet-100 bg-violet-50/70"}`}><p className="text-xs font-medium text-slate-600">{name}</p><p className={`mt-2 text-2xl font-bold tabular-nums ${name === "CV score" ? "text-teal-800" : name === "Interview score" ? "text-violet-800" : "text-blue-700"}`}>{score(value)}</p></div>)}</div>
     <p className="text-sm">{totals?.reason ?? "Calculate the final ranking to add interview and final scores to this older report."}</p>
     {totals?.ready ? <p className="mt-2 text-sm text-slate-500">CV 50% + interview 50%. Interview score: average of {totals.question_count} {totals.question_count === 1 ? "question" : "questions"}{totals.unanswered_count ? `, including ${totals.unanswered_count} unanswered (zero)` : ""}.</p> : null}
-    {r.simple_summary ? <div className="mt-5 grid gap-4 sm:grid-cols-2">{(["strengths", "improvements"] as const).map(key => <section className={`rounded-2xl border p-4 ${key === "strengths" ? "border-emerald-100 bg-emerald-50/40" : "border-amber-100 bg-amber-50/40"}`} key={key}><h3 className="text-sm font-semibold text-slate-700">{key === "strengths" ? "Strengths" : "Areas to improve"}</h3>{r.simple_summary![key].length ? <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">{r.simple_summary![key].map((fact, i) => <li key={i}>{fact.text}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No additional points recorded.</p>}</section>)}</div> : null}
+    {r.evidence_summary && Object.keys(r.evidence_summary).length ? <EvidenceSummary value={r.evidence_summary} evidence={finding => refs(finding.evidence_ids)} /> : r.simple_summary ? <div className="mt-5 grid gap-4 sm:grid-cols-2">{(["strengths", "improvements"] as const).map(key => <section className={`rounded-2xl border p-4 ${key === "strengths" ? "border-emerald-100 bg-emerald-50/40" : "border-amber-100 bg-amber-50/40"}`} key={key}><h3 className="text-sm font-semibold text-slate-700">{key === "strengths" ? "Strengths" : "Areas to improve"}</h3>{r.simple_summary![key].length ? <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">{r.simple_summary![key].map((fact, i) => <li key={i}>{fact.text}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No additional points recorded.</p>}</section>)}</div> : null}
     <h3 className="mt-6 text-lg font-bold">Interview questions and scores</h3>
     {!r.interviews.length ? <p className="mt-2 text-sm text-slate-500">Interview not scored yet.</p> : null}
     {r.interviews.map(interview => <section key={interview.id} className="mt-3">
       {interview.pairs.filter(pair => pair.state !== "excluded").map(pair => <details key={pair.id} className="mt-3 rounded-xl border border-slate-200 p-4"><summary className="flex cursor-pointer items-start justify-between gap-4"><span className="font-medium text-slate-700">{pair.question}</span><span className="shrink-0 rounded-lg bg-blue-50 px-2 py-1 text-sm font-bold text-blue-700">{score(pair.score?.percentage)}</span></summary>
         <p className="mt-3 whitespace-pre-wrap text-sm"><strong>Answer: </strong>{pair.answer || "No answer recorded. This question scores zero."}</p>
+        {pair.score_unavailable_reason ? <p className="mt-3 text-sm text-amber-800">{pair.score_unavailable_reason}</p> : null}
+        {pair.interpretation?.status === "context_supported" ? <details className="mt-3 text-sm"><summary className="cursor-pointer text-blue-700">Transcription interpretation</summary><p className="mt-2 text-xs text-slate-500">Contextual reading used for analysis; original transcript is unchanged.</p>{pair.interpretation.notes.map((note, i) => <p key={i} className="mt-2">“{note.original.quote}” → {note.interpreted_as}. {note.reason}</p>)}</details> : null}
         <details className="mt-4"><summary className="cursor-pointer text-sm text-blue-700">Why this score?</summary>{Object.entries(pair.dimensions).map(([name, dimension]) => <section key={name} className="mt-4 text-sm"><h4 className="font-semibold">{dimensions[name] ?? text(name)}</h4><p className="mt-1">{dimension.simple_reason ?? dimension.finding}</p></section>)}</details>
       </details>)}
     </section>)}

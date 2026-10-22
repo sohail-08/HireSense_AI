@@ -73,3 +73,4 @@ class ReportData(Strict):
     policy: str
     score_summary: dict = Field(default_factory=dict)
     simple_summary: dict = Field(default_factory=dict)
+    evidence_summary: dict = Field(default_factory=dict)
