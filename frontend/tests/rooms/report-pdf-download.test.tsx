@@ -27,7 +27,7 @@ it("only prepares a PDF on click and downloads it automatically", async () => {
   expect(anchor.download).toBe("hiresense-report-12.pdf");
   expect(anchor.href).toBe("blob:synthetic-report");
   expect(document.body.contains(anchor)).toBe(false);
-  expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
+  await waitFor(() => expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false));
 });
 
 it("waits for preparation, prevents duplicate requests, and downloads when ready", async () => {

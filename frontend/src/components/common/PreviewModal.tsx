@@ -1,8 +1,8 @@
 import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export function PreviewModal({ title, children, onClose, busy = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean;
+export function PreviewModal({ title, children, onClose, busy = false, wide = false }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -22,7 +22,7 @@ export function PreviewModal({ title, children, onClose, busy = false }: {
   return createPortal(<dialog ref={dialog} aria-modal="true" aria-labelledby={heading} aria-busy={busy}
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
     onClick={event => { if (!busy && event.target === event.currentTarget) onClose(); }}
-    className="fixed inset-0 m-auto max-h-[90dvh] w-[94vw] max-w-2xl overflow-hidden rounded-3xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-sm">
+    className={`fixed inset-0 m-auto max-h-[90dvh] w-[94vw] ${wide ? "max-w-5xl" : "max-w-2xl"} overflow-hidden rounded-3xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/45 backdrop:backdrop-blur-sm`}>
     <div className="flex max-h-[90dvh] flex-col">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-blue-100 bg-blue-50/60 px-6 py-5">
         <h2 id={heading} className="text-xl font-bold">{title}</h2>
