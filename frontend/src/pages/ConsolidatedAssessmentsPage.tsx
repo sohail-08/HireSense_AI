@@ -84,7 +84,7 @@ export function ConsolidatedAssessmentsPage() {
     <section aria-label="Ranking settings" className="mb-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-end gap-4 p-5">
         <label className="min-w-0 flex-[1_1_16rem] text-xs font-semibold text-slate-600">Job posting<StyledSelect label="Job posting" disabled={busy || jobsLoading} className="mt-2" value={job === undefined ? "" : String(job)} placeholder={jobsLoading ? "Loading jobs…" : "Select a job"}
-          options={jobs.map(j => ({ value: String(j.id), label: j.title, description: `Posting #${j.id}` }))} onChange={value => {
+          options={jobs.map(j => ({ value: String(j.id), label: j.title, description: j.application_count == null ? undefined : `${j.application_count} ${j.application_count === 1 ? "candidate" : "candidates"}` }))} onChange={value => {
             setJob(Number(value)); setReport(undefined); setComparison(undefined); setParams({ job: value }); setSelectedApplicationIds([]);
           }} /></label>
         <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none" disabled={calculating || !job || !ranking?.candidates.length} onClick={() => void calculate()}>

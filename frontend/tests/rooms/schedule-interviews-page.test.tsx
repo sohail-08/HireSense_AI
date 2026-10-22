@@ -56,7 +56,7 @@ it("clears selection and page when switching jobs and restores context on unmoun
   fireEvent.click(await screen.findByRole("checkbox", { name: "Select Candidate 1 for interview" }));
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   fireEvent.click(screen.getByRole("combobox", { name: "Job posting" }));
-  fireEvent.click(screen.getByRole("option", { name: /Posting #2/ }));
+  fireEvent.click(screen.getByRole("option", { name: /Job 2/ }));
   await screen.findByText("Second job candidate");
   expect(screen.queryByText("Candidate 11")).toBeNull();
   expect(screen.getByText("Page 1 of 1")).toBeTruthy();
@@ -88,7 +88,7 @@ it("rejects late responses for a previously selected job", async () => {
   open();
   const selector = await screen.findByRole("combobox", { name: "Job posting" });
   await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/scoring/runs/10"));
-  fireEvent.click(selector); fireEvent.click(screen.getByRole("option", { name: /Posting #2/ }));
+  fireEvent.click(selector); fireEvent.click(screen.getByRole("option", { name: /Job 2/ }));
   await screen.findByText("Second job candidate");
   await act(async () => finish(response("/scoring/runs/10")));
   expect(screen.queryByText("Candidate 1")).toBeNull();

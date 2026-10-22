@@ -268,4 +268,6 @@ def test_gemini_prompt_and_schema_ground_both_decisions_without_real_model_calls
     assert "untrusted" in client.calls[0]["system_instruction"]
     assert "NOT sufficient" in client.calls[0]["system_instruction"]
     assert "Do not invent" in client.calls[1]["system_instruction"]
+    assert '"company_name": "BJIT"' in client.calls[1]["prompt"]
+    assert "never the employer from a retrieved source" in client.calls[1]["system_instruction"]
     assert "min_years_experience" in client.calls[1]["schema"]["properties"]

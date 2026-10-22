@@ -154,6 +154,8 @@ it("keeps assistant conversations available without a separate creation button",
   render(<JobDescriptionPage />); await screen.findByRole("list", { name: "Saved job cards" });
   expect(screen.queryByRole("button", { name: "Create with assistant" })).toBeNull();
   expect(supervisor.startNewWorkflow).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Start with/)).toBeNull();
+  expect(screen.getByText(/Your draft will appear here/)).toBeTruthy();
   expect(screen.queryByText("React")).toBeNull();
   expect(screen.queryByRole("button", { name: "Confirm requirements" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Generate job description" })).toBeNull();

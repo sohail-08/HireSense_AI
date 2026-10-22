@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.job_posting_branding import CONTACT_EMAIL, COMPANY_ADDRESS, POST_HEADING, posting_description
 from app.integrations.discord_mcp import (
     DiscordConfigurationError,
     DiscordDeliveryUncertainError,
@@ -84,7 +85,7 @@ class DiscordJobPostComposer:
         self._append_optional_field(
             fields,
             footer_lines,
-            "Location",
+            "Address",
             options.location,
         )
         self._append_optional_field(
@@ -210,7 +211,7 @@ class DiscordJobPostingService:
         options = self._options(data)
         composed = self.composer.compose(
             job_title=job.title,
-            job_description=job.content,
+            job_description=posting_description(job.content),
             options=options,
         )
 
@@ -299,6 +300,18 @@ class DiscordJobPostingService:
             )
         if not posting.discord_payload or not posting.reviewed_content:
             raise ValueError("Prepare and review the Discord post before publishing")
+
+        # Never publish a legacy snapshot while the UI displays updated company
+        # details. Re-saving creates an explicitly reviewed, consistent payload.
+        current = self.composer.compose(job_title=job.title,
+            job_description=posting_description(job.content),
+            options=self._options(DiscordPostPreviewRequest(
+                job_description_id=job.id, application_url=posting.application_url,
+                application_deadline=posting.application_deadline,
+                additional_instructions=posting.additional_instructions,
+            )))
+        if posting.discord_payload != current.payload or posting.reviewed_content != current.reviewed_content:
+            raise StaleJobDescriptionError("Company posting details changed. Save and review the preview again before publishing.")
 
         claimed = db.execute(
             update(JobPosting)
@@ -478,28 +491,12 @@ class DiscordJobPostingService:
             settings.job_post_default_application_url,
         )
         return DiscordPostOptions(
-            heading=data.heading or settings.discord_default_heading,
+            heading=POST_HEADING,
             application_url=(
                 str(application_url) if application_url is not None else None
             ),
-            contact_email=(
-                str(
-                    optional_value(
-                        "contact_email",
-                        settings.job_post_default_contact_email,
-                    )
-                )
-                if optional_value(
-                    "contact_email",
-                    settings.job_post_default_contact_email,
-                )
-                is not None
-                else None
-            ),
-            location=optional_value(
-                "location",
-                settings.job_post_default_location,
-            ),
+            contact_email=CONTACT_EMAIL,
+            location=COMPANY_ADDRESS,
             application_deadline=optional_value(
                 "application_deadline",
                 settings.job_post_default_application_deadline,

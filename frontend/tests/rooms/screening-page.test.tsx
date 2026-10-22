@@ -36,14 +36,14 @@ it("keeps the ordinary screening screen uncluttered when no CV failed", async ()
 
 it("places the job selector inside the ranking section and switches the selected job", async () => {
   vi.mocked(apiRequest).mockImplementation(async path => path === "/screening/jobs" ?
-    [1, 2].map(id => ({ id, title: "Synthetic Engineer", application_count: 1, pending_count: 0 })) :
+    [1, 2].map(id => ({ id, title: id === 1 ? "Backend Engineer" : "Frontend Engineer", application_count: 1, pending_count: 0 })) :
     { job_posting_id: Number(path.split("/").pop()), applications: [] });
   render(<ScreeningPage />);
   const controls = await screen.findByRole("region", { name: "Ranking controls" });
   expect(within(controls).getByLabelText("Job posting")).toBeTruthy();
   expect(within(controls).getByText(/1 candidate/)).toBeTruthy();
   fireEvent.click(within(controls).getByLabelText("Job posting"));
-  fireEvent.click(screen.getByRole("option", { name: /Posting #2/ }));
+  fireEvent.click(screen.getByRole("option", { name: /Frontend Engineer/ }));
   expect(await screen.findByText("Selected job 2")).toBeTruthy();
   expect(screen.getAllByLabelText("Job posting")).toHaveLength(1);
 });

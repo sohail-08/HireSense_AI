@@ -77,7 +77,10 @@ export function CandidatesPage() {
   const jobs = useMemo(() => {
     const options = new Map(postings.map(posting => [posting.id, posting.title]));
     applications.forEach(application => options.set(application.job_posting_id, application.job_title));
-    return Array.from(options, ([id, title]) => ({ id, title })).sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
+    return Array.from(options, ([id, title]) => ({ id, title,
+      publishedAt: postings.find(posting => posting.id === id)?.published_at,
+      candidateCount: applications.filter(application => application.job_posting_id === id).length,
+    })).sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
   }, [postings, applications]);
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -191,7 +194,9 @@ export function CandidatesPage() {
           </label>
           <label className="block text-xs font-medium text-slate-500" htmlFor="candidate-job">Job posting
             <StyledSelect id="candidate-job" label="Job posting" value={jobFilter} className="mt-1.5"
-              options={[{ value: "", label: "All job postings" }, ...jobs.map(job => ({ value: String(job.id), label: job.title, description: `Posting #${job.id}` }))]}
+              options={[{ value: "", label: "All job postings" }, ...jobs.map(job => ({ value: String(job.id), label: job.title,
+                description: [job.publishedAt ? `Published ${candidateDate(job.publishedAt)}` : "", `${job.candidateCount} ${job.candidateCount === 1 ? "candidate" : "candidates"}`].filter(Boolean).join(" · "),
+              }))]}
               onChange={value => { setJobFilter(value); setPage(1); setChecked([]); }} />
           </label>
         </div>
@@ -215,7 +220,7 @@ export function CandidatesPage() {
                   {selecting ? <td className="py-4 pl-5"><input type="checkbox" aria-label={`Select ${name}`} checked={checkedIds.includes(application.id)} disabled={bulkDeleting || (!checkedIds.includes(application.id) && checkedIds.length >= 100)} onChange={() => setChecked(checkedIds.includes(application.id) ? checkedIds.filter(id => id !== application.id) : [...checkedIds, application.id])} className="h-4 w-4 accent-blue-600" /></td> : null}
                   <td className="py-4 pl-5 pr-3 text-slate-400">{start + index + 1}</td>
                   <td className="px-3 py-4"><div className="min-w-[120px] max-w-[230px]"><p className="truncate font-semibold text-slate-900" title={name}>{name}</p><p className="mt-1 truncate text-xs text-slate-500" title={application.candidate.email || undefined}>{application.candidate.email || "No email provided"}</p></div></td>
-                  <td className="max-w-[190px] px-3 py-4"><p className="line-clamp-2 font-medium text-slate-700">{application.job_title}</p><p className="mt-1 text-xs text-slate-400">Posting #{application.job_posting_id}</p></td>
+                  <td className="max-w-[190px] px-3 py-4"><p className="line-clamp-2 font-medium text-slate-700">{application.job_title}</p></td>
                   <td className="hidden whitespace-nowrap px-3 py-4 text-xs text-slate-500 xl:table-cell">{candidateDate(application.submitted_at)}</td>
                   <td className="px-3 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${status.style}`}>{status.label}</span></td>
                   <td className="py-4 pl-3 pr-5 text-right"><button type="button" aria-label={`Inspect ${name}`} onClick={event => { inspectTrigger.current = event.currentTarget; setSelectedId(application.id); }}

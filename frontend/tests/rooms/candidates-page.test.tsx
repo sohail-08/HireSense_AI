@@ -23,7 +23,7 @@ let items = applications;
 
 function respond(path: string, options?: RequestInit): any {
   if (path === "/candidates/google-forms/configuration") return config;
-  if (path === "/candidates/job-postings") return [7, 8].map(id => ({ id, title: "Frontend Engineer" }));
+  if (path === "/candidates/job-postings") return [7, 8].map(id => ({ id, title: "Frontend Engineer", published_at: id === 7 ? "2026-10-20T04:00:00Z" : "2026-10-19T04:00:00Z" }));
   if (path === "/candidates/applications") return items;
   if (path === "/candidates/applications/1" && options?.method === "DELETE") return null;
   if (path === "/candidates/applications/bulk-delete" && options?.method === "POST") {
@@ -49,6 +49,7 @@ it("shows numbered candidates without setup, initials or a CV column", async () 
   openPage();
   expect(await screen.findByText("Ada Candidate")).toBeTruthy();
   const table = screen.getByRole("table");
+  expect(table.textContent).not.toContain("Posting #");
   expect(within(table).getAllByRole("row")).toHaveLength(3);
   expect(screen.queryByText(/F1|CV collection|Collected applications/)).toBeNull();
   expect(screen.queryByText("Application collection setup")).toBeNull();
@@ -62,7 +63,7 @@ it("shows numbered candidates without setup, initials or a CV column", async () 
 
 it("filters identical job titles by posting ID and combines that filter with search", async () => {
   openPage(); await screen.findByText("Ada Candidate");
-  selectOption("Job posting", /Posting #8/);
+  selectOption("Job posting", /Published 19 Oct 2026/);
   expect(screen.queryByText("Ada Candidate")).toBeNull();
   expect(screen.getByText("Grace Candidate")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Search candidates"), { target: { value: "ada@example.test" } });
@@ -86,6 +87,7 @@ it("opens details in a top-level modal and restores focus after closing", async 
   const trigger = await screen.findByRole("button", { name: "Inspect Ada Candidate" }); trigger.focus();
   fireEvent.click(trigger);
   const modal = screen.getByRole("dialog");
+  expect(modal.textContent).not.toContain("Posting #");
   expect(modal.parentElement).toBe(document.body);
   expect(within(modal).getByText("123456")).toBeTruthy();
   expect(within(modal).queryByText("Location")).toBeNull();
@@ -242,7 +244,7 @@ it("bounds page buttons for a large list and allows jumping to the last page", a
   fireEvent.click(screen.getByRole("button", { name: "Go to page 11" }));
   expect(screen.getByText("101–101 of 101 applications")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
-  selectOption("Job posting", /Posting #7/);
+  selectOption("Job posting", /Published 20 Oct 2026/);
   expect(screen.getByText("Page 1 of 11")).toBeTruthy();
 });
 

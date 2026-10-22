@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.agents.job_posting import GeminiPostingCommandModel
 from app.config import get_settings
+from app.job_posting_branding import CONTACT_EMAIL, COMPANY_ADDRESS, POST_HEADING, posting_description
 from app.database import get_db
 from app.integrations.discord_mcp import (
     DiscordConfigurationError,
@@ -82,15 +83,27 @@ def chat_with_discord_posting_assistant(
     response_model=DiscordPostDefaultsResponse,
 )
 def get_discord_post_defaults(
-    _interviewer: User = Depends(require_interviewer),
+    job_description_id: int | None = Query(default=None, gt=0),
+    db: Session = Depends(get_db),
+    interviewer: User = Depends(require_interviewer),
 ):
     settings = get_settings()
     service = _service()
+    content = None
+    if job_description_id is not None:
+        try:
+            job = service._owned_approved_job(db, job_description_id, interviewer.id)
+            content = posting_description(job.content)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
     return DiscordPostDefaultsResponse(
-        heading=settings.discord_default_heading,
+        job_description_content=content,
+        heading=POST_HEADING,
         application_url=settings.job_post_default_application_url,
-        contact_email=settings.job_post_default_contact_email,
-        location=settings.job_post_default_location,
+        contact_email=CONTACT_EMAIL,
+        location=COMPANY_ADDRESS,
         application_deadline=settings.job_post_default_application_deadline,
         additional_instructions=settings.job_post_default_instructions,
         mcp_configured=service.publisher.is_configured(),

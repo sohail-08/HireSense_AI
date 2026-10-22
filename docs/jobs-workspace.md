@@ -49,6 +49,34 @@ draft panels. It keeps the existing indigo theme and central assistant workflow.
 - `JobDescriptionEditor.tsx`: draft editing and readable saved descriptions.
 - `JobDescriptionPreview.tsx`: safe text-based Markdown subset rendering; no raw
   HTML or executable links. Saved content is used instead of stale structured data.
+- `DiscordPostPreview.tsx`: dark-blue role header, formatted JD body and separate
+  application-detail cards with readable deadlines and HTTP(S)-only links. This
+  preview does not publish on load. Heading, contact email and address are fixed
+  company details, not editable fields. The editor only collects the application
+  link, deadline and optional instructions. The backend owns the fixed values in
+  `backend/app/job_posting_branding.py`; clients cannot override them.
+  The contact email is `sohail.sh.ahmed@gmail.com` and the address is
+  `House-5/B, Road-2/E, Block-J, Baridhara, Dhaka 1212`.
+- The defaults endpoint accepts an optional, owner-checked `job_description_id`
+  and returns the same posting-specific body used by the publisher. The known
+  reference-employer alias “Northstar Digital” becomes “BJIT” in this body;
+  existing approved JDs, knowledge documents and published posts are not rewritten.
+  New JD prompts explicitly identify BJIT as the hiring employer. Legacy saved
+  previews with old company details must be refreshed before publication. In the
+  UI, **Publish to Discord** asks for one confirmation, saves the current details
+  (including any updated company defaults), then publishes the returned preview
+  ID. There is no separate save button. A failed save never reaches publication;
+  changed JD/company content requires reloading and reviewing it again. Inputs
+  and repeated submissions are locked while saving/publishing. Uncertain delivery
+  is never automatically retried. Existing backend confirmation and snapshot
+  safeguards also remain in force for chatbot posting.
+- Confirmed publication shows an accessible green success notification and closes
+  the editor and preview. Failed or unconfirmed publication keeps them open;
+  recovering a confirmed published status also shows success without retrying.
+  Publication history is not displayed; records and delivery safeguards are
+  retained internally. Job
+  selectors, candidate details, notifications and ranking omit visible posting
+  numbers while retaining IDs for API requests and selection.
 - `JobKnowledgeModal.tsx`: reference uploads and deletion.
 - `PreviewModal.tsx`: optional wide layout; default modals are unchanged.
 - `SupervisorProvider.tsx`: exposes its existing new-workflow reset to the page.

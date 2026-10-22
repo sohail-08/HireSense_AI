@@ -97,7 +97,7 @@ export function CandidateDetailsModal({ application, deleting, restoreFocus, onC
       </header>
       <div className="overflow-y-auto px-6 py-5">
         <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${status.style}`}>{status.label}</span>
-          <span className="text-xs text-slate-500">Application #{application.id} · Posting #{application.job_posting_id}</span></div>
+          <span className="text-xs text-slate-500">Application #{application.id}</span></div>
         <dl className="mt-5 grid gap-5 text-sm sm:grid-cols-2">
           <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-medium">{candidate.email ? <a href={`mailto:${encodeURIComponent(candidate.email)}`} className="text-blue-700 hover:underline">{candidate.email}</a> : "Not provided"}</dd></div>
           <div><dt className="text-slate-500">Phone</dt><dd className="mt-1 font-medium">{candidate.phone || "Not provided"}</dd></div>

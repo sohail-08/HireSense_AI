@@ -39,6 +39,17 @@ function inline(text: string) {
   });
 }
 
+export function JobDescriptionContent({ title, content }: { title: string; content: string }) {
+  return <div className="space-y-4 text-sm leading-7 text-slate-600 [overflow-wrap:anywhere]">
+    {blocksFor(content, title).map((block, index) => {
+      if (block.kind === "heading") return <h4 key={index} className="flex items-center gap-2 border-t border-slate-100 pt-5 text-base font-semibold text-slate-900"><span aria-hidden="true" className="h-4 w-1 shrink-0 rounded-full bg-blue-600" />{inline(block.lines[0])}</h4>;
+      if (block.kind === "bullets") return <ul key={index} className="list-disc space-y-2 pl-5 marker:text-blue-500">{block.lines.map((line, i) => <li key={i} className="pl-1">{inline(line)}</li>)}</ul>;
+      if (block.kind === "numbers") return <ol key={index} start={block.start} className="list-decimal space-y-2 pl-5 marker:font-semibold marker:text-blue-700">{block.lines.map((line, i) => <li key={i} className="pl-1">{inline(line)}</li>)}</ol>;
+      return <p key={index} className="whitespace-pre-line">{inline(block.lines.join("\n"))}</p>;
+    })}
+  </div>;
+}
+
 export function JobDescriptionPreview({ title, content }: { title: string; content: string }) {
   return <article aria-label="Job description preview" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
     <header className="border-b border-blue-100 bg-linear-to-br from-blue-50 via-white to-violet-50/60 px-5 py-6 sm:px-7">
@@ -47,13 +58,8 @@ export function JobDescriptionPreview({ title, content }: { title: string; conte
       </div>
       <h3 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{title}</h3>
     </header>
-    <div className="space-y-4 px-5 py-6 text-sm leading-7 text-slate-600 [overflow-wrap:anywhere] sm:px-7">
-      {blocksFor(content, title).map((block, index) => {
-        if (block.kind === "heading") return <h4 key={index} className="flex items-center gap-2 border-t border-slate-100 pt-5 text-base font-semibold text-slate-900"><span aria-hidden="true" className="h-4 w-1 shrink-0 rounded-full bg-blue-600" />{inline(block.lines[0])}</h4>;
-        if (block.kind === "bullets") return <ul key={index} className="list-disc space-y-2 pl-5 marker:text-blue-500">{block.lines.map((line, i) => <li key={i} className="pl-1">{inline(line)}</li>)}</ul>;
-        if (block.kind === "numbers") return <ol key={index} start={block.start} className="list-decimal space-y-2 pl-5 marker:font-semibold marker:text-blue-700">{block.lines.map((line, i) => <li key={i} className="pl-1">{inline(line)}</li>)}</ol>;
-        return <p key={index} className="whitespace-pre-line">{inline(block.lines.join("\n"))}</p>;
-      })}
+    <div className="px-5 py-6 sm:px-7">
+      <JobDescriptionContent title={title} content={content} />
     </div>
   </article>;
 }

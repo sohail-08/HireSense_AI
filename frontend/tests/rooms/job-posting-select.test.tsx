@@ -19,17 +19,20 @@ it("renders a styled popup outside clipped cards and identifies the selected job
   render(<Example />);
   const trigger = screen.getByRole("combobox", { name: "Job posting" });
   expect(trigger.textContent).toContain("Machine Learning Engineer");
-  expect(trigger.textContent).toContain("Posting #7 · 1 candidate");
+  expect(trigger.textContent).toContain("1 candidate");
+  expect(trigger.textContent).not.toContain("Posting #");
   fireEvent.click(trigger);
   const list = screen.getByRole("listbox", { name: "Job posting" });
   expect(list.parentElement).toBe(document.body);
   expect(list.style.position).toBe("fixed");
   expect(within(list).getAllByRole("option")).toHaveLength(3);
-  expect(within(list).getByRole("option", { selected: true }).textContent).toContain("Posting #7");
-  fireEvent.click(within(list).getByRole("option", { name: /Posting #6/ }));
+  expect(within(list).getByRole("option", { selected: true }).textContent).toContain("Machine Learning Engineer");
+  expect(list.textContent).not.toContain("Posting #");
+  fireEvent.click(within(list).getByRole("option", { name: /Frontend Engineer.*4 candidates/ }));
   expect(screen.queryByRole("listbox")).toBeNull();
   expect(trigger.textContent).toContain("Frontend Engineer");
-  expect(trigger.textContent).toContain("Posting #6 · 4 candidates");
+  expect(trigger.textContent).toContain("4 candidates");
+  expect(trigger.getAttribute("data-selected-value")).toBe("6");
 });
 
 it("supports arrows, Home, End, Enter and Escape without changing jobs on navigation", async () => {
@@ -37,16 +40,16 @@ it("supports arrows, Home, End, Enter and Escape without changing jobs on naviga
   const trigger = screen.getByRole("combobox"); trigger.focus();
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
-  expect(trigger.getAttribute("aria-activedescendant")).toBe(screen.getByRole("option", { name: /Posting #6/ }).id);
-  expect(trigger.textContent).toContain("Posting #7");
+  expect(trigger.getAttribute("aria-activedescendant")).toBe(screen.getByRole("option", { name: /Frontend Engineer.*4 candidates/ }).id);
+  expect(trigger.getAttribute("data-selected-value")).toBe("7");
   fireEvent.keyDown(trigger, { key: "End" });
   fireEvent.keyDown(trigger, { key: "Enter" });
-  expect(trigger.textContent).toContain("Posting #9");
+  expect(trigger.getAttribute("data-selected-value")).toBe("9");
   await waitFor(() => expect(document.activeElement).toBe(trigger));
   fireEvent.keyDown(trigger, { key: "Home" });
   fireEvent.keyDown(trigger, { key: "Escape" });
   expect(screen.queryByRole("listbox")).toBeNull();
-  expect(trigger.textContent).toContain("Posting #9");
+  expect(trigger.getAttribute("data-selected-value")).toBe("9");
   expect(document.activeElement).toBe(trigger);
 });
 
@@ -55,11 +58,11 @@ it("supports type-ahead and lets Tab move to the next control", async () => {
   render(<Example />);
   const trigger = screen.getByRole("combobox"); trigger.focus();
   await user.keyboard("fro");
-  expect(trigger.getAttribute("aria-activedescendant")).toBe(screen.getByRole("option", { name: /Posting #6/ }).id);
+  expect(trigger.getAttribute("aria-activedescendant")).toBe(screen.getByRole("option", { name: /Frontend Engineer.*4 candidates/ }).id);
   await user.tab();
   expect(screen.queryByRole("listbox")).toBeNull();
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Outside action" }));
-  expect(trigger.textContent).toContain("Posting #7");
+  expect(trigger.getAttribute("data-selected-value")).toBe("7");
 });
 
 it("dismisses on outside clicks and focus changes", async () => {
