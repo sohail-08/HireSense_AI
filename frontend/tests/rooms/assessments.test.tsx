@@ -10,8 +10,8 @@ function fixture(): Assessment {
   return { id: 1, version: 2, application_id: 101, job_posting_id: 1, status: "completed", stage: "completed", completeness: "partial", review_status: "not_reviewed", stale: true,
     created_at: "2026-10-20T05:00:00Z", missing: [], notes: [], selection_policy: "latest-completed",
     result: { identification: { application_id: 101, job_posting_id: 1, candidate_name: "Synthetic Alpha", job_title: "Backend Engineer", requirement_version: "v1" },
-      cv: null, completeness: "partial", missing: [], flags: [], policy: "CV 50% + interview 50%",
-      score_summary: { cv_score: "80", interview_score: "60", final_score: "70", ready: true, question_count: 1, unanswered_count: 0, reason: "The final score combines the CV score and the interview score, with equal weight." },
+      cv: null, completeness: "partial", missing: [], flags: [], policy: "CV 40% + interview 60%",
+      score_summary: { cv_score: "80", interview_score: "60", final_score: "68", cv_weight: 40, interview_weight: 60, ready: true, question_count: 1, unanswered_count: 0, reason: "The final score weights the CV score at 40% and the interview score at 60%." },
       simple_summary: { strengths: [{ text: "The interview answer showed database transactions.", evidence_ids: ["source"] }], improvements: [] },
       evidence: { source: { id: "source", kind: "transcript", quote: "I test atomic transactions.", locator: "Candidate · 00:03", source_version: "test" } },
       matrix: [], interviews: [{ id: 1, date: "2026-10-20", analysis_id: 1, analysis_version: 1, rubric_version: "v2", limitations: [], pairs: [{ id: "q1", question: "How do you test transactions?", answer: "I test atomic transactions.", state: "analyzed", evidence_ids: ["source"], score: { percentage: 60 }, dimensions: { relevance: { label: "direct", finding: "The answer addressed the question.", evidence_ids: ["source"], gaps: [] } } }] }],
@@ -20,6 +20,33 @@ function fixture(): Assessment {
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(assessmentApi.export).mockResolvedValue({ id: 5, status: "failed", format: "pdf", error: "PDF renderer unavailable." }); });
 
 describe("simple candidate details", () => {
+  it("keeps historical report weights and totals instead of relabelling them", () => {
+    const report = fixture();
+    report.result.score_summary = { ...report.result.score_summary!, cv_weight: 50, interview_weight: 50, final_score: "70", reason: "Saved 50/50 calculation." };
+    render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
+    expect(screen.getByText(/CV 50% \+ interview 50%/)).toBeTruthy();
+    expect(screen.getByText("70.00%")).toBeTruthy();
+    expect(screen.queryByText(/CV 40% \+ interview 60%/)).toBeNull();
+  });
+  it("replaces the old summary with four traceable categories in new reports", async () => {
+    const report = fixture();
+    report.result.evidence_summary = {
+      strengths: [{ text: "Supported atomicity explanation.", evidence_ids: ["source", "source"] }], weaknesses: [],
+      evidence_gaps: [{ text: "Failure testing was not explored.", evidence_ids: ["source"] }],
+      verification: [{ text: "Confirm the contextual transcription reading.", evidence_ids: ["source"] }],
+    };
+    const saved = JSON.stringify(report);
+    render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
+    const summary = screen.getByRole("region", { name: "Candidate performance" });
+    for (const name of ["Strengths", "Areas to improve", "Not yet assessed", "Needs checking"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
+    const strengths = within(summary).getByRole("region", { name: "Strengths" });
+    fireEvent.click(within(strengths).getByText("Sources"));
+    expect(await within(strengths).findByText(/Candidate · 00:03/)).toBeTruthy();
+    expect(strengths.querySelectorAll("blockquote")).toHaveLength(1);
+    expect(screen.queryByText("Evidence summary")).toBeNull();
+    expect(JSON.stringify(report)).toBe(saved);
+    expect(assessmentApi.export).not.toHaveBeenCalled();
+  });
   it("formats scores exactly and keeps missing scores distinct from zero", () => {
     expect(score("2.675000")).toBe("2.68%");
     expect(score("0E-60")).toBe("0.00%");
@@ -28,7 +55,8 @@ describe("simple candidate details", () => {
   it("shows three scores and plain reasons without technical controls", () => {
     render(<MemoryRouter><AssessmentView report={fixture()} /></MemoryRouter>);
     expect(screen.getByText("80.00%")).toBeTruthy();
-    expect(screen.getByText("70.00%")).toBeTruthy();
+    expect(screen.getByText("68.00%")).toBeTruthy();
+    expect(screen.getByText(/CV 40% \+ interview 60%/)).toBeTruthy();
     expect(screen.getByText(/These are saved results/)).toBeTruthy();
     expect(screen.getByText("The interview answer showed database transactions.")).toBeTruthy();
     expect(screen.queryByText("Requirement evidence matrix")).toBeNull();
@@ -54,10 +82,10 @@ describe("simple candidate details", () => {
     expect((screen.getByRole("button", { name: "Download this report" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByText("Prepare HTML / print")).toBeNull();
     expect(screen.queryByText("Prepare PDF")).toBeNull();
-    expect(screen.getByText("70.00%")).toBeTruthy();
+    expect(screen.getByText("68.00%")).toBeTruthy();
     expect(screen.getByText("80.00%").className).toContain("text-teal-800");
     expect(screen.getAllByText("60.00%")[0].className).toContain("text-violet-800");
-    expect(screen.getByText("70.00%").className).toContain("text-blue-700");
+    expect(screen.getByText("68.00%").className).toContain("text-blue-700");
   });
   it("prints the answer once even when all scoring categories cite it", () => {
     const report = fixture();
@@ -130,7 +158,7 @@ describe("simple candidate details", () => {
     render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
     fireEvent.click(screen.getByText("CV evidence"));
     expect(screen.getByText("Built transaction tests.")).toBeTruthy();
-    expect(screen.getByText("CV page 1")).toBeTruthy();
+    expect(screen.getByText(/CV page 1 · Source version v1/)).toBeTruthy();
   });
   it("does not invent final scores for older saved reports", () => {
     const r = fixture(); delete r.result.score_summary;

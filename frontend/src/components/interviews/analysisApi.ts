@@ -13,12 +13,17 @@ export type AnswerScore = { percentage: number; earned: number; possible: number
   breakdown: Record<"relevance" | "accuracy" | "completeness" | "quality", { value: number; weight: number; status: "met" | "partially_met" | "unmet"; reason: string }> };
 export type Pair = PairEdit & { state: string; flags: string[]; pairing_confidence: string; pairing_reasons: string[];
   score?: AnswerScore;
-  analysis_error?: string; assessment?: Record<"relevance" | "accuracy" | "completeness" | "quality", Dimension> & { expected_elements: string[]; expected_elements_basis: string };
+  score_unavailable_reason?: string;
+  analysis_error?: string; assessment?: Record<"relevance" | "accuracy" | "completeness" | "quality", Dimension> & { expected_elements: string[]; expected_elements_basis: string;
+    interpretation?: { status: string; meaning: string; support_status?: string; notes: { original: Citation; interpreted_as: string; reason: string; context: Citation[] }[] } };
   mappings?: Mapping[]; suggestions?: Suggestion[] };
+export type InterviewSummaryFinding = { id: string; text: string; summary_text?: string; rule: string; pair_id: string | null; citations: Citation[];
+  references: Dimension["references"]; source: { kind?: string; requirement_id?: string; version?: string; state?: string } };
 export type Reference = { id: string; title: string; kind: "answer_guide" | "technical_reference"; content: string; requirement_ids: string[]; version?: string };
 export type AnalysisRun = { id: number; version: number; status: string; stage: string; stale: boolean; error?: string; created_at: string;
   snapshot: { segments: Segment[]; requirements: { requirements: { key: string; name: string }[] }; references: Reference[]; requirement_version: string };
   result: { pairs?: Pair[]; coverage?: { requirement_id: string; name: string; statuses: string[]; evidence: Mapping[]; coverage_status?: string; question_pair_ids?: string[] }[]; gaps?: string[];
+    evidence_summary?: Record<"strengths" | "weaknesses" | "evidence_gaps" | "verification", InterviewSummaryFinding[]>;
     unpaired?: {segment_id: string; kind: string}[]; reconciled?: boolean };
   reviews: { id: number; kind: string; target_id: string; payload: { note?: string; segment_ids?: string[] }; created_at: string }[] };
 export type AnalysisState = { run: AnalysisRun | null; automatic: boolean; reference_revision: number; references: Reference[];

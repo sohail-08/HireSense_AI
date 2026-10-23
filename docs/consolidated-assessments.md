@@ -19,6 +19,14 @@
    a PDF in one step. The button shows progress and can be retried if preparation
    or download fails. Ranking/comparison exports retain their existing formats.
 
+**Candidate performance** replaces the verbose evidence-summary grid. Strengths and
+areas to improve are short, grouped highlights (three visible per card). Unassessed
+topics and verification points stay in separate collapsed sections. Use **Show all**
+for additional highlights or **Sources** for original explanations and evidence.
+The concise wording is a deterministic presentation of validated labels and source
+statuses, not a new AI judgment. Original findings, scores and 40/60 weights are
+unchanged; existing saved reports adopt the presentation without being regenerated.
+
 The main screen does not expose source hashes, requirement matrices, review
 checkboxes, version selectors, or a multi-step comparison form. Evidence is optional
 to inspect, not a gate that blocks the ranking. The existing CV Assessments page
@@ -32,9 +40,16 @@ is started by opening, searching, paging or inspecting the ranking.
 
 The interviewer approved this fixed formula:
 
-**Final score = CV score × 50% + interview score × 50%.**
+**Final score = CV score × 40% + interview score × 60%.**
 
-For example, CV 80% and interview 60% give a final score of 70%.
+For example, CV 80% and interview 60% give a final score of 68%.
+
+Formula `cv40-interview60-v2` replaces the previous 50/50 policy. Click **Calculate
+final ranking** to update existing totals. Validated interview grades and CV scores
+are reused; changing these weights does not itself require another AI assessment.
+Historical reports retain their saved weights and totals, and old rankings/reports
+are marked outdated. Reports with different final weighting policies cannot share
+a new combined rank. Screen and export formula captions use each report's saved weights.
 
 The interview score is the average score of all included interview questions.
 Each question uses the saved answer rubric: relevance, correctness, completeness,
@@ -106,7 +121,7 @@ and bounded by a hard subprocess deadline. A failed export cannot invalidate sco
 
 The supplied WBS rows 36–42 and business requirements Features 5–6 cover question
 answer analysis, consolidated assessment, reports and candidate comparison. This
-simpler UI retains those functions while using the interviewer's approved 50/50
+simpler UI retains those functions while using the interviewer's approved 40/60
 policy. The original WBS spreadsheet and requirements PDF were not modified.
 
 ## Verification and synthetic samples

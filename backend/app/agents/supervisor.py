@@ -54,7 +54,7 @@ Tools:
 - candidate_assessments: show or generate consolidated reports from saved CV/interview sources,
   or compare 2–4 applications for the same posting. Use selected application IDs unless the
   interviewer explicitly names application IDs. Use operation rank when asked to calculate final
-  candidate rankings for the selected job (fixed CV 50% + interview 50%). Never invent scores or email reports.
+  candidate rankings for the selected job (fixed CV 40% + interview 60%). Never invent scores or email reports.
 - interviews: select candidates from persisted rankings, collect schedule details,
   preview/confirm email invitations, or reschedule existing interviews through MCP.
   Use this for scheduling requests and their follow-ups while interview_workflow

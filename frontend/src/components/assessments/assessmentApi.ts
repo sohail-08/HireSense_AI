@@ -11,12 +11,14 @@ export type CV = { final_score: string | null; categories: Record<string, string
   document_id: number; original_cv_rank: number | null; original_cohort: number[]; configuration_id: number; formula_version: string;
   written_justification: string; configuration: { category_weights: Record<string, string> }; breakdown: { counts: Record<string, number> } };
 export type ReportData = { identification: { application_id: number; job_posting_id: number; candidate_name: string; job_title: string; requirement_version: string };
-  score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; ready: boolean; reason: string; question_count: number; unanswered_count: number };
+  score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; cv_weight?: number; interview_weight?: number; formula_version?: string; ready: boolean; reason: string; question_count: number; unanswered_count: number };
   simple_summary?: { strengths: { text: string; evidence_ids: string[] }[]; improvements: { text: string; evidence_ids: string[] }[] };
+  evidence_summary?: Record<"strengths" | "weaknesses" | "evidence_gaps" | "verification", { text: string; summary_text?: string; evidence_ids: string[] }[]>;
   cv: CV | null; completeness: string; missing: string[]; flags: string[]; policy: string; evidence: Record<string, Evidence>; matrix: MatrixRow[];
   summary: { position: Fact[]; strengths: Fact[]; limitations: Fact[]; verification: Fact[]; basis: string };
   interviews: { id: number; date: string; analysis_id: number | null; analysis_version: number | null; rubric_version: string | null;
     limitations: string[]; pairs: { id: string; question: string; answer: string; state: string; evidence_ids: string[]; score?: { percentage: number };
+    score_unavailable_reason?: string; interpretation?: { status: string; meaning: string; notes: { interpreted_as: string; reason: string; original: { quote: string } }[] };
     dimensions: Record<string, { label: string; finding: string; simple_reason?: string; evidence_ids: string[]; gaps: string[] }> }[] }[] };
 export type Assessment = { id: number; version: number; application_id: number; job_posting_id: number; status: string; stage: string;
   completeness: string; review_status: string; stale: boolean; missing: string[]; error?: string; created_at: string; completed_at?: string;

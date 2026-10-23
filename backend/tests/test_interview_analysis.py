@@ -43,7 +43,7 @@ def classify(segments, kinds):
 def snapshot(segments, complete=True):
     return {"segments": segments, "complete": complete, "finalize_last": False, "previous_turns": [], "previous_pairs": [],
             "requirements": {"requirements": [{"key": "required_skill:0", "name": "Database transactions"}, {"key": "required_skill:1", "name": "Testing"}]},
-            "requirement_version": "requirements-v1", "references": [], "prompt_version": "test-v1", "rubric_version": "test-v1",
+            "requirement_version": "requirements-v1", "references": [{"id": "guide", "kind": "answer_guide", "title": "Transactions testing", "content": "Transactions are atomic.", "version": "v1"}], "prompt_version": "test-v1", "rubric_version": "test-v1",
             "model": "mock", "gaps": [], "watermark": {s["id"]: s["hash"] for s in segments}}
 
 
@@ -70,8 +70,14 @@ class Model:
         if title == "Assessment":
             def dimension(label):
                 return {"label": label, "justification": "The candidate describes transactions.", "citations": [quote] if quote else [], "references": [], "flags": [], "evidence_gaps": []}
-            return {"relevance": dimension("direct"), "accuracy": dimension("supported"), "completeness": dimension("complete"), "quality": dimension("clear"),
+            result = {"relevance": dimension("direct"), "accuracy": dimension("supported"), "completeness": dimension("complete"), "quality": dimension("clear"),
+                    "interpretation": {"status": "faithful", "meaning": "The candidate describes transactions.", "citations": [quote] if quote else [], "notes": []},
                     "expected_elements": ["Explain transaction atomicity"], "expected_elements_basis": "approved_guide"}
+            if data["approved_references"]:
+                ref = data["approved_references"][0]
+                for name in ("accuracy", "completeness"):
+                    result[name]["references"] = [{"reference_id": ref["id"], "quote": ref["content"][:200]}]
+            return result
         if title == "Mappings":
             return {"mappings": [{"requirement_id": "required_skill:0", "status": "contradictory_evidence" if self.contradictory else "supporting_evidence",
                                   "explanation": "Transaction example", "citations": [quote], "flags": []}]}
@@ -145,21 +151,24 @@ def test_quote_provenance_rejects_cross_interview_and_wrong_answer_association(c
 
 def test_no_reference_accuracy_unverified_provisional_rubric_and_unassessed_requirements():
     items = [segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I used transactions in my project.")]
-    result = execute(snapshot(items))
+    data = snapshot(items)
+    data["references"] = []
+    result = execute(data)
     assessment = result["pairs"][0]["assessment"]
     assert assessment["accuracy"]["label"] == "unable_to_verify"
     assert assessment["expected_elements_basis"] == "provisional"
     assert result["coverage"][1]["statuses"] == ["not_assessed"]
     assert "unmet" not in json.dumps(result["coverage"])
-    assert result["pairs"][0]["score"]["breakdown"]["accuracy"]["value"] == 0
+    assert result["pairs"][0]["state"] == "analysis_failed"
+    assert "score" not in result["pairs"][0]
 
 
 @pytest.mark.parametrize("bad_quote,supported", [(True, True), (False, False)])
 def test_fabricated_quotes_and_valid_quotes_with_unsupported_conclusions(bad_quote, supported):
     result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I use transactions.")]), Model(bad_quote=bad_quote, supported=supported))
     pair = result["pairs"][0]
-    assert pair["state"] == "analyzed"
-    assert pair["score"]["percentage"] == 0
+    assert pair["state"] == "needs_clarification"
+    assert "score" not in pair
     assert pair["assessment"]["relevance"]["label"] == "not_assessed"
     assert pair["mappings"][0]["status"] == "insufficient_evidence"
     if bad_quote: assert pair["assessment"]["relevance"]["citations"] == []
@@ -233,13 +242,13 @@ def test_unanswered_is_zero_procedural_excluded_and_in_progress_are_not_scored()
     assert "score" not in present_result({"pairs": [excluded]})["pairs"][0]
 
 
-def test_legacy_review_results_receive_scores_without_mutating_saved_results():
+def test_legacy_unverified_results_are_not_converted_to_zero_without_mutating_saved_results():
     result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I commit atomically.")]))
     result["pairs"][0]["state"] = "needs_review"
     result["pairs"][0]["assessment"]["accuracy"]["support_status"] = "needs_review"
     shown = present_result(result)
-    assert shown["pairs"][0]["state"] == "analyzed"
-    assert shown["pairs"][0]["score"]["percentage"] == 50
+    assert shown["pairs"][0]["state"] == "analysis_failed"
+    assert "score" not in shown["pairs"][0]
     assert "needs_review" not in json.dumps(shown)
     assert result["pairs"][0]["state"] == "needs_review"
 
@@ -256,7 +265,7 @@ def test_provider_failures_are_errors_and_do_not_create_a_review_gate(failed_sta
     if failed_stage == "Assessment":
         assert pair["state"] == "analysis_failed" and "score" not in pair
     else:
-        assert pair["state"] == "analyzed" and pair["score"]["percentage"] == 50
+        assert pair["state"] == "analyzed" and pair["score"]["percentage"] == 100
 
 
 @pytest.fixture
@@ -511,6 +520,28 @@ def test_automatic_reconciliation_and_no_model_calls_on_refresh(saved):
     t.analysis.tick()
     t.db.expire_all()
     assert t.analysis.latest(t.db, t.row.id).result["reconciled"] is True
+
+
+@pytest.mark.parametrize("field", ["prompt_version", "pairing_version", "rubric_version", "model"])
+def test_deployment_does_not_automatically_regrade_saved_interviews(saved, field):
+    t = saved
+    run = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
+    t.analysis.process(run.id)
+    t.db.expire_all()
+    run = t.db.get(InterviewAnalysisRun, run.id)
+    run.snapshot = {**copy.deepcopy(run.snapshot), field: "previous-deployment"}
+    run.fingerprint = f"previous-{field}"
+    control = t.db.get(InterviewAnalysisControl, t.row.id)
+    control.checked_at = datetime.now(timezone.utc) - timedelta(seconds=25)
+    t.db.commit()
+    before = len(t.analysis.model.calls)
+    t.analysis.tick()
+    t.db.expire_all()
+    assert t.analysis.latest(t.db, t.row.id).id == run.id
+    assert len(t.analysis.model.calls) == before
+    assert t.db.get(InterviewAnalysisControl, t.row.id).automatic
+    explicit = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(reanalyze=True))
+    assert explicit.id != run.id and explicit.status == "queued"
 
 
 def test_chatbot_reads_saved_analysis_and_queues_only_when_stale(saved):

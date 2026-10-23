@@ -178,7 +178,7 @@ twenty-candidate throughput. Expand the labelled evaluation before production.
 Results are saved under ignored `output/cv-screening-benchmark-validated.json`.
 The actual PostgreSQL `vector(768)` retrieval/isolation probe also passed, with
 all synthetic inserts rolled back. No real candidates were rescored during these
-checks. Existing CV category weights and the CV/interview 50/50 final weighting
+checks. Existing CV category weights and the CV/interview 40/60 final weighting
 were preserved; historical scores were not overwritten.
 
 To verify the actual PostgreSQL vector operator and CV-local scope after upgrading:

@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import uuid4
 from sqlalchemy import select
 from app.database import SessionLocal
-from app.agents.interview_analysis import digest
+from app.agents.interview_analysis import digest, PROMPT_VERSION, RUBRIC_VERSION, PAIRING_VERSION
 from app.assessments.sources import resolve_sources
 from app.assessments.final_scoring import FORMULA_VERSION, POLICY, rank_reports
 from app.models.assessment import AssessmentComparison, AssessmentRun
@@ -24,7 +24,7 @@ def source_identity(source):
 
 
 def needs_answer_scoring(result, rubric):
-    return any(not p.get("score") or p["state"] not in {"analyzed", "unanswered"} or
+    return rubric != RUBRIC_VERSION or any(not p.get("score") or p["state"] not in {"analyzed", "unanswered"} or
         p["score"].get("rubric_version") != rubric for p in result.get("pairs", [])
         if not p.get("excluded") and p.get("state") != "excluded")
 
@@ -56,7 +56,7 @@ class FinalRankingService:
             .order_by(CandidateApplication.id)))
         if not ids: raise ValueError("No candidates have applied for this job yet.")
         sources = [resolve_sources(db, user_id, app_id, GenerateAssessment()) for app_id in ids]
-        fingerprint = digest([FORMULA_VERSION, [source_identity(s) for s in sources]])
+        fingerprint = digest([FORMULA_VERSION, self.scoring_policy(), [source_identity(s) for s in sources]])
         existing = db.scalar(select(AssessmentComparison).where(AssessmentComparison.job_posting_id == job_id,
             AssessmentComparison.fingerprint == fingerprint))
         if existing and unexpired(existing):
@@ -74,6 +74,7 @@ class FinalRankingService:
             "scoring_run_id": (s.get("cv") or {}).get("scoring_run_id"), "analysis_ids": [], "analysis_requested": False,
             "assessment_id": None} for s in sources]
         snapshot = {"kind": "final_ranking", "status": "processing", "stage": "scoring_answers", "policy": POLICY,
+            "scoring_policy": self.scoring_policy(),
             "basis": "Final candidate ranking", "formula_version": FORMULA_VERSION, "plans": plans,
             "selected_cohort_application_ids": ids, "source_interview_ids": [i for p in plans for i in p["interview_ids"]],
             "assessment_ids": [], "assessments": [], "incompatibilities": [], "interview_incompatibilities": [],
@@ -102,7 +103,7 @@ class FinalRankingService:
         self.owned_job(db, user_id, row.job_posting_id)
         snapshot = row.snapshot
         current_ids = list(db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == row.job_posting_id)))
-        stale = sorted(current_ids) != sorted(snapshot["selected_cohort_application_ids"])
+        stale = sorted(current_ids) != sorted(snapshot["selected_cohort_application_ids"]) or snapshot.get("scoring_policy") != self.scoring_policy() or snapshot.get("formula_version") != FORMULA_VERSION
         candidates = []
         saved = {r["application_id"]: r for r in snapshot.get("assessments", [])}
         service = AssessmentService(session_factory=self.factory)
@@ -123,6 +124,10 @@ class FinalRankingService:
         return {"id": row.id, "status": snapshot["status"], "stage": snapshot["stage"], "policy": POLICY,
             "candidates": candidates, "stale": stale, "incompatibilities": snapshot.get("incompatibilities", []),
             "error": snapshot.get("error")}
+
+    @staticmethod
+    def scoring_policy():
+        return {"prompt": PROMPT_VERSION, "rubric": RUBRIC_VERSION, "pairing": PAIRING_VERSION}
 
     def tick(self):
         with self.factory() as db:

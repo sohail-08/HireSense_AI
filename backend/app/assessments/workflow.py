@@ -6,8 +6,8 @@ from langgraph.graph import START, END, StateGraph
 from app.agents.interview_analysis import canonical_quote, digest, provider_schema
 from app.schemas.assessment import SummarySelection, ReportData
 
-PROMPT_VERSION = "consolidation-final-score-v2"
-POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 50% + interview 50%."
+PROMPT_VERSION = "consolidation-evidence-summary-v4-cv40-interview60"
+POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 40% + interview 60%."
 
 
 class State(TypedDict, total=False):
@@ -22,6 +22,7 @@ def build_report(snapshot):
     cv = snapshot["cv"]
     evidence, facts, matrix, interviews = {}, [], [], []
     flags, missing = list(snapshot["flags"]), list(snapshot["missing"])
+    evidence_summary = {key: [] for key in ("strengths", "weaknesses", "evidence_gaps", "verification")}
     def add_evidence(key, **value):
         evidence[key] = {"id": key, **value}
         return key
@@ -90,6 +91,21 @@ def build_report(snapshot):
             p = {"id": pair["id"], "state": pair["state"], "question": "\n".join(allowed[i]["text"] for i in pair["question_ids"]),
                  "answer": "\n".join(allowed[i]["text"] for i in pair["answer_ids"]), "dimensions": {},
                  "score": copy.deepcopy(pair.get("score")), "notes": list(pair.get("flags", []))}
+            interpretation = (pair.get("assessment") or {}).get("interpretation") or {}
+            meaning_verified = not interpretation or (interpretation.get("support_status") == "supported_by_check" and interpretation.get("status") != "uncertain")
+            if interpretation:
+                citations = interpretation.get("citations", [])
+                if not citations or len(quotes(citations, pair["answer_ids"])) != len(citations): meaning_verified = False
+                for note in interpretation.get("notes", []):
+                    if not quotes([note["original"]], all_ids, note["original"].get("speaker")): meaning_verified = False
+                    if not note.get("context"): meaning_verified = False
+                    for cite in note.get("context", []):
+                        if not quotes([cite], all_ids, cite.get("speaker")): meaning_verified = False
+                if interpretation.get("status") == "context_supported" and not interpretation.get("notes"):
+                    meaning_verified = False
+            p["interpretation"] = copy.deepcopy(interpretation) if meaning_verified else None
+            if not meaning_verified: p["score"] = None
+            p["score_unavailable_reason"] = pair.get("score_unavailable_reason")
             p["excluded"] = bool(pair.get("excluded"))
             p["evidence_ids"] = []
             for role, ids in (("INTERVIEWER", pair["question_ids"]), ("CANDIDATE", pair["answer_ids"])):
@@ -102,13 +118,13 @@ def build_report(snapshot):
                 dim = (pair.get("assessment") or {}).get(name)
                 if not dim: continue
                 refs = quotes(dim.get("citations", []), pair["answer_ids"])
-                validated = dim.get("support_status") == "supported_by_check" and bool(refs)
+                validated = meaning_verified and dim.get("support_status") == "supported_by_check" and bool(refs)
                 if not validated:
                     flags.append(f"Interview #{interview['id']}: a saved {name} finding lacks validated logical support")
                 technical = []
                 for cite in dim.get("references", []):
                     source = next((r for r in analysis["snapshot"]["references"] if r["id"] == cite["reference_id"]), None)
-                    if source and cite.get("version") == source["version"] and cite["quote"] in source["content"]:
+                    if source and cite.get("version") == source["version"] and cite["quote"].strip() and cite["quote"] in source["content"] and ("reference_ids" not in pair or source["id"] in pair["reference_ids"]):
                         eid = f"guide:{analysis['id']}:{source['id']}:{digest(cite['quote'])[:12]}"
                         technical.append(add_evidence(eid, kind=source.get("kind", "answer_guide"), quote=cite["quote"], locator=source["title"], source_version=source["version"]))
                     else:
@@ -126,6 +142,8 @@ def build_report(snapshot):
                 if dim["label"] == "unable_to_verify":
                     fact("limitations", f"Unable to verify: {name} for question '{p['question'][:140]}' remains unverified in the saved interview analysis.", refs + [source_id])
             item["pairs"].append(p)
+            if pair["state"] != "unanswered" and any(not d["support_validated"] for d in p["dimensions"].values()):
+                p["score"] = None
             if pair["state"] == "unanswered":
                 fact("limitations", f"No answer was recorded for the selected interview question: {p['question'][:180]}", p["evidence_ids"] + [source_id])
             if pair.get("flags"): item["limitations"].extend(pair["flags"])
@@ -133,11 +151,30 @@ def build_report(snapshot):
             for mapping in pair.get("mappings", []):
                 if not compatible or mapping.get("requirement_version") != snapshot["identification"]["requirement_version"]: continue
                 refs = quotes(mapping.get("citations", []), pair["answer_ids"])
-                supported = mapping.get("support_status") == "supported_by_check" and bool(refs)
+                supported = meaning_verified and mapping.get("support_status") == "supported_by_check" and bool(refs)
                 entry = {"status": mapping["status"] if supported else "insufficient_evidence", "pair_id": pair["id"],
                     "interview_id": interview["id"], "analysis_id": analysis["id"], "evidence_ids": refs,
                     "conclusion": mapping["explanation"] if supported else "Available evidence does not establish this requirement."}
                 mapped.setdefault(mapping["requirement_id"], []).append(entry)
+        # Use the same deterministic interview summary; recheck each citation against
+        # the selected, current source versions before adding it to the report registry.
+        from app.agents.interview_summary import evidence_summary as summarize_interview
+        valid_pairs = {p["id"]: p for p in item["pairs"]}
+        raw_pairs = {p["id"]: p for p in analysis["result"].get("pairs", [])}
+        for category, findings in summarize_interview(analysis["result"], analysis["snapshot"]).items():
+            for finding in findings:
+                pair = raw_pairs.get(finding["pair_id"])
+                if not pair or pair["id"] not in valid_pairs: continue
+                refs = []
+                for role, ids in (("CANDIDATE", pair["answer_ids"]), ("INTERVIEWER", pair["question_ids"])):
+                    refs.extend(quotes([q for q in finding["citations"] if q["speaker"] == role], ids, role))
+                if finding["citations"] and len(set(refs)) != len(finding["citations"]): continue
+                for ref in finding["references"]:
+                    source = next(r for r in analysis["snapshot"]["references"] if r["id"] == ref["reference_id"])
+                    refs.append(add_evidence(f"guide:{analysis['id']}:{source['id']}:{digest(ref['quote'])[:12]}",
+                        kind=source["kind"], quote=ref["quote"], locator=source["title"], source_version=source["version"]))
+                evidence_summary[category].append({"text": finding["text"], "evidence_ids": list(dict.fromkeys(refs + [source_id])),
+                    "rule": finding["rule"], "interview_id": interview["id"], "pair_id": pair["id"]})
         item["limitations"].extend(analysis["result"].get("gaps", []))
         if item["limitations"]:
             flags.append(f"Interview #{interview['id']}: transcript or pairing limitations are recorded")
@@ -193,6 +230,7 @@ def build_report(snapshot):
         matrix.append(row)
         if status == "met" and cv_refs:
             fact("strengths", f"CV evidence: saved screening marks {req['name']} as met.", cv_refs + [rid])
+            evidence_summary["strengths"].append({"text": f"CV evidence supports {req['name']}.", "evidence_ids": cv_refs + [rid]})
         elif status in {"unmet", "partially_met"}:
             fact("limitations", f"CV evidence gap ({req['classification']}): {req['name']} is {status.replace('_', ' ')} in saved screening; capability is not independently disproved.", [rid] + cv_refs + screening_refs)
         if not entries:
@@ -205,6 +243,10 @@ def build_report(snapshot):
                 fact("limitations", f"Demonstrated limitation in the saved interview assessment for {req['name']}: contradictory evidence was recorded.", m["evidence_ids"] + [rid])
         if row["verification"]:
             fact("verification", row["verification"], [rid] + cv_refs + [e for m in entries for e in m["evidence_ids"]])
+            evidence_summary["verification"].append({"text": row["verification"], "evidence_ids": [rid] + cv_refs + [e for m in entries for e in m["evidence_ids"]]})
+        if uncertainty:
+            evidence_summary["evidence_gaps"].append({"text": f"{req['name']}: " + " ".join(uncertainty),
+                "evidence_ids": [rid, readiness_id] + cv_refs + screening_refs})
     aligned = [r for r in matrix if r["cv_status"] == "met" or "supporting_evidence" in r["interview_statuses"]]
     gaps = [r for r in matrix if r["classification"] == "required" and r["cv_status"] in {"unmet", "partially_met"}]
     if aligned:
@@ -215,13 +257,18 @@ def build_report(snapshot):
             [requirement_evidence[r["requirement_id"]] for r in gaps[:4]] + [e for r in gaps[:4] for e in r["cv_evidence_ids"]])
     for problem in missing:
         fact("limitations", f"Missing upstream processing or compatibility: {problem}.", [readiness_id])
+        evidence_summary["evidence_gaps"].append({"text": problem, "evidence_ids": [readiness_id]})
     for flag in sorted(set(flags)):
         fact("limitations", f"Evidence limitation: {flag}.", [readiness_id])
     evidence[readiness_id]["quote"] = "; ".join(sorted(set(missing + flags))) or "Selected sources were finalized and compatible. Requirement coverage is recorded separately in the matrix."
     fact("position", f"The report uses {len(interviews)} explicitly identified interview session(s). Interview findings and unexplored requirements must be considered alongside CV coverage.", [readiness_id])
-    return {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
+    result = {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
         "interviews": interviews, "matrix": matrix, "evidence": evidence, "completeness": "partial" if missing or flags else "complete",
-        "missing": sorted(set(missing)), "flags": sorted(set(flags)), "facts": facts, "summary": {}, "policy": POLICY}
+        "missing": sorted(set(missing)), "flags": sorted(set(flags)), "facts": facts, "summary": {}, "policy": POLICY,
+        "evidence_summary": evidence_summary}
+    from app.assessments.performance_summary import report_performance_summary
+    result["evidence_summary"] = report_performance_summary(result)
+    return result
 
 
 class ConsolidatedAssessmentGraph:
@@ -285,6 +332,10 @@ class ConsolidatedAssessmentGraph:
         for fact in report["facts"]:
             if not fact["evidence_ids"] or any(i not in report["evidence"] for i in fact["evidence_ids"]):
                 raise ValueError("Unsupported report conclusion")
+        for findings in report["evidence_summary"].values():
+            for finding in findings:
+                if not finding["evidence_ids"] or any(i not in report["evidence"] for i in finding["evidence_ids"]):
+                    raise ValueError("Unsupported evidence summary")
         # No model-authored prose: logical support follows the explicit source-status
         # rules in build_report. AI is allowed to select only those grounded facts.
         registry = {f["id"]: f for f in report["facts"]}

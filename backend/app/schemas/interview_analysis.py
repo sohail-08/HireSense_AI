@@ -84,7 +84,22 @@ class Dimension(Strict):
     flags: list[str] = Field(default_factory=list, max_length=12)
 
 
+class InterpretationNote(Strict):
+    original: Quote
+    interpreted_as: str = Field(min_length=1, max_length=800)
+    reason: str = Field(min_length=1, max_length=800)
+    context: list[Quote] = Field(min_length=1, max_length=6)
+
+
+class AnswerInterpretation(Strict):
+    status: Literal["faithful", "context_supported", "uncertain"]
+    meaning: str = Field(min_length=1, max_length=2000)
+    citations: list[Quote] = Field(min_length=1, max_length=12)
+    notes: list[InterpretationNote] = Field(max_length=8)
+
+
 class Assessment(Strict):
+    interpretation: AnswerInterpretation
     relevance: Dimension
     accuracy: Dimension
     completeness: Dimension
