@@ -40,10 +40,10 @@ describe("simplified interviewer answer analysis", () => {
     vi.mocked(analysisApi.read).mockResolvedValue(data);
     const saved = JSON.stringify(data);
     render(<InterviewAnalysisPanel interviewId={1} />);
-    const summary = await screen.findByRole("region", { name: "Evidence-based summary" });
-    for (const name of ["Strengths", "Weaknesses", "Evidence gaps", "Further verification"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
-    fireEvent.click(within(within(summary).getByRole("region", { name: "Strengths" })).getByText("View supporting evidence"));
-    fireEvent.click(within(summary).getByRole("button", { name: /Candidate · 00:03/ }));
+    const summary = await screen.findByRole("region", { name: "Candidate performance" });
+    for (const name of ["Strengths", "Areas to improve", "Not yet assessed", "Needs checking"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
+    fireEvent.click(within(within(summary).getByRole("region", { name: "Strengths" })).getByText("Sources"));
+    fireEvent.click(await within(summary).findByRole("button", { name: /Candidate · 00:03/ }));
     expect(await screen.findByRole("dialog", { name: "Transcript source passage" })).toBeTruthy();
     expect(analysisApi.read).toHaveBeenCalledWith(1, 10);
     expect(analysisApi.start).not.toHaveBeenCalled();

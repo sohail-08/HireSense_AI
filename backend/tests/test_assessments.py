@@ -77,7 +77,7 @@ def test_four_part_summary_is_deterministic_traceable_and_separates_missing_evid
                 assert "Automated testing" not in finding["text"]  # Not explored, not a weakness.
     assert report(source)["evidence_summary"] == summary and source == before
     html = render_html({"kind": "individual", "reports": [{"id": 1, "result": result, "created_at": "2026-10-22T00:00:00Z"}]})
-    for heading in ("Strengths", "Weaknesses", "Evidence gaps", "Further verification"):
+    for heading in ("Candidate performance", "Strengths", "Areas to improve", "Not yet assessed", "Needs checking"):
         assert heading in html
     assert "Source version" in html
 

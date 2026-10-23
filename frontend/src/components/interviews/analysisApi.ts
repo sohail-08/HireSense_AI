@@ -17,7 +17,7 @@ export type Pair = PairEdit & { state: string; flags: string[]; pairing_confiden
   analysis_error?: string; assessment?: Record<"relevance" | "accuracy" | "completeness" | "quality", Dimension> & { expected_elements: string[]; expected_elements_basis: string;
     interpretation?: { status: string; meaning: string; support_status?: string; notes: { original: Citation; interpreted_as: string; reason: string; context: Citation[] }[] } };
   mappings?: Mapping[]; suggestions?: Suggestion[] };
-export type InterviewSummaryFinding = { id: string; text: string; rule: string; pair_id: string | null; citations: Citation[];
+export type InterviewSummaryFinding = { id: string; text: string; summary_text?: string; rule: string; pair_id: string | null; citations: Citation[];
   references: Dimension["references"]; source: { kind?: string; requirement_id?: string; version?: string; state?: string } };
 export type Reference = { id: string; title: string; kind: "answer_guide" | "technical_reference"; content: string; requirement_ids: string[]; version?: string };
 export type AnalysisRun = { id: number; version: number; status: string; stage: string; stale: boolean; error?: string; created_at: string;

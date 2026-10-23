@@ -262,10 +262,13 @@ def build_report(snapshot):
         fact("limitations", f"Evidence limitation: {flag}.", [readiness_id])
     evidence[readiness_id]["quote"] = "; ".join(sorted(set(missing + flags))) or "Selected sources were finalized and compatible. Requirement coverage is recorded separately in the matrix."
     fact("position", f"The report uses {len(interviews)} explicitly identified interview session(s). Interview findings and unexplored requirements must be considered alongside CV coverage.", [readiness_id])
-    return {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
+    result = {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
         "interviews": interviews, "matrix": matrix, "evidence": evidence, "completeness": "partial" if missing or flags else "complete",
         "missing": sorted(set(missing)), "flags": sorted(set(flags)), "facts": facts, "summary": {}, "policy": POLICY,
         "evidence_summary": evidence_summary}
+    from app.assessments.performance_summary import report_performance_summary
+    result["evidence_summary"] = report_performance_summary(result)
+    return result
 
 
 class ConsolidatedAssessmentGraph:

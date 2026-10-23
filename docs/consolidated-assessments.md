@@ -19,6 +19,14 @@
    a PDF in one step. The button shows progress and can be retried if preparation
    or download fails. Ranking/comparison exports retain their existing formats.
 
+**Candidate performance** replaces the verbose evidence-summary grid. Strengths and
+areas to improve are short, grouped highlights (three visible per card). Unassessed
+topics and verification points stay in separate collapsed sections. Use **Show all**
+for additional highlights or **Sources** for original explanations and evidence.
+The concise wording is a deterministic presentation of validated labels and source
+statuses, not a new AI judgment. Original findings, scores and 40/60 weights are
+unchanged; existing saved reports adopt the presentation without being regenerated.
+
 The main screen does not expose source hashes, requirement matrices, review
 checkboxes, version selectors, or a multi-step comparison form. Evidence is optional
 to inspect, not a gate that blocks the ranking. The existing CV Assessments page

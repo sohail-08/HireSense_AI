@@ -134,6 +134,8 @@ def present_result(result, snapshot=None):
     if snapshot:
         from app.agents.interview_summary import evidence_summary
         result["evidence_summary"] = evidence_summary(result, snapshot)
+        from app.assessments.performance_summary import performance_summary
+        result["evidence_summary"] = performance_summary(result["evidence_summary"], result.get("pairs", []))
     return result
 
 
@@ -561,6 +563,8 @@ class InterviewAnalysisGraph:
                   "reconciled": state["snapshot"]["complete"]}
         from app.agents.interview_summary import evidence_summary
         result["evidence_summary"] = evidence_summary(result, state["snapshot"])
+        from app.assessments.performance_summary import performance_summary
+        result["evidence_summary"] = performance_summary(result["evidence_summary"], state["pairs"])
         result["model_revision"] = getattr(self, "model_revision", None)
         self.persist(result)
         return {"result": result}

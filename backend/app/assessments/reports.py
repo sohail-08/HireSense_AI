@@ -10,10 +10,17 @@ from app.agents.interview_analysis import digest
 from app.services.scoring_calculation import display_score
 from app.services.date_time_display import format_date_time
 
-TEMPLATE_VERSION = "assessment-report-v5-saved-weights"
+TEMPLATE_VERSION = "assessment-report-v6-candidate-performance"
 
 
 def render_html(payload):
+    import copy
+    from app.assessments.performance_summary import report_performance_summary
+    payload = copy.deepcopy(payload)
+    for run in payload.get("reports", []):
+        result = run.get("result", {})
+        if result.get("evidence_summary"):
+            result["evidence_summary"] = report_performance_summary(result)
     env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"),
                       autoescape=select_autoescape(["html"], default_for_string=True))
     env.filters["score"] = lambda value: display_score(str(value)) if value is not None else "Not available"

@@ -13,7 +13,7 @@ export type CV = { final_score: string | null; categories: Record<string, string
 export type ReportData = { identification: { application_id: number; job_posting_id: number; candidate_name: string; job_title: string; requirement_version: string };
   score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; cv_weight?: number; interview_weight?: number; formula_version?: string; ready: boolean; reason: string; question_count: number; unanswered_count: number };
   simple_summary?: { strengths: { text: string; evidence_ids: string[] }[]; improvements: { text: string; evidence_ids: string[] }[] };
-  evidence_summary?: Record<"strengths" | "weaknesses" | "evidence_gaps" | "verification", { text: string; evidence_ids: string[] }[]>;
+  evidence_summary?: Record<"strengths" | "weaknesses" | "evidence_gaps" | "verification", { text: string; summary_text?: string; evidence_ids: string[] }[]>;
   cv: CV | null; completeness: string; missing: string[]; flags: string[]; policy: string; evidence: Record<string, Evidence>; matrix: MatrixRow[];
   summary: { position: Fact[]; strengths: Fact[]; limitations: Fact[]; verification: Fact[]; basis: string };
   interviews: { id: number; date: string; analysis_id: number | null; analysis_version: number | null; rubric_version: string | null;

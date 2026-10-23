@@ -79,6 +79,10 @@ class AssessmentService:
         notes = [{"id": n.id, "note": n.note, "reviewed": n.reviewed, "author_id": n.created_by,
                   "created_at": utc(n.created_at).isoformat()} for n in db.scalars(select(AssessmentReview).where(
                       AssessmentReview.run_id == row.id).order_by(AssessmentReview.id))]
+        from app.assessments.performance_summary import report_performance_summary
+        presented = copy.deepcopy(row.result)
+        if presented.get("evidence_summary"):
+            presented["evidence_summary"] = report_performance_summary(presented)
         return {"id": row.id, "version": row.version, "application_id": row.application_id, "job_posting_id": row.job_posting_id,
             "status": row.status, "stage": row.stage, "completeness": row.completeness,
             "review_status": "reviewed" if any(n["reviewed"] for n in notes) else "not_reviewed",
@@ -87,7 +91,7 @@ class AssessmentService:
             "source_versions": {"requirement_version": row.snapshot["identification"]["requirement_version"],
                 "scoring_run_id": (row.snapshot["cv"] or {}).get("scoring_run_id"),
                 "interview_analysis_ids": [i["analysis"]["id"] for i in row.snapshot["interviews"] if i["analysis"]]},
-            "missing": row.result.get("missing", row.snapshot["missing"]), "result": copy.deepcopy(row.result), "notes": notes}
+            "missing": row.result.get("missing", row.snapshot["missing"]), "result": presented, "notes": notes}
 
     def list_application(self, db, user_id, application_id):
         app, _ = owned_application(db, user_id, application_id)

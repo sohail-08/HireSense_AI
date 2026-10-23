@@ -39,10 +39,14 @@ candidate captions. Interim text never enters the analysis workflow.
    explanations. The per-answer **Evidence & details** expander, cited passages,
    reference quotes and full explanations are no longer rendered here. Saved evidence,
    references and original score explanations remain intact in backend records.
-   A separate **Evidence summary** provides strengths, weaknesses, evidence gaps and
-   further verification. Findings link to exact saved passages, guide versions or
-   approved requirement/readiness checks. Missing evidence is not called a weakness.
-   The same four categories appear in consolidated assessments and PDF reports.
+   **Candidate performance** shows concise, grouped **Strengths** and **Areas to
+   improve**, with three highlights per card and **Show all** for the rest.
+   **Not yet assessed** and **Needs checking** are folded below, keeping missing
+   evidence separate from demonstrated weaknesses. **Sources** opens the original
+   explanation and exact saved passages, guides or requirement checks on demand.
+   Repeated highlights share a row without losing any of their source links.
+   Existing saved results get this read-only presentation without model calls,
+   rescoring or changes to stored findings. Exports use the same plain-language titles.
 7. **Other transcript passages** reuses the live transcript's messenger-style
    conversation layout: interviewer speech on the right in dark blue and candidate
    speech on the left in soft mint, with elapsed timestamps below each bubble.

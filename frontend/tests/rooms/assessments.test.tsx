@@ -28,7 +28,7 @@ describe("simple candidate details", () => {
     expect(screen.getByText("70.00%")).toBeTruthy();
     expect(screen.queryByText(/CV 40% \+ interview 60%/)).toBeNull();
   });
-  it("replaces the old summary with four traceable categories in new reports", () => {
+  it("replaces the old summary with four traceable categories in new reports", async () => {
     const report = fixture();
     report.result.evidence_summary = {
       strengths: [{ text: "Supported atomicity explanation.", evidence_ids: ["source", "source"] }], weaknesses: [],
@@ -37,13 +37,13 @@ describe("simple candidate details", () => {
     };
     const saved = JSON.stringify(report);
     render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
-    const summary = screen.getByRole("region", { name: "Evidence-based summary" });
-    for (const name of ["Strengths", "Weaknesses", "Evidence gaps", "Further verification"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
+    const summary = screen.getByRole("region", { name: "Candidate performance" });
+    for (const name of ["Strengths", "Areas to improve", "Not yet assessed", "Needs checking"]) expect(within(summary).getByRole("region", { name })).toBeTruthy();
     const strengths = within(summary).getByRole("region", { name: "Strengths" });
-    fireEvent.click(within(strengths).getByText("View supporting evidence"));
+    fireEvent.click(within(strengths).getByText("Sources"));
+    expect(await within(strengths).findByText(/Candidate · 00:03/)).toBeTruthy();
     expect(strengths.querySelectorAll("blockquote")).toHaveLength(1);
-    expect(within(strengths).getByText(/Candidate · 00:03/)).toBeTruthy();
-    expect(screen.queryByText("Areas to improve")).toBeNull();
+    expect(screen.queryByText("Evidence summary")).toBeNull();
     expect(JSON.stringify(report)).toBe(saved);
     expect(assessmentApi.export).not.toHaveBeenCalled();
   });
