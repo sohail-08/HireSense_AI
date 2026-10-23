@@ -168,7 +168,8 @@ def consolidated(saved, monkeypatch, tmp_path):
     t.db.expire_all()
     t.row.status, t.row.room_status = "completed", "ended"
     t.db.commit()
-    from app.models.work_sample import WorkSampleExercise, WorkSampleAttempt, WorkSampleDecision
+    from app.models.work_sample import WorkSampleExercise, WorkSampleAttempt, WorkSampleAssessment
+    from app.agents.practical_scoring import POLICY, PROMPT_VERSION, LIMITATION
     from app.agents.interview_analysis import digest
     from datetime import datetime, timezone
     task = {"title": "Synthetic short task", "instructions": "Provide a short synthetic response to this task.", "materials": "Synthetic materials",
@@ -177,10 +178,16 @@ def consolidated(saved, monkeypatch, tmp_path):
         task=task, task_hash=digest(task), status="submitted", expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     t.db.add(practical); t.db.flush()
     submission = WorkSampleAttempt(exercise_id=practical.id, number=1, status="submitted", content="Synthetic response", explanation="",
-        remaining_seconds=0, revision=1, submission_hash="b" * 64)
+        remaining_seconds=0, revision=1, submission_hash=digest({"task_hash": practical.task_hash, "attempt": 1,
+            "content": "Synthetic response", "explanation": "", "status": "submitted"}))
     t.db.add(submission); t.db.flush()
-    t.db.add(WorkSampleDecision(exercise_id=practical.id, attempt_id=submission.id, submission_hash=submission.submission_hash,
-        correct=True, note="Synthetic interviewer approval", decided_by=t.owner.id))
+    evaluation = {"score": 100, "summary": "Synthetic approved correctness review.", "verified": True,
+        "evidence": [{"line_start": 1, "line_end": 1, "quote": "Synthetic response"}],
+        "verification_reason": "Synthetic independent support check.", "limitation": LIMITATION}
+    t.db.add(WorkSampleAssessment(attempt_id=submission.id, status="approved", result=evaluation, approved_result=copy.deepcopy(evaluation),
+        snapshot={"policy": POLICY, "exercise_id": practical.id, "task_hash": practical.task_hash, "submission_hash": submission.submission_hash,
+            "task": copy.deepcopy(task), "content": submission.content, "status": submission.status,
+            "model": "synthetic", "prompt_version": PROMPT_VERSION}, approved_by=t.owner.id, approved_at=datetime.now(timezone.utc)))
     t.db.commit()
     t.assessments = AssessmentService(model=FailingModel(), session_factory=lambda: Session(t.db.get_bind(), expire_on_commit=False))
     t.reports = ReportService(session_factory=t.assessments.factory)

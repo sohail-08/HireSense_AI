@@ -17,7 +17,7 @@ from app.security import require_interviewer
 from app.services.final_ranking_service import FinalRankingService
 from app.services.assessment_service import AssessmentService
 from app.services.interview_analysis import InterviewAnalysisService
-from assessment_fixtures import synthetic_source
+from assessment_fixtures import synthetic_source, practical_score
 from test_assessments import consolidated, FailingModel  # noqa: F401
 from test_interview_analysis import saved  # noqa: F401
 from test_transcription import transcription  # noqa: F401
@@ -68,7 +68,7 @@ def test_rankings_cannot_mix_saved_final_weighting_policies():
 
 
 @pytest.mark.parametrize("case", ["missing", "pending", "legacy", "wrong_hash", "wrong_exercise", "wrong_interview", "forged_score", "missing_reviewer", "duplicate"])
-def test_practical_requires_one_traceable_manual_decision(case):
+def test_practical_requires_one_traceable_verified_and_approved_llm_score(case):
     source = synthetic_source()
     entry = source["practical_assessments"][0]
     if case == "missing": source["practical_assessments"] = []
@@ -85,13 +85,21 @@ def test_practical_requires_one_traceable_manual_decision(case):
     assert summary["practical_score"] is None and summary["interview_score"] == "75"
 
 
-def test_approval_adds_exactly_ten_points_and_rejection_is_not_pending():
+def test_approved_zero_is_not_pending_and_full_credit_adds_exactly_ten_points():
     source = synthetic_source()
     approved = result(source)["score_summary"]
-    source["practical_assessments"][0]["assessment"].update(correct=False, score=0)
+    source["practical_assessments"][0]["assessment"] = practical_score(0)
     rejected = result(source)["score_summary"]
     assert rejected["ready"] and rejected["practical_score"] == "0"
     assert Fraction(approved["final_score"]) - Fraction(rejected["final_score"]) == 10
+
+
+def test_partial_practical_credit_uses_the_exact_approved_llm_score():
+    source = synthetic_source()
+    source["practical_assessments"][0]["assessment"] = practical_score(83)
+    summary = result(source)["score_summary"]
+    assert summary["ready"] and summary["practical_score"] == "83"
+    assert Fraction(summary["final_score"]) == Fraction(379, 5)
 
 
 @pytest.mark.parametrize("mutation", ["no_cv", "no_interview", "open_transcript", "failed_analysis", "no_score", "outdated_transcript", "old_requirements", "unsupported", "forged_score", "missing_guide"])
@@ -117,7 +125,7 @@ def test_missing_or_invalid_processing_never_becomes_zero(mutation):
 
 def test_zero_is_a_real_score_excluded_questions_are_not_in_average():
     source = synthetic_source()
-    source["practical_assessments"][0]["assessment"].update(correct=False, score=0)
+    source["practical_assessments"][0]["assessment"] = practical_score(0)
     source["cv"]["final_score"] = "0E-60"
     source["cv"]["breakdown"]["exact_final_score"] = {"numerator": 0, "denominator": 1}
     pair = source["interviews"][0]["analysis"]["result"]["pairs"][0]

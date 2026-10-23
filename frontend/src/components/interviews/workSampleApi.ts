@@ -4,13 +4,17 @@ export type ExerciseTask = { title: string; instructions: string; materials: str
   duration_minutes: number; tools_policy: string; response_type: "code" | "text"; criteria?: Criterion[] };
 export type ExerciseEvidence = { field: "content" | "explanation" | "discussion"; segment_id?: string | null; line_start: number; line_end: number; quote: string };
 export type ExerciseEvaluation = { summary: string; findings: { criterion_id: string; label: string; reason: string; evidence: ExerciseEvidence[] }[];
-  score?: number | null; limitation?: string; discussion_sources?: { id: string; speaker: string; text: string; start_offset_ms: number; source_hash: string }[] };
+  score?: number | null; evidence?: { line_start: number; line_end: number; quote: string }[]; verified?: boolean; limitation?: string; discussion_sources?: { id: string; speaker: string; text: string; start_offset_ms: number; source_hash: string }[] };
+export type PracticalScore = { score: number | null; summary: string; evidence: { line_start: number; line_end: number; quote: string }[];
+  verified: boolean; verification_reason: string; limitation: string };
+export type PracticalScoreReview = { id: number; status: string; result: Partial<PracticalScore>; result_hash: string | null;
+  submission_hash: string; error: string | null; approved_at: string | null; approved_by: number | null };
 export type CorrectnessDecision = ExerciseEvaluation & { decision_id: number; policy: string; exercise_id: number;
   submission_hash: string; correct: boolean; approved_by: number; approved_at: string };
 export type ExerciseAttempt = { id: number; status: string; content: string; revision: number; remaining_seconds: number;
   deadline_at: string | null; started_at: string | null; saved_at: string | null; finished_at: string | null; submission_hash: string | null };
 export type Exercise = { id: number; task: ExerciseTask; task_hash: string; status: string; version: number;
-  approved_at: string | null; attempt: ExerciseAttempt | null; decision?: CorrectnessDecision | null;
+  approved_at: string | null; attempt: ExerciseAttempt | null; decision?: CorrectnessDecision | null; assessment?: PracticalScoreReview | null;
   events?: { kind: string; actor: string; reason: string; at: string }[] };
 export type ExerciseState = { exercise: Exercise | null; server_now: string };
 export type PracticalReport = { interview_id: number; exercise_id: number; title: string; task: ExerciseTask;
@@ -34,7 +38,8 @@ export const workSampleApi = {
   action: (id: number, version: number, action: string, reason = "") => post<ExerciseState>(`${base(id)}/action`, { version, action, reason }),
   templates: () => apiRequest<{ id: number; task: ExerciseTask }[]>("/work-samples/templates"),
   template: (task: ExerciseTask) => post<{ id: number; task: ExerciseTask }>("/work-samples/templates", task),
-  decide: (id: number, submission_hash: string, correct: boolean, note: string) => post<ExerciseState>(`${base(id)}/decision`, { submission_hash, correct, note, confirmed: true }),
+  score: (id: number, submission_hash: string) => post<ExerciseState>(`${base(id)}/score`, { submission_hash }),
+  approve: (id: number, assessment_id: number, submission_hash: string, result_hash: string) => post<ExerciseState>(`${base(id)}/approve`, { assessment_id, submission_hash, result_hash, confirmed: true }),
   candidateRead: () => candidate<ExerciseState>(),
   ready: (attempt_id: number) => candidate<ExerciseState>("/ready", { attempt_id }),
   candidateSave: (attempt_id: number, revision: number, content: string, submit = false) => candidate<ExerciseState>("/save", { attempt_id, revision, content, submit }),

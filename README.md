@@ -16,8 +16,9 @@ and interviewer correction/version history are documented in [Feature 5](docs/in
 The interview console includes a practical-exercise workspace for technical and
 nontechnical roles: assistant-suggested or manual task preparation, reusable private
 templates, candidate readiness, a maximum 15-minute working period, live read-only
-work, autosave and one immutable submission. The interviewer discusses the work
-and approves correctness for 100 marks or rejects it for 0. Final ranking uses
+work, autosave and one immutable submission. The LLM verifies the saved work and
+proposes a correctness score (0–100); the interviewer only approves that score.
+Unverified or unapproved scores remain pending. Final ranking uses
 60% interview, 30% CV and 10% practical; pending decisions remain unranked.
 No candidate code is executed and no AI-use
 or cheating detection is performed. See [setup and safeguards](docs/live-work-samples.md).

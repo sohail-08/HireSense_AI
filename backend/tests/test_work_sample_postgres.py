@@ -3,12 +3,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from threading import Barrier
 from uuid import uuid4
+import json
 from alembic import command
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models import Candidate, CandidateApplication, ApplicationSource
 from app.models.interview import InterviewBatch, InterviewSchedule
-from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, CorrectnessDecision
+from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, ApproveScore
 from app.services.interview_rooms import InterviewRooms, RoomConflict, RoomAccessError
 from app.services.work_sample import WorkSampleService
 from test_pgvector import pg_database, _config  # noqa: F401
@@ -17,13 +18,26 @@ from test_interview_rooms import FakeMedia
 from test_work_samples import TASK
 
 
+class SyntheticModel:
+    def __init__(self):
+        self.calls = []
+
+    def generate_json(self, **kwargs):
+        self.calls.append(kwargs)
+        if "supported" in kwargs["schema"].get("properties", {}):
+            return {"supported": True, "reason": "Synthetic independent correctness check."}
+        content = json.loads(kwargs["prompt"])["content"]
+        return {"score": 75, "summary": "Synthetic correctness score for the saved response.",
+            "evidence": [{"line_start": 1, "line_end": 1, "quote": content.splitlines()[0]}]}
+
+
 def test_concurrent_candidate_saves_and_shutdown_are_serialized(pg_database, tmp_path):
     command.upgrade(_config(pg_database), "head")
     engine = create_engine(pg_database)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     settings = _settings(tmp_path)
     rooms = InterviewRooms(settings, media=FakeMedia(settings))
-    service = WorkSampleService(rooms=rooms, session_factory=factory)
+    service = WorkSampleService(rooms=rooms, model=SyntheticModel(), session_factory=factory)
     try:
         with factory() as db:
             owner, _, posting = _records(db)
@@ -89,23 +103,28 @@ def test_concurrent_candidate_saves_and_shutdown_are_serialized(pg_database, tmp
             assert attempt["content"] == ("final response" if outcomes[0] == "submitted" else preserved)
             assert attempt["submission_hash"]
             submission_hash = attempt["submission_hash"]
+        with factory() as db:
+            current = service.read(db, owner_id, interview_id)["exercise"]["assessment"]
+        # A model call runs outside the transaction, never inside a candidate save.
         barrier = Barrier(2)
-        def decide(correct):
+        def process(_):
+            barrier.wait(timeout=10)
+            service.process(current["id"])
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(process, range(2)))
+        assert len(service.model.calls) == 2  # Only one scoring/check pair can claim the job.
+        with factory() as db:
+            current = service.read(db, owner_id, interview_id)["exercise"]["assessment"]
+        barrier = Barrier(2)
+        def approve(_):
             with factory() as db:
                 barrier.wait(timeout=10)
-                try:
-                    value = service.decide(db, owner_id, interview_id, CorrectnessDecision(
-                        submission_hash=submission_hash, correct=correct, confirmed=True))
-                    return value["exercise"]["decision"]["correct"]
-                except RoomConflict:
-                    db.rollback()
-                    return "conflict"
+                return service.approve(db, owner_id, interview_id, ApproveScore(assessment_id=current["id"],
+                    submission_hash=submission_hash, result_hash=current["result_hash"], confirmed=True))["exercise"]["assessment"]["status"]
         with ThreadPoolExecutor(max_workers=2) as pool:
-            decisions = list(pool.map(decide, [True, False]))
-        assert decisions.count("conflict") == 1
+            assert list(pool.map(approve, range(2))) == ["approved", "approved"]
         with factory() as db:
-            decision = service.read(db, owner_id, interview_id)["exercise"]["decision"]
-            assert decision["score"] == (100 if decision["correct"] else 0)
-            assert decision["submission_hash"] == submission_hash
+            assessment = service.read(db, owner_id, interview_id)["exercise"]["assessment"]
+            assert assessment["result"]["score"] == 75 and assessment["status"] == "approved"
     finally:
         engine.dispose()

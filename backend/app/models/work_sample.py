@@ -25,6 +25,7 @@ class WorkSampleExercise(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     task: Mapped[dict] = mapped_column(JSON)
     task_hash: Mapped[str] = mapped_column(String(64))
+    grading_policy: Mapped[str | None] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(30), default="draft")
     version: Mapped[int] = mapped_column(Integer, default=1)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

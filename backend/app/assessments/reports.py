@@ -10,7 +10,7 @@ from app.agents.interview_analysis import digest
 from app.services.scoring_calculation import display_score
 from app.services.date_time_display import format_date_time
 
-TEMPLATE_VERSION = "assessment-report-v8-three-component-score"
+TEMPLATE_VERSION = "assessment-report-v9-approved-llm-practical-score"
 
 
 def render_html(payload):

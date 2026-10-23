@@ -11,7 +11,7 @@ import { PracticalAssessments } from "../../src/components/assessments/Practical
 import { type ExerciseState, type ExerciseTask } from "../../src/components/interviews/workSampleApi";
 
 const api = vi.hoisted(() => ({ candidateRead: vi.fn(), ready: vi.fn(), candidateSave: vi.fn(), read: vi.fn(), save: vi.fn(),
-  templates: vi.fn(), template: vi.fn(), action: vi.fn(), decide: vi.fn() }));
+  templates: vi.fn(), template: vi.fn(), action: vi.fn(), score: vi.fn(), approve: vi.fn() }));
 vi.mock("../../src/components/interviews/workSampleApi", async original => ({ ...await original<any>(), workSampleApi: api }));
 
 const task: ExerciseTask = { title: "Customer quotation", instructions: "Prepare a quotation for two units using the catalogue.", materials: "Basic costs 100 per unit.",
@@ -142,16 +142,56 @@ test("a private task cannot silently adopt a newer revision while being edited",
   await waitFor(() => expect(api.save).toHaveBeenCalledWith(7, expect.objectContaining({ title: "My edited task" }), 3));
 });
 
-test.each([true, false])("correctness decision needs explicit confirmation (approve=%s)", async correct => {
-  const decide = vi.fn();
-  render(<WorkSampleReview busy={false} onDecide={decide} />);
-  fireEvent.click(screen.getByRole("button", { name: correct ? "Approve · 100 marks" : "Reject · 0 marks" }));
-  const button = await screen.findByRole("button", { name: "Confirm decision" });
+function scored(status = "scored", score: number | null = 75) {
+  return { id: 8, status, result: { score, summary: "The submitted quotation is mostly correct.", evidence: [{ line_start: 1, line_end: 1, quote: "200 BDT" }],
+    verified: score !== null, verification_reason: "The task materials support this result.", limitation: "Code was not executed." }, result_hash: "result-hash",
+    submission_hash: "submission-hash", error: null, approved_at: status === "approved" ? new Date().toISOString() : null, approved_by: status === "approved" ? 1 : null };
+}
+
+test("the interviewer only approves the LLM score without assigning marks", async () => {
+  const approve = vi.fn();
+  render(<WorkSampleReview assessment={scored()} busy={false} onApprove={approve} onScore={vi.fn()} />);
+  expect(screen.getByLabelText("Practical correctness score").textContent).toBe("75/100");
+  expect(screen.queryByRole("button", { name: /Reject/ })).toBeNull();
+  expect(screen.queryByRole("spinbutton")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Approve score" }));
+  const button = await screen.findByRole("button", { name: "Confirm approval" });
   expect((button as HTMLButtonElement).disabled).toBe(true);
-  expect(decide).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("checkbox", { name: "I have reviewed the saved response." }));
+  expect(approve).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("checkbox", { name: "I have reviewed the AI score and saved response." }));
   fireEvent.click(button);
-  expect(decide).toHaveBeenCalledWith(correct, "");
+  expect(approve).toHaveBeenCalledOnce();
+});
+
+test.each(["queued", "processing", "failed", "needs_verification"])("does not approve an unavailable AI result (%s)", async status => {
+  const retry = vi.fn();
+  render(<WorkSampleReview assessment={scored(status, null)} busy={false} onApprove={vi.fn()} onScore={retry} />);
+  expect(screen.queryByRole("button", { name: "Approve score" })).toBeNull();
+  expect(screen.queryByLabelText("Practical correctness score")).toBeNull();
+  if (status === "queued" || status === "processing") expect(screen.getByRole("status").textContent).toContain("AI is checking");
+  else { fireEvent.click(screen.getByRole("button", { name: "Retry AI review" })); expect(retry).toHaveBeenCalledOnce(); }
+});
+
+test("an approved zero is displayed as a score, not missing work", () => {
+  render(<WorkSampleReview assessment={scored("approved", 0)} busy={false} onApprove={vi.fn()} onScore={vi.fn()} />);
+  expect(screen.getByLabelText("Practical correctness score").textContent).toBe("0/100");
+  expect(screen.getByText("Score approved")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Approve score" })).toBeNull();
+});
+
+test("the panel approves the exact saved result without sending a score", async () => {
+  const initial = state("submitted", "200 BDT", 1);
+  initial.exercise!.attempt!.submission_hash = "submission-hash";
+  initial.exercise!.assessment = scored();
+  api.read.mockResolvedValue(initial);
+  api.approve.mockResolvedValue({ ...initial, exercise: { ...initial.exercise!, assessment: scored("approved") } });
+  render(<WorkSamplePanel interviewId={7} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Approve score" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "I have reviewed the AI score and saved response." }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
+  await waitFor(() => expect(api.approve).toHaveBeenCalledWith(7, 8, "submission-hash", "result-hash"));
+  await screen.findByText("Score approved");
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 test("task editor has a 15-minute cap and no rubric, explanation or retry controls", async () => {

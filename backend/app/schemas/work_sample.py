@@ -46,8 +46,10 @@ class SaveSubmission(BaseModel):
     content: str = Field(max_length=50000)
     submit: bool = Field(default=False, strict=True)
 
-class CorrectnessDecision(Strict):
+class ScoreExercise(Strict):
     submission_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
-    correct: bool = Field(strict=True)
+
+class ApproveScore(ScoreExercise):
+    assessment_id: int = Field(strict=True, ge=1)
+    result_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     confirmed: Literal[True]
-    note: str = Field(default="", max_length=1000)

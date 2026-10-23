@@ -283,7 +283,7 @@ class InterviewRooms:
                 exercises.reconcile(db, row, exercise)
                 attempts = exercises.attempts(db, exercise)
                 if attempts and attempts[-1].status not in {"submitted", "time_ended", "interview_ended"}:
-                    exercises.finish(exercise, attempts[-1], "interview_ended")
+                    exercises.finish(db, exercise, attempts[-1], "interview_ended")
             from app.services.transcription_service import TranscriptionService
             TranscriptionService(self.settings).request_stop(db, row)
             row.room_status, row.end_requested_at = "ending", self.now()

@@ -5,7 +5,7 @@ from app.database import get_db
 from app.security import require_interviewer
 from app.models.user import User
 from app.routes.interview_rooms import COOKIE_NAME, candidate_origin, sensitive, run, limiter
-from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, CorrectnessDecision
+from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, ScoreExercise, ApproveScore
 from app.services.work_sample import WorkSampleService
 
 router = APIRouter(tags=["Live work samples"])
@@ -70,7 +70,13 @@ def action(interview_id: int, data: Action, response: Response, db: Session = De
     return run(db, lambda: service.action(db, user.id, interview_id, data))
 
 
-@router.post("/api/work-samples/interviews/{interview_id}/decision")
-def decision(interview_id: int, data: CorrectnessDecision, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
+@router.post("/api/work-samples/interviews/{interview_id}/score")
+def score(interview_id: int, data: ScoreExercise, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
     sensitive(response)
-    return run(db, lambda: service.decide(db, user.id, interview_id, data))
+    return run(db, lambda: service.score(db, user.id, interview_id, data))
+
+
+@router.post("/api/work-samples/interviews/{interview_id}/approve")
+def approve(interview_id: int, data: ApproveScore, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
+    sensitive(response)
+    return run(db, lambda: service.approve(db, user.id, interview_id, data))

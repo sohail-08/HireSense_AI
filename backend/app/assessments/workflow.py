@@ -6,7 +6,7 @@ from langgraph.graph import START, END, StateGraph
 from app.agents.interview_analysis import canonical_quote, digest, provider_schema
 from app.schemas.assessment import SummarySelection, ReportData
 
-PROMPT_VERSION = "consolidation-evidence-summary-v5-three-component-score"
+PROMPT_VERSION = "consolidation-evidence-summary-v6-approved-llm-practical-score"
 POLICY = "Calculate final ranking using interview 60% + CV 30% + practical task 10%."
 
 

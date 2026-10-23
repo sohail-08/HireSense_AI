@@ -1,4 +1,4 @@
-"""Job-scoped task planning only. The interviewer alone decides practical marks."""
+"""Job-scoped task planning, separate from submitted-work correctness scoring."""
 import json
 from typing import TypedDict
 from langgraph.graph import START, END, StateGraph
@@ -15,7 +15,8 @@ in 1 to 15 minutes including reading materials. Prefer a small bug fix, calculat
 written response or focused scenario, never a full project, application or environment setup.
 Supply all required information and concise deliverables. No rubric, assessment criteria,
 weights, model answers or written explanation requirement. The interviewer asks explanations
-verbally and alone decides correctness (100 or 0). No protected-trait or honesty inferences.
+verbally. A separate LLM reviews correctness; the interviewer approves its score.
+No protected-trait or honesty inferences.
 No code execution, dependency installation, uploads or external systems are available."""
 
 class State(TypedDict, total=False):

@@ -1,6 +1,17 @@
 """Synthetic source snapshots, never copied from candidate data."""
 import copy
 from app.agents.interview_analysis import canonical_quote, digest
+from app.agents.practical_scoring import POLICY, PROMPT_VERSION, LIMITATION, result_hash
+
+
+def practical_score(score=100):
+    raw = {"score": score, "summary": "Synthetic correctness score approved by the interviewer.",
+        "evidence": [{"line_start": 1, "line_end": 1, "quote": "Synthetic response"}],
+        "verified": True, "verification_reason": "Synthetic independent support check.", "limitation": LIMITATION}
+    metadata = {"assessment_id": 1, "policy": POLICY, "exercise_id": 1001, "task_hash": "synthetic-task",
+        "submission_hash": "a" * 64, "model": "synthetic", "prompt_version": PROMPT_VERSION,
+        "approved_by": 1, "approved_at": "2026-10-20T04:30:00+00:00", "findings": []}
+    return {**raw, **metadata, "result_hash": result_hash(metadata, raw)}
 
 
 def synthetic_source(application_id=101, name="Synthetic Candidate Alpha", long=False):
@@ -44,8 +55,6 @@ def synthetic_source(application_id=101, name="Synthetic Candidate Alpha", long=
         "practical_assessments": [{"interview_id": 201, "exercise_id": 1001, "title": "Synthetic task", "status": "submitted",
             "content": "Synthetic response", "task_hash": "synthetic-task", "submission_hash": "a" * 64,
             "task": {"title": "Synthetic task", "response_type": "text"}, "review_status": "reviewed",
-            "assessment": {"decision_id": 1, "policy": "interviewer-correctness-binary-v1", "exercise_id": 1001,
-                "submission_hash": "a" * 64, "correct": True, "score": 100, "findings": [], "summary": "Synthetic interviewer approval.",
-                "approved_by": 1, "approved_at": "2026-10-20T04:30:00+00:00"}}],
+            "assessment": practical_score()}],
         "interviews": [{"id": 201, "date": "2026-10-20T04:00:00+00:00", "finalized": True, "segments": {s["id"]: s for s in (q, a)}, "reviews": [],
             "analysis": {"id": 901, "version": 1, "requirement_version": version, "rubric_version": "answer-coverage-equal-dimensions-v2", "snapshot": {"segments": [q, a], "watermark": {s["id"]: s["hash"] for s in (q,a)}, "references": [guide]}, "result": {"pairs": [pair], "gaps": [], "reconciled": True}}}]}

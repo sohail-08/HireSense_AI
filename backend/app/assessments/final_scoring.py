@@ -4,12 +4,13 @@ from fractions import Fraction
 import json
 import copy
 from app.agents.interview_analysis import score_pair
+from app.agents.practical_scoring import POLICY as PRACTICAL_POLICY, result_hash
 
-FORMULA_VERSION = "cv30-interview60-practical10-v3"
+FORMULA_VERSION = "cv30-interview60-practical10-llm-v4"
 CV_WEIGHT = 30
 INTERVIEW_WEIGHT = 60
 PRACTICAL_WEIGHT = 10
-POLICY = f"Final score = {INTERVIEW_WEIGHT}% interview + {CV_WEIGHT}% CV + {PRACTICAL_WEIGHT}% practical task. Practical correctness is approved by the interviewer (100 or 0)."
+POLICY = f"Final score = {INTERVIEW_WEIGHT}% interview + {CV_WEIGHT}% CV + {PRACTICAL_WEIGHT}% practical task. The LLM scores practical correctness; the interviewer approves that score."
 DIMENSIONS = ("relevance", "accuracy", "completeness", "quality")
 
 
@@ -40,15 +41,21 @@ def practical_value(report, source):
         return None
     entry = entries[0]
     decision = entry.get("assessment") or {}
-    if (entry.get("review_status") != "reviewed" or decision.get("policy") != "interviewer-correctness-binary-v1"
-        or type(decision.get("correct")) is not bool or not decision.get("decision_id")
+    if (entry.get("review_status") != "reviewed" or decision.get("policy") != PRACTICAL_POLICY
+        or decision.get("verified") is not True or not decision.get("assessment_id")
         or decision.get("submission_hash") != entry.get("submission_hash")
+        or decision.get("task_hash") != entry.get("task_hash")
         or decision.get("exercise_id") != entry.get("exercise_id") or not decision.get("approved_by") or not decision.get("approved_at")):
         return None
-    expected = 100 if decision["correct"] else 0
-    if decision.get("score") != expected or entry not in report.get("practical_assessments", []):
+    score = decision.get("score")
+    if type(score) is not int or not 0 <= score <= 100 or entry not in report.get("practical_assessments", []):
         return None
-    return Fraction(expected)
+    fields = ("score", "summary", "evidence", "verified", "verification_reason", "limitation")
+    if not all(key in decision for key in (*fields, "model", "prompt_version")):
+        return None
+    if decision.get("result_hash") != result_hash(decision, {key: decision[key] for key in fields}):
+        return None
+    return Fraction(score)
 
 
 def score_summary(report, source):
@@ -119,7 +126,7 @@ def score_summary(report, source):
     result.update(interview_score=decimal(interview_score), exact_interview_score=exact(interview_score),
         question_count=len(scores), rubric_version=next(iter(rubrics)))
     if practical is None:
-        result["reason"] = "The interviewer must approve or reject the practical task for the selected interview before the final score is available."
+        result["reason"] = "The practical task needs a verified LLM score and interviewer approval before the final score is available."
         return result
     final = (cv_value(cv) * CV_WEIGHT + interview_score * INTERVIEW_WEIGHT + practical * PRACTICAL_WEIGHT) / 100
     result.update(interview_score=decimal(interview_score), final_score=decimal(final),

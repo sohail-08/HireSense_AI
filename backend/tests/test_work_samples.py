@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.work_sample import WorkSampleExercise, WorkSampleAttempt, WorkSampleAssessment, WorkSampleDecision
-from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, CorrectnessDecision
+from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, ScoreExercise, ApproveScore
 from app.services.work_sample import WorkSampleService
 from app.services.interview_rooms import RoomConflict, RoomAccessError
 from app.services.interview_content import utc
@@ -27,11 +27,20 @@ TASK = {"title": "Customer quotation", "instructions": "Calculate a quote for tw
 ANSWER = "Two Basic units cost 200 BDT.\nNo discount applies."
 
 class Model:
-    def __init__(self):
-        self.calls = []
+    def __init__(self, score=75, mode="valid"):
+        self.calls, self.score, self.mode, self.hook = [], score, mode, None
     def generate_json(self, **kwargs):
         self.calls.append(kwargs)
-        raise AssertionError("No model should grade practical work")
+        if self.hook:
+            hook, self.hook = self.hook, None
+            hook()
+        if self.mode == "error":
+            raise RuntimeError("PRIVATE provider details and secret")
+        if "supported" in kwargs["schema"].get("properties", {}):
+            return {"supported": self.mode != "unsupported", "reason": "The proposed score follows from the task and submitted work."}
+        return {"score": None if self.mode == "uncertain" else self.score,
+            "summary": "The submitted quote is mostly correct against the supplied catalogue.",
+            "evidence": [{"line_start": 1, "line_end": 1, "quote": "Invented quote" if self.mode == "bad_quote" else "Two Basic units cost 200 BDT."}]}
 
 @pytest.fixture
 def exercise_setup(room_setup):
@@ -63,11 +72,14 @@ def submit(ctx):
     return service.save_submission(db, cookie, SaveSubmission(attempt_id=state["exercise"]["attempt"]["id"],
         revision=0, content=ANSWER, submit=True))
 
-def decide(ctx, correct=True, submission_hash=None):
+def approve(ctx):
     db, owner, _, row, service, *_ = ctx
-    current = service.read(db, owner.id, row.id)
-    return service.decide(db, owner.id, row.id, CorrectnessDecision(
-        submission_hash=submission_hash or current["exercise"]["attempt"]["submission_hash"], correct=correct, confirmed=True))
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    service.process(current["id"])
+    db.expire_all()
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    return service.approve(db, owner.id, row.id, ApproveScore(assessment_id=current["id"],
+        submission_hash=current["submission_hash"], result_hash=current["result_hash"], confirmed=True))
 
 def test_private_draft_locks_at_share(exercise_setup):
     db, owner, _, row, service, cookie, *_ = exercise_setup
@@ -141,33 +153,104 @@ def test_end_interview_preserves_unfinished_work(exercise_setup):
     assert result["exercise"]["attempt"]["content"] == "partial"
     with pytest.raises(RoomAccessError): service.candidate_read(db, cookie)
 
-@pytest.mark.parametrize("correct,score", [(True, 100), (False, 0)])
-def test_correctness_is_manual_final_private_and_traceable(exercise_setup, correct, score):
-    submit(exercise_setup)
+@pytest.mark.parametrize("score", [0, 75, 100])
+def test_llm_score_is_automatic_cached_private_and_requires_human_approval(exercise_setup, score):
+    state = submit(exercise_setup)
     db, owner, _, row, service, cookie, _, _, model, _ = exercise_setup
+    model.score = score
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    assert current["status"] == "queued" and not model.calls  # No model call in candidate request.
     assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"] is None
-    reviewed = decide(exercise_setup, correct)["exercise"]["decision"]
-    assert reviewed["correct"] == correct and reviewed["score"] == score
-    assert reviewed["approved_by"] == owner.id and reviewed["approved_at"]
-    assert reviewed["submission_hash"] == service.read(db, owner.id, row.id)["exercise"]["attempt"]["submission_hash"]
-    assert decide(exercise_setup, correct)["exercise"]["decision"] == reviewed
-    with pytest.raises(RoomConflict): decide(exercise_setup, not correct)
+    service.process(current["id"])
+    db.expire_all()
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    assert current["status"] == "scored" and current["result"]["score"] == score and current["result"]["verified"]
+    assert len(model.calls) == 2
+    assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"] is None
+    service.score(db, owner.id, row.id, ScoreExercise(submission_hash=current["submission_hash"]))
+    service.process(current["id"])
+    assert len(model.calls) == 2  # Successfully scored work cannot be rerolled.
+    request = ApproveScore(assessment_id=current["id"], submission_hash=current["submission_hash"],
+        result_hash=current["result_hash"], confirmed=True)
+    approved = service.approve(db, owner.id, row.id, request)["exercise"]["assessment"]
+    assert approved["status"] == "approved" and approved["approved_by"] == owner.id
+    assert service.approve(db, owner.id, row.id, request)["exercise"]["assessment"] == approved
+    report = service.report_sources(db, owner.id, row.application_id)[0]["assessment"]
+    assert report["score"] == score and report["result_hash"] == current["result_hash"]
+    assert report["submission_hash"] == state["exercise"]["attempt"]["submission_hash"]
     candidate = service.candidate_read(db, cookie)["exercise"]
-    assert not {"decision", "assessments", "events", "attempts"} & candidate.keys()
-    assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"] == reviewed
-    assert not model.calls
+    assert not {"assessment", "decision", "assessments", "events", "attempts"} & candidate.keys()
 
-def test_decision_requires_finished_work_matching_hash_and_confirmation(exercise_setup):
+def test_approval_requires_verified_score_matching_hash_and_confirmation(exercise_setup):
     start(exercise_setup)
-    with pytest.raises(RoomConflict): decide(exercise_setup, submission_hash="a" * 64)
-    db, _, _, _, service, cookie, *_ = exercise_setup
-    current = service.candidate_read(db, cookie)
-    service.save_submission(db, cookie, SaveSubmission(attempt_id=current["exercise"]["attempt"]["id"], revision=0, content=ANSWER, submit=True))
-    with pytest.raises(RoomConflict): decide(exercise_setup, submission_hash="a" * 64)
-    with pytest.raises(ValidationError):
-        CorrectnessDecision(submission_hash="a" * 64, correct=True, confirmed=False)
-    with pytest.raises(ValidationError):
-        CorrectnessDecision(submission_hash="a" * 64, correct="true", confirmed=True)
+    db, owner, _, row, service, cookie, *_ = exercise_setup
+    with pytest.raises(RoomConflict):
+        service.score(db, owner.id, row.id, ScoreExercise(submission_hash="a" * 64))
+    state = service.candidate_read(db, cookie)
+    service.save_submission(db, cookie, SaveSubmission(attempt_id=state["exercise"]["attempt"]["id"], revision=0, content=ANSWER, submit=True))
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    request = ApproveScore(assessment_id=current["id"], submission_hash=current["submission_hash"], result_hash="a" * 64, confirmed=True)
+    with pytest.raises(RoomConflict): service.approve(db, owner.id, row.id, request)
+    service.process(current["id"])
+    db.expire_all()
+    with pytest.raises(RoomConflict): service.approve(db, owner.id, row.id, request)
+    with pytest.raises(ValidationError): ApproveScore(**{**request.model_dump(), "confirmed": False})
+    with pytest.raises(ValidationError): ApproveScore(**{**request.model_dump(), "score": 100})
+    with pytest.raises(ValidationError): ApproveScore(**{**request.model_dump(), "correct": True})
+
+@pytest.mark.parametrize("mode,status", [("error", "failed"), ("bad_quote", "failed"), ("unsupported", "needs_verification"), ("uncertain", "needs_verification")])
+def test_unavailable_or_unsupported_ai_review_never_becomes_zero_or_approvable(exercise_setup, mode, status):
+    submit(exercise_setup)
+    db, owner, _, row, service, _, _, _, model, _ = exercise_setup
+    model.mode = mode
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    service.process(current["id"])
+    db.expire_all()
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    assert current["status"] == status and current["result"].get("score") is None
+    assert "PRIVATE" not in (current["error"] or "")
+    assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"] is None
+    with pytest.raises(RoomConflict):
+        service.approve(db, owner.id, row.id, ApproveScore(assessment_id=current["id"], submission_hash=current["submission_hash"],
+            result_hash=current["result_hash"] or "a" * 64, confirmed=True))
+    db.rollback()
+    model.mode = "valid"
+    service.score(db, owner.id, row.id, ScoreExercise(submission_hash=current["submission_hash"]))
+    assert approve(exercise_setup)["exercise"]["assessment"]["status"] == "approved"
+
+def test_processing_recovers_but_never_rerolls_a_verified_score(exercise_setup):
+    submit(exercise_setup)
+    db, owner, _, row, service, *_ = exercise_setup
+    saved = db.scalar(select(WorkSampleAssessment))
+    original_request = saved.snapshot["request_id"]
+    saved.status = "processing"; db.commit()
+    service.recover(db)
+    assert saved.status == "queued" and saved.snapshot["request_id"] != original_request
+    service.process(saved.id); db.expire_all()
+    service.recover(db)
+    assert service.read(db, owner.id, row.id)["exercise"]["assessment"]["status"] == "scored"
+
+def test_result_from_changed_submission_cannot_be_persisted_or_approved(exercise_setup):
+    submit(exercise_setup)
+    db, owner, _, row, service, _, _, _, model, _ = exercise_setup
+    saved = db.scalar(select(WorkSampleAssessment))
+    def change():
+        attempt = db.get(WorkSampleAttempt, saved.attempt_id)
+        attempt.content = "Changed during model call"; db.commit()
+    model.hook = change
+    service.process(saved.id); db.expire_all()
+    current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+    assert current["status"] == "cancelled" and current["result"] == {}
+
+def test_approved_score_cannot_follow_a_changed_submission_into_reports(exercise_setup):
+    submit(exercise_setup)
+    approve(exercise_setup)
+    db, owner, _, row, service, *_ = exercise_setup
+    assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"]["score"] == 75
+    attempt = db.scalar(select(WorkSampleAttempt))
+    attempt.content = "A different response cannot inherit the approved grade."
+    db.commit()
+    assert service.report_sources(db, owner.id, row.application_id)[0]["assessment"] is None
 
 def test_owner_scope_and_revocation(exercise_setup):
     db, owner, other, row, service, cookie, _, rooms, *_ = exercise_setup
@@ -205,12 +288,22 @@ def test_routes_require_auth_origin_and_exclude_old_grading_endpoints(exercise_s
         response = client.get("/api/interview-rooms/candidate/work-sample")
         assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
         assert "decision" not in response.json()["exercise"]
+        assert "assessment" not in response.json()["exercise"]
         assert client.post("/api/interview-rooms/candidate/work-sample/ready", json={"attempt_id": 1},
             headers={"Origin": "https://attacker.test"}).status_code == 403
         assert client.get(f"/api/work-samples/interviews/{row.id}").status_code == 401
         headers = {"Authorization": f"Bearer {create_access_token(owner.id)}"}
         assert client.get(f"/api/work-samples/interviews/{row.id}", headers=headers).status_code == 200
-        for removed in ("assess", "review", "draft"):
+        submission_hash = service.read(db, owner.id, row.id)["exercise"]["attempt"]["submission_hash"]
+        assert client.post(f"/api/work-samples/interviews/{row.id}/score", json={"submission_hash": submission_hash}).status_code == 401
+        assert client.post(f"/api/work-samples/interviews/{row.id}/score", headers=headers,
+            json={"submission_hash": submission_hash, "score": 100}).status_code == 422
+        assert client.post(f"/api/work-samples/interviews/{row.id}/score", headers=headers,
+            json={"submission_hash": submission_hash}).status_code == 200
+        current = service.read(db, owner.id, row.id)["exercise"]["assessment"]
+        assert client.post(f"/api/work-samples/interviews/{row.id}/approve", headers=headers,
+            json={"assessment_id": current["id"], "submission_hash": submission_hash, "result_hash": "a" * 64, "confirmed": True, "score": 100}).status_code == 422
+        for removed in ("assess", "review", "draft", "decision"):
             assert f"/api/work-samples/interviews/{{interview_id}}/{removed}" not in app.openapi()["paths"]
 
 def test_pending_practical_blocks_final_and_report_escapes_response(exercise_setup):
@@ -228,7 +321,7 @@ def test_pending_practical_blocks_final_and_report_escapes_response(exercise_set
 
 def test_delete_cleans_decisions_and_submission(exercise_setup):
     submit(exercise_setup)
-    decide(exercise_setup)
+    approve(exercise_setup)
     db, _, _, row, service, *_ = exercise_setup
     service.delete_for_interviews(db, [row.id])
     db.commit()
@@ -238,9 +331,10 @@ def test_delete_cleans_decisions_and_submission(exercise_setup):
 def test_legacy_recovery_preserves_historical_approved_results(exercise_setup):
     state = submit(exercise_setup)
     db, owner, _, _, service, *_ = exercise_setup
-    legacy = WorkSampleAssessment(attempt_id=state["exercise"]["attempt"]["id"], status="approved",
-        snapshot={}, result={"score": 70}, approved_result={"score": 70}, approved_by=owner.id)
-    db.add(legacy); db.commit()
+    legacy = db.scalar(select(WorkSampleAssessment))
+    legacy.snapshot = {}
+    legacy.status, legacy.result, legacy.approved_result, legacy.approved_by = "approved", {"score": 70}, {"score": 70}, owner.id
+    db.commit()
     service.recover(db)
     assert legacy.status == "approved" and legacy.approved_result == {"score": 70}
     legacy.status = "processing"; db.commit()

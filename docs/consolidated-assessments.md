@@ -4,7 +4,7 @@
 
 1. In **CV Screening**, select a job, choose the CV scoring weights, and rank CVs.
 2. Conduct the interviews and save the transcripts.
-3. Review the live practical response and approve or reject correctness.
+3. Let the AI verify/score the live practical response, then approve its result.
 4. In **Assessment**, select the job and click **Calculate final ranking**.
    Read rank, candidate, CV score, interview score, practical score and final score.
 5. Search candidates by name and use the pagination controls for larger lists.
@@ -43,12 +43,13 @@ The interviewer approved this fixed formula:
 
 **Final score = interview score × 60% + CV score × 30% + practical score × 10%.**
 
-For example, CV 80%, interview 60% and practical approval (100%) give 70%.
-Rejection (0%) gives 60%. A pending practical review is not zero and withholds
-the final score/rank. Correctness is decided by the interviewer after discussing
-the candidate's single submitted response, not by an AI model.
+For example, CV 80%, interview 60% and an approved practical score of 75% give
+67.5%. An approved practical 0 gives 60%. A pending, failed or unverified practical
+review is not zero and withholds the final score/rank. The LLM verifies correctness
+and proposes 0–100 marks; the interviewer only approves the saved result.
 
-Formula `cv30-interview60-practical10-v3` replaces the previous 40/60 policy. Click **Calculate
+Formula `cv30-interview60-practical10-llm-v4` keeps the 60/30/10 weights but requires
+verified, interviewer-approved LLM practical scores instead of manual binary marks. Click **Calculate
 final ranking** to update existing totals. Validated interview grades and CV scores
 are reused; changing these weights does not itself require another AI assessment.
 Historical reports retain their saved weights and totals, and old rankings/reports
