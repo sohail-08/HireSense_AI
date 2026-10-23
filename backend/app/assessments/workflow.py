@@ -265,7 +265,7 @@ def build_report(snapshot):
     result = {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
         "interviews": interviews, "matrix": matrix, "evidence": evidence, "completeness": "partial" if missing or flags else "complete",
         "missing": sorted(set(missing)), "flags": sorted(set(flags)), "facts": facts, "summary": {}, "policy": POLICY,
-        "evidence_summary": evidence_summary}
+        "evidence_summary": evidence_summary, "practical_assessments": copy.deepcopy(snapshot.get("practical_assessments", []))}
     from app.assessments.performance_summary import report_performance_summary
     result["evidence_summary"] = report_performance_summary(result)
     return result

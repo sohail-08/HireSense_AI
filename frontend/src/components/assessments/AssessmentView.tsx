@@ -4,6 +4,7 @@ import { assessmentApi, type Assessment, type Artifact, type Comparison } from "
 import { displayPercent } from "../candidates/scoringDisplay";
 import { ReportPdfDownload } from "./ReportPdfDownload";
 import { EvidenceSummary } from "./EvidenceSummary";
+import { PracticalAssessments } from "./PracticalAssessments";
 
 export const text = (value: string) => value.replaceAll("_", " ");
 export const score = (value: string | number | null | undefined) => value === null || value === undefined ? "—" : displayPercent(String(value));
@@ -64,6 +65,7 @@ export function AssessmentView({ report }: { report: Assessment; onReviewed?: (r
     <p className="text-sm">{totals?.reason ?? "Calculate the final ranking to add interview and final scores to this older report."}</p>
     {totals?.ready ? <p className="mt-2 text-sm text-slate-500">CV {totals.cv_weight ?? 50}% + interview {totals.interview_weight ?? 50}%. Interview score: average of {totals.question_count} {totals.question_count === 1 ? "question" : "questions"}{totals.unanswered_count ? `, including ${totals.unanswered_count} unanswered (zero)` : ""}.</p> : null}
     {r.evidence_summary && Object.keys(r.evidence_summary).length ? <EvidenceSummary value={r.evidence_summary} evidence={finding => refs(finding.evidence_ids)} /> : r.simple_summary ? <div className="mt-5 grid gap-4 sm:grid-cols-2">{(["strengths", "improvements"] as const).map(key => <section className={`rounded-2xl border p-4 ${key === "strengths" ? "border-emerald-100 bg-emerald-50/40" : "border-amber-100 bg-amber-50/40"}`} key={key}><h3 className="text-sm font-semibold text-slate-700">{key === "strengths" ? "Strengths" : "Areas to improve"}</h3>{r.simple_summary![key].length ? <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">{r.simple_summary![key].map((fact, i) => <li key={i}>{fact.text}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No additional points recorded.</p>}</section>)}</div> : null}
+    <PracticalAssessments values={r.practical_assessments ?? []} />
     <h3 className="mt-6 text-lg font-bold">Interview questions and scores</h3>
     {!r.interviews.length ? <p className="mt-2 text-sm text-slate-500">Interview not scored yet.</p> : null}
     {r.interviews.map(interview => <section key={interview.id} className="mt-3">

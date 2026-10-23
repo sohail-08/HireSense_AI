@@ -74,3 +74,4 @@ class ReportData(Strict):
     score_summary: dict = Field(default_factory=dict)
     simple_summary: dict = Field(default_factory=dict)
     evidence_summary: dict = Field(default_factory=dict)
+    practical_assessments: list[dict] = Field(default_factory=list)
