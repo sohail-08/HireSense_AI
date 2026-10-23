@@ -168,6 +168,20 @@ def consolidated(saved, monkeypatch, tmp_path):
     t.db.expire_all()
     t.row.status, t.row.room_status = "completed", "ended"
     t.db.commit()
+    from app.models.work_sample import WorkSampleExercise, WorkSampleAttempt, WorkSampleDecision
+    from app.agents.interview_analysis import digest
+    from datetime import datetime, timezone
+    task = {"title": "Synthetic short task", "instructions": "Provide a short synthetic response to this task.", "materials": "Synthetic materials",
+        "deliverables": "A short response", "duration_minutes": 10, "response_type": "text", "tools_policy": "Supplied materials only"}
+    practical = WorkSampleExercise(interview_id=t.row.id, application_id=t.row.application_id, owner_id=t.owner.id,
+        task=task, task_hash=digest(task), status="submitted", expires_at=datetime.now(timezone.utc) + timedelta(days=30))
+    t.db.add(practical); t.db.flush()
+    submission = WorkSampleAttempt(exercise_id=practical.id, number=1, status="submitted", content="Synthetic response", explanation="",
+        remaining_seconds=0, revision=1, submission_hash="b" * 64)
+    t.db.add(submission); t.db.flush()
+    t.db.add(WorkSampleDecision(exercise_id=practical.id, attempt_id=submission.id, submission_hash=submission.submission_hash,
+        correct=True, note="Synthetic interviewer approval", decided_by=t.owner.id))
+    t.db.commit()
     t.assessments = AssessmentService(model=FailingModel(), session_factory=lambda: Session(t.db.get_bind(), expire_on_commit=False))
     t.reports = ReportService(session_factory=t.assessments.factory)
     for module in ("app.services.report_service", "app.services.assessment_service"):
@@ -212,8 +226,9 @@ def test_old_formula_report_stays_immutable_and_new_request_uses_current_weights
     t.db.expire_all()
     current = t.assessments.read(t.db, t.owner.id, new.id)
     assert not current["stale"]
-    assert current["result"]["score_summary"]["cv_weight"] == 40
+    assert current["result"]["score_summary"]["cv_weight"] == 30
     assert current["result"]["score_summary"]["interview_weight"] == 60
+    assert current["result"]["score_summary"]["practical_weight"] == 10
     assert t.db.get(AssessmentRun, row.id).result == saved
     assert len(t.analysis.model.calls) == before
 

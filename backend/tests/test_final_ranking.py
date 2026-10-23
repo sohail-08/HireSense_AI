@@ -29,13 +29,13 @@ def result(source):
     return ConsolidatedAssessmentGraph().graph.invoke({"snapshot": source})["result"]
 
 
-def test_fixed_40_60_weights_and_question_average_are_exact():
+def test_fixed_30_60_10_weights_and_question_average_are_exact():
     source = synthetic_source()
     summary = result(source)["score_summary"]
     assert summary["ready"]
-    assert Fraction(summary["final_score"]) == 75
+    assert Fraction(summary["final_score"]) == Fraction(155, 2)
     assert Fraction(summary["interview_score"]) == 75
-    assert (summary["cv_weight"], summary["interview_weight"]) == (40, 60)
+    assert (summary["cv_weight"], summary["interview_weight"], summary["practical_weight"]) == (30, 60, 10)
     analysis = source["interviews"][0]["analysis"]
     unanswered = copy.deepcopy(analysis["result"]["pairs"][0])
     unanswered.update(id="unanswered", state="unanswered", answer_ids=[], assessment=None, mappings=[])
@@ -45,11 +45,11 @@ def test_fixed_40_60_weights_and_question_average_are_exact():
     summary = result(source)["score_summary"]
     assert summary["ready"] and summary["question_count"] == 2 and summary["unanswered_count"] == 1
     assert Fraction(summary["interview_score"]) == Fraction(75, 2)
-    assert Fraction(summary["final_score"]) == Fraction(105, 2)
+    assert Fraction(summary["final_score"]) == 55
 
 
-@pytest.mark.parametrize("cv,expected", [("80", Fraction(77)), ("0", Fraction(45)), ("100", Fraction(85)), ("2.675", Fraction(4607, 100))])
-def test_asymmetric_scores_use_exact_40_cv_60_interview_arithmetic(cv, expected):
+@pytest.mark.parametrize("cv,expected", [("80", Fraction(79)), ("0", Fraction(55)), ("100", Fraction(85)), ("2.675", Fraction(22321, 400))])
+def test_asymmetric_scores_use_exact_30_cv_60_interview_10_practical_arithmetic(cv, expected):
     source = synthetic_source()
     source["cv"]["final_score"] = cv
     value = Fraction(cv)
@@ -65,6 +65,33 @@ def test_rankings_cannot_mix_saved_final_weighting_policies():
     reports[0]["result"]["score_summary"].update(formula_version="cv50-interview50-v1", cv_weight=50, interview_weight=50)
     ordered, issue = rank_reports(reports)
     assert issue and all(r.get("final_rank") is None for r in ordered)
+
+
+@pytest.mark.parametrize("case", ["missing", "pending", "legacy", "wrong_hash", "wrong_exercise", "wrong_interview", "forged_score", "missing_reviewer", "duplicate"])
+def test_practical_requires_one_traceable_manual_decision(case):
+    source = synthetic_source()
+    entry = source["practical_assessments"][0]
+    if case == "missing": source["practical_assessments"] = []
+    elif case == "pending": entry["assessment"] = None
+    elif case == "legacy": entry["assessment"]["policy"] = "old-ai-review"
+    elif case == "wrong_hash": entry["assessment"]["submission_hash"] = "b" * 64
+    elif case == "wrong_exercise": entry["assessment"]["exercise_id"] = 999
+    elif case == "wrong_interview": entry["interview_id"] = 999
+    elif case == "forged_score": entry["assessment"]["score"] = 99
+    elif case == "missing_reviewer": entry["assessment"]["approved_by"] = None
+    elif case == "duplicate": source["practical_assessments"].append(copy.deepcopy(entry))
+    summary = result(source)["score_summary"]
+    assert not summary["ready"] and summary["final_score"] is None
+    assert summary["practical_score"] is None and summary["interview_score"] == "75"
+
+
+def test_approval_adds_exactly_ten_points_and_rejection_is_not_pending():
+    source = synthetic_source()
+    approved = result(source)["score_summary"]
+    source["practical_assessments"][0]["assessment"].update(correct=False, score=0)
+    rejected = result(source)["score_summary"]
+    assert rejected["ready"] and rejected["practical_score"] == "0"
+    assert Fraction(approved["final_score"]) - Fraction(rejected["final_score"]) == 10
 
 
 @pytest.mark.parametrize("mutation", ["no_cv", "no_interview", "open_transcript", "failed_analysis", "no_score", "outdated_transcript", "old_requirements", "unsupported", "forged_score", "missing_guide"])
@@ -90,6 +117,7 @@ def test_missing_or_invalid_processing_never_becomes_zero(mutation):
 
 def test_zero_is_a_real_score_excluded_questions_are_not_in_average():
     source = synthetic_source()
+    source["practical_assessments"][0]["assessment"].update(correct=False, score=0)
     source["cv"]["final_score"] = "0E-60"
     source["cv"]["breakdown"]["exact_final_score"] = {"numerator": 0, "denominator": 1}
     pair = source["interviews"][0]["analysis"]["result"]["pairs"][0]
@@ -227,7 +255,7 @@ def test_central_assistant_can_start_fixed_weight_job_ranking(consolidated):
     supervisor = SimpleNamespace(state_json={"selected_screening_job_posting_id": t.row.job_posting_id})
     instance = object.__new__(SupervisorService)
     result = instance._assessments_tool(t.db, supervisor, t.owner.id, AssessmentToolRequest(operation="rank"))
-    assert result["refresh_required"] and "CV 40% + interview 60%" in result["assistant_message"]
+    assert result["refresh_required"] and "interview 60% + CV 30% + practical task 10%" in result["assistant_message"]
     assert result["assessment_links"][0]["path"].endswith(f"job={t.row.job_posting_id}")
     with pytest.raises(LookupError):
         instance._assessments_tool(t.db, supervisor, t.other.id, AssessmentToolRequest(operation="rank"))

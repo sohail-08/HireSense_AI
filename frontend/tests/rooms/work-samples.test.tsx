@@ -11,25 +11,20 @@ import { PracticalAssessments } from "../../src/components/assessments/Practical
 import { type ExerciseState, type ExerciseTask } from "../../src/components/interviews/workSampleApi";
 
 const api = vi.hoisted(() => ({ candidateRead: vi.fn(), ready: vi.fn(), candidateSave: vi.fn(), read: vi.fn(), save: vi.fn(),
-  templates: vi.fn(), template: vi.fn(), draft: vi.fn(), action: vi.fn(), assess: vi.fn(), review: vi.fn() }));
+  templates: vi.fn(), template: vi.fn(), action: vi.fn(), decide: vi.fn() }));
 vi.mock("../../src/components/interviews/workSampleApi", async original => ({ ...await original<any>(), workSampleApi: api }));
 
 const task: ExerciseTask = { title: "Customer quotation", instructions: "Prepare a quotation for two units using the catalogue.", materials: "Basic costs 100 per unit.",
-  deliverables: "A quote and explanation.", duration_minutes: 15, tools_policy: "Use supplied materials only. No AI or outside help.", response_type: "text",
-  criteria: [{ id: "correctness", title: "Correctness", description: "The quote uses the supplied prices.", weight: 100 }] };
+  deliverables: "A customer quote.", duration_minutes: 15, tools_policy: "Use supplied materials only. No AI or outside help.", response_type: "text" };
 function state(status = "running", content = "", revision = 0): ExerciseState {
   return { server_now: new Date().toISOString(), exercise: { id: 1, task, task_hash: "task-hash", status, version: 3, approved_at: new Date().toISOString(),
-    attempt: { id: 10, number: 1, status, content, explanation: "", revision, remaining_seconds: 900,
+    attempt: { id: 10, status, content, revision, remaining_seconds: 900,
       deadline_at: status === "running" ? new Date(Date.now() + 900000).toISOString() : null, started_at: null, saved_at: null, finished_at: null, submission_hash: null },
-    attempts: [], assessments: [], events: [] } };
+    decision: null, events: [] } };
 }
-const evaluation = { summary: "The quotation uses the supplied price.", score: 100, findings: [{ criterion_id: "correctness", label: "met" as const,
-  reason: "Two units cost 200.", evidence: [{ field: "content" as const, line_start: 1, line_end: 1, quote: "200" }] }] };
 beforeEach(() => {
   api.candidateRead.mockResolvedValue(state()); api.read.mockResolvedValue(state("draft")); api.templates.mockResolvedValue([]);
-  api.ready.mockResolvedValue(state("ready")); api.candidateSave.mockImplementation(async (_id, rev, content, explanation, submit) => {
-    const result = state(submit ? "submitted" : "running", content, rev + 1); result.exercise!.attempt!.explanation = explanation; return result;
-  });
+  api.ready.mockResolvedValue(state("ready")); api.candidateSave.mockImplementation(async (_id, rev, content, submit) => state(submit ? "submitted" : "running", content, rev + 1));
   api.save.mockResolvedValue(state("draft")); api.action.mockResolvedValue(state("shared"));
 });
 
@@ -49,7 +44,7 @@ test("autosave keeps exact text and sends the expected revision", async () => {
   render(<CandidateWorkSample />);
   const input = await screen.findByLabelText("Your response");
   fireEvent.change(input, { target: { value: "  exact\ntext  " } });
-  await waitFor(() => expect(api.candidateSave).toHaveBeenCalledWith(10, 0, "  exact\ntext  ", "", false), { timeout: 2500 });
+  await waitFor(() => expect(api.candidateSave).toHaveBeenCalledWith(10, 0, "  exact\ntext  ", false), { timeout: 2500 });
   await screen.findByText("Saved", { exact: true });
   expect((input as HTMLTextAreaElement).value).toBe("  exact\ntext  ");
 });
@@ -66,7 +61,7 @@ test("a delayed save receipt cannot overwrite newer typing", async () => {
   await act(async () => complete(state("running", "first", 1)));
   expect((input as HTMLTextAreaElement).value).toBe("newer typing");
   fireEvent.click(screen.getByRole("button", { name: "Save now" }));
-  await waitFor(() => expect(api.candidateSave).toHaveBeenLastCalledWith(10, 1, "newer typing", "", false));
+  await waitFor(() => expect(api.candidateSave).toHaveBeenLastCalledWith(10, 1, "newer typing", false));
 });
 
 test("submission requires confirmation, includes unsaved text and locks the response", async () => {
@@ -76,7 +71,7 @@ test("submission requires confirmation, includes unsaved text and locks the resp
   fireEvent.click(screen.getByRole("button", { name: "Submit exercise" }));
   expect(api.candidateSave).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole("button", { name: "Confirm submission" }));
-  await waitFor(() => expect(api.candidateSave).toHaveBeenCalledWith(10, 0, "My final response", "", true));
+  await waitFor(() => expect(api.candidateSave).toHaveBeenCalledWith(10, 0, "My final response", true));
   await screen.findByRole("heading", { name: "Submission received" });
   expect((input as HTMLTextAreaElement).readOnly).toBe(true);
   expect(screen.queryByRole("button", { name: "Submit exercise" })).toBeNull();
@@ -147,23 +142,36 @@ test("a private task cannot silently adopt a newer revision while being edited",
   await waitFor(() => expect(api.save).toHaveBeenCalledWith(7, expect.objectContaining({ title: "My edited task" }), 3));
 });
 
-test("human approval requires a review note and preserves evidence", async () => {
-  const approve = vi.fn();
-  render(<WorkSampleReview task={task} busy={false} onApprove={approve} assessment={{ id: 3, attempt_id: 10, status: "draft", result: evaluation,
-    approved_result: null, review_reason: null, approved_at: null, approved_by: null, error: null }} />);
-  const button = screen.getByRole("button", { name: "Approve assessment" });
+test.each([true, false])("correctness decision needs explicit confirmation (approve=%s)", async correct => {
+  const decide = vi.fn();
+  render(<WorkSampleReview busy={false} onDecide={decide} />);
+  fireEvent.click(screen.getByRole("button", { name: correct ? "Approve · 100 marks" : "Reject · 0 marks" }));
+  const button = await screen.findByRole("button", { name: "Confirm decision" });
   expect((button as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText("Review note"), { target: { value: "Checked the quote against the catalogue." } });
+  expect(decide).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("checkbox", { name: "I have reviewed the saved response." }));
   fireEvent.click(button);
-  expect(approve).toHaveBeenCalledWith(evaluation, "Checked the quote against the catalogue.");
-  expect(screen.getByText("AI assessment draft")).toBeTruthy();
+  expect(decide).toHaveBeenCalledWith(correct, "");
 });
 
-test("reports distinguish unapproved practical work from the existing final score", () => {
-  render(<MemoryRouter><PracticalAssessments values={[{ interview_id: 7, exercise_id: 1, title: task.title, task, task_hash: "hash", attempt: 1,
-    status: "submitted", content: "200", explanation: "100 times 2", submission_hash: "submission", review_status: "draft", assessment: null,
+test("task editor has a 15-minute cap and no rubric, explanation or retry controls", async () => {
+  const ask = vi.fn();
+  render(<WorkSamplePanel interviewId={7} onAskAssistant={ask} />);
+  await screen.findByDisplayValue("Customer quotation");
+  const duration = screen.getByRole("spinbutton");
+  expect(duration.getAttribute("max")).toBe("15");
+  expect(duration.getAttribute("min")).toBe("1");
+  expect(screen.queryByText("Assessment criteria")).toBeNull();
+  expect(screen.queryByText("Draft with AI")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Ask interview assistant" }));
+  expect(ask).toHaveBeenCalledOnce();
+});
+
+test("reports distinguish pending practical work from a rejected score", () => {
+  render(<MemoryRouter><PracticalAssessments values={[{ interview_id: 7, exercise_id: 1, title: task.title, task, task_hash: "hash",
+    status: "submitted", content: "200", submission_hash: "submission", review_status: "not_reviewed", assessment: null,
     approved_at: null, approved_by: null }]} /></MemoryRouter>);
-  expect(screen.getByText(/not included in the 40% CV/)).toBeTruthy();
+  expect(screen.getByText(/contributes 10%/)).toBeTruthy();
   expect(screen.getByText(/No interviewer-approved assessment yet/)).toBeTruthy();
   expect(screen.queryByLabelText("Practical assessment findings")).toBeNull();
   expect(screen.getByRole("link", { name: /Open interview workspace/ }).getAttribute("href")).toBe("/interviews/7/console");

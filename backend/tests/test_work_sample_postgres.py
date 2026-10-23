@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models import Candidate, CandidateApplication, ApplicationSource
 from app.models.interview import InterviewBatch, InterviewSchedule
-from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission
+from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, CorrectnessDecision
 from app.services.interview_rooms import InterviewRooms, RoomConflict, RoomAccessError
 from app.services.work_sample import WorkSampleService
 from test_pgvector import pg_database, _config  # noqa: F401
@@ -56,7 +56,7 @@ def test_concurrent_candidate_saves_and_shutdown_are_serialized(pg_database, tmp
             with factory() as db:
                 barrier.wait(timeout=10)
                 try:
-                    service.save_submission(db, cookie, SaveSubmission(attempt_id=attempt_id, revision=0, content=text, explanation=""))
+                    service.save_submission(db, cookie, SaveSubmission(attempt_id=attempt_id, revision=0, content=text))
                     return "saved"
                 except RoomConflict:
                     db.rollback()
@@ -76,7 +76,7 @@ def test_concurrent_candidate_saves_and_shutdown_are_serialized(pg_database, tmp
                     return "ended"
                 try:
                     service.save_submission(db, cookie, SaveSubmission(attempt_id=attempt_id, revision=1,
-                        content="final response", explanation="", submit=True))
+                        content="final response", submit=True))
                     return "submitted"
                 except (RoomConflict, RoomAccessError):
                     db.rollback()
@@ -88,5 +88,24 @@ def test_concurrent_candidate_saves_and_shutdown_are_serialized(pg_database, tmp
             assert attempt["status"] == ("submitted" if outcomes[0] == "submitted" else "interview_ended")
             assert attempt["content"] == ("final response" if outcomes[0] == "submitted" else preserved)
             assert attempt["submission_hash"]
+            submission_hash = attempt["submission_hash"]
+        barrier = Barrier(2)
+        def decide(correct):
+            with factory() as db:
+                barrier.wait(timeout=10)
+                try:
+                    value = service.decide(db, owner_id, interview_id, CorrectnessDecision(
+                        submission_hash=submission_hash, correct=correct, confirmed=True))
+                    return value["exercise"]["decision"]["correct"]
+                except RoomConflict:
+                    db.rollback()
+                    return "conflict"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            decisions = list(pool.map(decide, [True, False]))
+        assert decisions.count("conflict") == 1
+        with factory() as db:
+            decision = service.read(db, owner_id, interview_id)["exercise"]["decision"]
+            assert decision["score"] == (100 if decision["correct"] else 0)
+            assert decision["submission_hash"] == submission_hash
     finally:
         engine.dispose()

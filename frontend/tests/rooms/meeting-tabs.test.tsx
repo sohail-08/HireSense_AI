@@ -3,6 +3,22 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 
+it("allows programmatic task navigation without unmounting other panels", () => {
+  function Workspace() {
+    const [active, setActive] = useState("assistant");
+    return <MeetingTabs label="Workspace" activeId={active} onActiveChange={setActive} tabs={[
+      { id: "assistant", label: "Assistant", content: <button onClick={() => setActive("practical")}>Task created</button> },
+      { id: "practical", label: "Practical", content: <p>Private task draft</p> },
+    ]} />;
+  }
+  render(<Workspace />);
+  fireEvent.click(screen.getByRole("button", { name: "Task created" }));
+  expect(screen.getByRole("tab", { name: "Practical" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("tabpanel", { name: "Practical" })).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Practical" }), { key: "Home" });
+  expect(screen.getByRole("button", { name: "Task created" })).toBeTruthy();
+});
+
 it.each(["underline", "segmented"] as const)("supports keyboard navigation and preserves mounted panel state with %s tabs", (variant) => {
   const mounted = vi.fn();
   function Draft() { const [text, setText] = useState(""); useEffect(() => { mounted(); }, []); return <input aria-label="Draft" value={text} onChange={event => setText(event.target.value)} />; }

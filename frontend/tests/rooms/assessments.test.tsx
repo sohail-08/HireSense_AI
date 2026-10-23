@@ -20,6 +20,14 @@ function fixture(): Assessment {
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(assessmentApi.export).mockResolvedValue({ id: 5, status: "failed", format: "pdf", error: "PDF renderer unavailable." }); });
 
 describe("simple candidate details", () => {
+  it("shows the practical contribution and saved three-component formula", () => {
+    const report = fixture();
+    report.result.score_summary = { ...report.result.score_summary!, cv_weight: 30, interview_weight: 60, practical_weight: 10, practical_score: "100", final_score: "70" };
+    render(<MemoryRouter><AssessmentView report={report} /></MemoryRouter>);
+    expect(screen.getByText(/CV 30% \+ interview 60% \+ practical 10%/)).toBeTruthy();
+    expect(screen.getByText("100.00%")).toBeTruthy();
+    expect(screen.getByText("70.00%")).toBeTruthy();
+  });
   it("keeps historical report weights and totals instead of relabelling them", () => {
     const report = fixture();
     report.result.score_summary = { ...report.result.score_summary!, cv_weight: 50, interview_weight: 50, final_score: "70", reason: "Saved 50/50 calculation." };
@@ -165,7 +173,7 @@ describe("simple candidate details", () => {
     const value = { id: 3, created_at: "synthetic", snapshot: { basis: "Saved comparison", policy: "Historical comparison", cv_order_compatible: false,
       combined_ranking_available: false, incompatibilities: [], interview_incompatibilities: [], assessments: [r], selected_cohort_application_ids: [101], cohort_policy: "Explicit cohort" } } satisfies Comparison;
     render(<MemoryRouter><ComparisonView value={value} /></MemoryRouter>);
-    expect(screen.getAllByText("—")).toHaveLength(3);
+    expect(screen.getAllByText("—")).toHaveLength(4);
     expect(screen.getByText("View details")).toBeTruthy();
   });
 });

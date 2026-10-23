@@ -1,119 +1,112 @@
 # Innovation Feature — Live Work-Sample Studio
 
-This feature adds an observable work product to the existing CV and interview
-evidence. It supports code or written responses, including fictional HR, sales,
-and support exercises. It does not infer honesty, personality, protected traits,
-AI assistance, or future job performance.
+A short live task adds an observable work product to CV and verbal-interview
+evidence. Technical and nontechnical roles use the same flow: a focused bug fix,
+HR scenario, sales quotation, or short written response using supplied facts.
+It does not infer honesty, personality, protected traits, AI use, or future success.
 
-## Using the feature
+## Interviewer and candidate flow
 
-Open an interview console and select **Practical exercise**. Prepare a task
-manually, choose one of your saved templates, or request an AI draft based on the
-job description and available knowledge. Check every generated fact, permitted
-tool rule, deliverable and criterion. Weights must total 100. Private draft saves
-do not message the chatbot or send invitations. Templates are immutable copies
-and should contain reusable, synthetic material only.
+1. Ask the private **Interview assistant** to draft a practical task. It suggests
+   2–3 job-relevant options using the current posting and available knowledge.
+   Each option is designed for 1–15 minutes, including reading; no environment
+   setup or full projects. Suggestions alone create no exercise.
+2. Select **Use this task**. The assistant generates a private draft and opens
+   **Practical exercise**. Review/edit it before sharing. Manual drafting and saved
+   private templates remain available. There is no rubric or assessment-criteria editor.
+3. **Approve & share task** locks the instructions and makes them available to
+   the admitted candidate. The candidate reads them and selects **I'm ready**.
+   Only **Start exercise** starts the server-controlled working period.
+4. The candidate writes one response in a text/code workspace. No written
+   explanation is requested; the interviewer asks for explanations verbally.
+   Autosave and **Save now** preserve exact text. The interviewer sees server-saved
+   work, not unsent keystrokes. No candidate code is executed.
+5. **Submit exercise** requires confirmation and atomically saves/locks the
+   response. Each candidate has one submission only: no retries or extra attempts.
+   The time budget cannot exceed 15 minutes or be extended. A reasoned pause stops
+   editing and preserves remaining working time; resume never increases it.
+   Time expiry/interview shutdown freezes the latest server-saved draft with its
+   own status, not as a candidate-confirmed submission.
+6. Discuss the work, then **Approve · 100 marks** or **Reject · 0 marks**.
+   Confirm that the saved response was reviewed; an optional note can explain the
+   decision. This is the interviewer's correctness decision, not an AI grade.
+   A final decision is immutable and bound to the exact submission hash.
 
-**Approve & share task** freezes the task/rubric snapshot and makes it visible to
-the admitted candidate in their existing private interview page. The candidate
-reads it, asks clarifications, and selects **I'm ready**. Only the interviewer
-starts the working period. Video/audio and consented transcription remain the
-existing independent services; an exercise does not enable recording or obtain
-device permissions automatically.
+Video/audio and consented transcription remain independent. Creating an exercise
+does not start recording, invite candidates, request device access, or message
+the central chatbot. Reload restores server-saved work; offline edits are not
+stored in localStorage. Unsaved text remains visible after a pause or access ends,
+with a before-unload warning to help prevent accidental loss.
 
-The candidate writes a response and explanation. Changes autosave after a short
-typing pause; **Save now** is also available. The interviewer sees the last
-server-saved work, not unsent keystrokes. Timing adjustments require a reason;
-pauses stop editing and preserve unsaved text in the current page. Reloading
-restores server-saved work, not offline changes. A before-unload warning helps
-avoid losing unsaved changes; no candidate text is stored in localStorage.
+## Final score
 
-**Submit exercise** saves the current response and explanation atomically and
-locks the final attempt. Its receipt is shown only after server acknowledgement.
-Time expiry or interview shutdown freezes the latest server-saved draft with a
-different status; neither is relabelled as candidate-confirmed submission.
-Another attempt requires interviewer authorization and a reason, retains the
-original, starts from a copy, and waits for readiness again (maximum five).
+**Final = interview × 60% + CV × 30% + practical × 10%.**
 
-After discussing the work, the interviewer can optionally select up to 12 saved
-transcript passages (16,000 characters total) before choosing **Assess exercise**.
-Interviewer passages are context only. Candidate discussion can be cited, but
-unclear ASR remains unverified. The task, exact response, chosen discussion,
-hashes, prompt version and model are frozen in a durable assessment request.
+Practical approval contributes 10 points; rejection contributes 0. Missing work
+or a pending review is not a rejection: final score/rank stay unavailable until
+the interviewer explicitly decides. The selected interview's practical decision
+must match the saved exercise and submission. Calculate the final ranking after
+review to refresh reports; valid CV and interview grades are reused without
+another AI assessment just for changing weights. Historical reports keep their
+saved formula and scores; old AI practical reviews are not converted into binary
+decisions. Reports/PDFs display the saved response and decision.
 
-The interviewer reviews concise criterion findings, expands exact evidence as
-needed, adjusts the summary/outcomes/reasons/quotations, and records a review
-note before approval. AI drafts are retained separately from approved findings.
-Approval is immutable. A new attempt is the explicit way to collect more work.
-Accepted AI results are reused; retry only retries a failed assessment, not an
-accepted score. No practical result enters the existing 40% CV / 60% interview
-formula. Newly generated candidate reports and PDF exports include a separate
-practical section; old saved reports remain historical and become stale when
-their sources change. Recalculate the ranking to refresh a saved report.
+The workspace is not a runtime, test runner, repository fetcher or plagiarism
+detector. Do not claim execution/tests passed from a text response. Keep conditions
+job-relevant and consistent. Discuss connection/device problems separately; do
+not turn camera or typing behaviour into a cheating score.
 
-## Assessment boundaries
+## Persistence, access and retention
 
-The LangGraph pipeline generates a structured assessment, validates exact source
-quotes and line ranges, then independently checks logical support against the
-approved criteria/materials. Every scored finding needs evidence. Unsupported
-findings become **Needs verification**; a provider/schema/evidence failure yields
-an unavailable assessment, never a zero. Numeric aggregation is deterministic:
-met=1, partially met=0.5, unmet=0, weighted by the approved rubric. If any criterion
-needs verification, the overall practical percentage is withheld.
+Migration `0024_live_work_samples` introduced private templates, exercises,
+submission/attempt storage and legacy AI reviews. Migration
+`0025_work_sample_decisions` adds one immutable interviewer decision per exercise
+and submission. Existing task JSON, submissions, hashes, reviews and reports stay
+historical. Old queued automatic grading is cancelled; automatic grading is no
+longer offered. No file uploads or new external services are needed.
 
-An independent AI check is not a guarantee of correctness. Human review remains
-essential. The code editor is a text workspace: no code execution, test runner,
-dependency installation, arbitrary repository fetching, or runtime verification
-exists in this version. Nothing may claim tests passed on that basis. Use
-job-relevant criteria and consistent conditions, allow appropriate adjustments,
-and never penalize device/connection problems or use camera/typing behaviour as
-a cheating score.
+Task generation uses the configured Gemini model and optional knowledge embedding
+service. Server-saved suggestion IDs, posting hashes, exercise versions and chat
+compare-and-swap protect selection from forged/stale requests. Private task saves
+and their assistant messages commit together; nothing is shared automatically.
 
-## Persistence and access
-
-Migration `0024_live_work_samples` adds private template, exercise, attempt and
-assessment tables to PostgreSQL. No external file uploads are accepted. Exercise
-commands serialize on the assigned interview row; candidate saves also require
-the expected attempt ID and draft revision to prevent stale-tab overwrites.
-Submitted attempts have content hashes and cannot be modified by normal saves.
+Commands serialize on the assigned interview row. Candidate saves additionally
+require the current submission ID and revision to prevent stale-tab overwrites.
+An identical repeated final submission/decision is idempotent; changed content or
+a changed final decision is rejected.
 
 Candidates use the existing expiring, revocable, application-scoped HttpOnly
-interview cookie and admission check; matching a candidate account's email never
-grants access. Candidate mutations require the configured frontend origin.
-Candidates cannot access templates, events, private reviews, assessment results,
-reports, or other candidates' work. Interviewer endpoints require JWT role and
-ownership checks. Sensitive responses are no-store; no credentials or submission
-content are written to application error logs.
+interview cookie and admission check. Mutations require the configured frontend
+origin. A matching candidate email is not authorization. Candidate responses
+exclude decisions, events, templates, reviews and other candidates' work.
+Interviewer routes require JWT role and ownership checks. Sensitive reads are
+no-store; credentials/submission content are not logged.
 
-`WORK_SAMPLE_RETENTION_DAYS` defaults to 30 days from task creation. Linking a
-discussion passage can shorten expiry to that passage's retention deadline.
-Expired exercise access is denied immediately; a durable worker removes expired
-work and derived reports. Candidate/application deletion explicitly removes work,
-attempts, assessments and derived reports. Deleting a transcript also removes
-practical assessments containing copies of that discussion, while retaining the
-independent written submission. Saved reusable templates remain until managed
-by their owner and must not contain candidate-specific personal information.
+`WORK_SAMPLE_RETENTION_DAYS` defaults to 30 days from task creation. Expired
+access is denied immediately; the worker removes expired work and derived reports.
+Application/interview deletion removes submissions, decisions and derived reports.
+Deleting transcript discussion sources still removes legacy reviews containing
+those copied passages; independent written submissions/manual decisions remain.
+Reusable templates must contain synthetic, non-personal data.
 
-The worker recovers only queued/interrupted assessments on backend restart.
-It never shares tasks, starts exercises, approves reviews, or sends email.
-Normal Docker restarts preserve database content. Build/restart the backend and
-frontend through the existing safe deployment procedure; startup applies the
-Alembic migration. No new external service is required beyond configured Gemini
-and the existing knowledge embedding service for optional AI task drafting.
+Build/restart only the web backend/frontend using the existing safe deployment
+procedure, with no live rooms or pending deliveries. Startup applies migration
+0025. The background worker only reconciles deadlines and retention; it never
+shares/starts tasks, grades responses, approves decisions, or sends email.
 
 ## Verification
 
-Offline tests use synthetic task/response data and fake models/media. Run:
+Offline tests use synthetic tasks/responses and fake models/media:
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/test_work_samples.py tests/test_migrations.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_work_samples.py tests/test_interview_copilot.py tests/test_final_ranking.py tests/test_migrations.py -q
 cd ../frontend
-npm run test:rooms -- tests/rooms/work-samples.test.tsx
+npm run test:rooms
 npm run build
 ```
 
-The real PostgreSQL concurrency tests use only disposable randomly named test
-databases when `PGVECTOR_TEST_SERVER_URL` is explicitly configured. No paid model,
-mail, publication, real candidate scoring, or browser automation is used for
-verification.
+PostgreSQL concurrency checks require an explicitly configured
+`PGVECTOR_TEST_SERVER_URL` and create disposable randomly named databases.
+Verification does not grade real candidates, call paid models, publish posts,
+send mail, or use browser automation.

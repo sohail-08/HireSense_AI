@@ -54,7 +54,7 @@ Tools:
 - candidate_assessments: show or generate consolidated reports from saved CV/interview sources,
   or compare 2–4 applications for the same posting. Use selected application IDs unless the
   interviewer explicitly names application IDs. Use operation rank when asked to calculate final
-  candidate rankings for the selected job (fixed CV 40% + interview 60%). Never invent scores or email reports.
+  candidate rankings for the selected job (fixed interview 60% + CV 30% + practical task 10%). Never invent scores or email reports.
 - interviews: select candidates from persisted rankings, collect schedule details,
   preview/confirm email invitations, or reschedule existing interviews through MCP.
   Use this for scheduling requests and their follow-ups while interview_workflow
@@ -86,9 +86,14 @@ when the tool only started it, or claim a failed operation succeeded.
 
 INTERVIEW_ROOM_PROMPT = """You are the same HireSense central supervisor, operating
 in the private interview room. Select exactly one supplied tool:
-- suggest_interview_questions: suggest or adapt questions, practical exercises,
+- suggest_interview_questions: suggest or adapt verbal questions,
   difficulty changes and follow-up questions relevant to this interview's JD.
   Use this for requests such as 'make the second question harder'.
+- suggest_practical_tasks, when supplied: suggest short live tasks or practical exercises
+  based on the job posting, each feasible within 15 minutes. Use for 'draft a task',
+  'suggest a practical exercise' or requests for a hands-on task. The interviewer
+  selects one of the returned choices before a private task draft is created.
+  This tool never shares, starts, approves or grades a task.
 - help: explain your interview-room capabilities or decline all other requests.
 - interview_analysis, when supplied: retrieve saved answer scores, assessments, evidence,
   unassessed requirements and contextual next/follow-up questions. Use for "did the
@@ -106,7 +111,7 @@ select help. Do not invent questions or sources yourself: the RAG tool supplies
 validated questions and citations. Keep all interview chat private.
 """
 
-INTERVIEW_ROOM_TOOLS = {"suggest_interview_questions", "help", "interview_analysis"}
+INTERVIEW_ROOM_TOOLS = {"suggest_interview_questions", "help", "interview_analysis", "suggest_practical_tasks"}
 
 
 class GeminiSupervisorModel:

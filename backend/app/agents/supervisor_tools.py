@@ -15,6 +15,7 @@ class InterviewRoomToolCallbacks:
     suggest_questions: ToolCallback
     help: ToolCallback
     analysis: ToolCallback | None = None
+    practical_tasks: ToolCallback | None = None
 
 
 def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_message: str) -> list[BaseTool]:
@@ -42,7 +43,15 @@ def build_interview_room_tools(callbacks: InterviewRoomToolCallbacks, *, user_me
         """
         return json.dumps(callbacks.analysis(user_message), ensure_ascii=False)
 
-    return [suggest_interview_questions, interview_help] + ([interview_analysis] if callbacks.analysis else [])
+    @tool("suggest_practical_tasks")
+    def suggest_practical_tasks(message: str) -> str:
+        """Suggest 2–3 short practical-task choices for this interview's job, each at most 15 minutes.
+
+        Only suggestions: never shares, starts, scores or approves a task. The human must select a choice.
+        """
+        return json.dumps(callbacks.practical_tasks(user_message), ensure_ascii=False)
+
+    return [suggest_interview_questions, interview_help] + ([interview_analysis] if callbacks.analysis else []) + ([suggest_practical_tasks] if callbacks.practical_tasks else [])
 
 
 class ScreeningToolRequest(BaseModel):
@@ -190,7 +199,7 @@ def build_supervisor_tools(
     def candidate_assessments(message: str, operation: Literal["show", "generate", "compare", "rank"] = "show", application_ids: list[int] = []) -> str:
         """Show saved consolidated candidate reports, generate a report from saved sources, or compare 2–4 applications for the same job.
 
-        Use rank only when asked to calculate final rankings for the selected job. It scores saved interview answers when needed and combines CV 40% + interview 60%.
+        Use rank only when asked to calculate final rankings for the selected job. It scores saved interview answers when needed and combines interview 60% + CV 30% + practical task 10%.
         Show/generate/compare use saved sources. Never re-screen CVs, email or invent scores or weights.
         """
         if not callbacks.assessments: raise ValueError("Candidate reports are unavailable")

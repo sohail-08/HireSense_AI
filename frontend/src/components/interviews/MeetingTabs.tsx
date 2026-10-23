@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 // Keep panels mounted so tab changes cannot lose a draft, captions or analysis.
-export function MeetingTabs({ label, tabs, fill = false, variant = "underline", pageScroll = false }: { label: string; tabs: { id: string; label: string; content: ReactNode }[]; fill?: boolean; variant?: "underline" | "segmented"; pageScroll?: boolean }) {
-  const [active, setActive] = useState(tabs[0].id);
+export function MeetingTabs({ label, tabs, fill = false, variant = "underline", pageScroll = false, activeId, onActiveChange }: { label: string; tabs: { id: string; label: string; content: ReactNode }[]; fill?: boolean; variant?: "underline" | "segmented"; pageScroll?: boolean; activeId?: string; onActiveChange?: (id: string) => void }) {
+  const [internalActive, setInternalActive] = useState(tabs[0].id);
+  const active = activeId ?? internalActive;
+  const setActive = (id: string) => { setInternalActive(id); onActiveChange?.(id); };
   const uid = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tablist = useRef<HTMLDivElement>(null);

@@ -5,7 +5,7 @@ from app.database import get_db
 from app.security import require_interviewer
 from app.models.user import User
 from app.routes.interview_rooms import COOKIE_NAME, candidate_origin, sensitive, run, limiter
-from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, DraftTask, Review, AssessExercise
+from app.schemas.work_sample import Task, SaveTask, Action, CandidateReady, SaveSubmission, CorrectnessDecision
 from app.services.work_sample import WorkSampleService
 
 router = APIRouter(tags=["Live work samples"])
@@ -70,25 +70,7 @@ def action(interview_id: int, data: Action, response: Response, db: Session = De
     return run(db, lambda: service.action(db, user.id, interview_id, data))
 
 
-@router.post("/api/work-samples/interviews/{interview_id}/draft")
-def draft(interview_id: int, data: DraftTask, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
+@router.post("/api/work-samples/interviews/{interview_id}/decision")
+def decision(interview_id: int, data: CorrectnessDecision, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
     sensitive(response)
-    if not limiter.allow(("work-draft", user.id), 5):
-        raise HTTPException(429, "Please wait before generating another draft")
-    try:
-        return run(db, lambda: service.draft_task(db, user.id, interview_id, data.brief))
-    except RuntimeError:
-        db.rollback()
-        raise HTTPException(503, "AI task drafting is unavailable. You can still prepare the task manually.") from None
-
-
-@router.post("/api/work-samples/interviews/{interview_id}/assess")
-def assess(interview_id: int, data: AssessExercise, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
-    sensitive(response)
-    return run(db, lambda: service.assess(db, user.id, interview_id, data.discussion_segment_ids))
-
-
-@router.post("/api/work-samples/interviews/{interview_id}/review")
-def review(interview_id: int, data: Review, response: Response, db: Session = Depends(get_db), user: User = Depends(require_interviewer), service=Depends(get_service)):
-    sensitive(response)
-    return run(db, lambda: service.review(db, user.id, interview_id, data))
+    return run(db, lambda: service.decide(db, user.id, interview_id, data))

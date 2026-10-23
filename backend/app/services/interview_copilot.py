@@ -1,4 +1,4 @@
-"""Read-only, interviewer-owned RAG assistance. Never sent over the media room."""
+"""Interviewer-owned assistance and explicitly selected private task drafts."""
 import json
 from sqlalchemy import select, update
 from app.config import get_settings
@@ -14,6 +14,7 @@ from app.schemas.interview_copilot import CopilotAnswer, InterviewCopilotContext
 from app.services.interview_rooms import InterviewRooms, RoomConflict
 from app.agents.supervisor_tools import InterviewRoomToolCallbacks
 from app.services.supervisor_service import SupervisorService
+from app.services.work_sample import WorkSampleService
 
 
 def names(items):
@@ -86,20 +87,41 @@ class InterviewCopilot:
         callbacks = InterviewRoomToolCallbacks(
             suggest_questions=lambda text: self._suggest_questions(db, context, interview_id, text),
             analysis=lambda text: self._analysis(db, user_id, interview_id, text),
+            practical_tasks=lambda text: {"phase": "interview_room", "outcome": "success", "refresh_required": False,
+                "assistant_message": "Choose a short task for this job. I’ll create the selected task and open Practical exercise for your review.",
+                "questions": [], "sources": [], "task_options": WorkSampleService(model=self.model, knowledge=self.knowledge).suggest_tasks(db, user_id, interview_id, text)},
             help=lambda _: {"phase": "interview_room", "outcome": "info", "refresh_required": False,
-                "assistant_message": "I am the HireSense central assistant. In the interview room I can suggest job-relevant questions and follow-ups using the knowledge base. For posting, email, scheduling, screening or JD changes, return to the relevant recruitment page. No business action was performed.",
+                "assistant_message": "I can suggest interview questions, short practical tasks, and insights from this interview. Select a suggested task to create its private draft. For posting, email, scheduling or CV screening, return to the relevant page. No business action was performed.",
                 "questions": [], "sources": []},
         )
-        result = SupervisorService.chat_interview(message=request.message, context=routing_context,
-            callbacks=callbacks, model=self.supervisor_model)
+        if request.selected_task_id:
+            latest_options = next((m.get("task_options", []) for m in reversed(context["messages"]) if m.get("task_options")), [])
+            option = next((o for o in latest_options if o["id"] == request.selected_task_id), None)
+            if not option:
+                raise RoomConflict("This task suggestion is no longer available. Ask for new suggestions.")
+            tasks = WorkSampleService(model=self.model, knowledge=self.knowledge)
+            task_request = tasks.create_selected_task(db, user_id, interview_id, option)
+            row = tasks.rooms.owned(db, user_id, interview_id, lock=True)
+            if row.copilot_version != request.version:
+                raise RoomConflict("This conversation changed. Reload before selecting a task.")
+            tasks.save_task(db, user_id, interview_id, task_request, commit=False)
+            result = {"assistant_message": f"Created {task_request.task.title} as a private {task_request.task.duration_minutes}-minute task. Review it in Practical exercise, then share it when ready.",
+                "questions": [], "sources": [], "tool_name": "create_practical_task", "task_created": True,
+                "selected_task_id": request.selected_task_id}
+        else:
+            result = SupervisorService.chat_interview(message=request.message, context=routing_context,
+                callbacks=callbacks, model=self.supervisor_model)
         answer = CopilotAnswer.model_validate({"message": result["assistant_message"], "questions": result["questions"]})
         messages = context["messages"] + [
             {"role": "user", "content": request.message, "questions": [], "sources": []},
             {"role": "assistant", "content": answer.message,
                 "questions": [item.model_dump() for item in answer.questions],
                 "sources": result["sources"], "tool_name": result["tool_name"],
+                "task_options": result.get("task_options", []), "task_created": result.get("task_created", False),
+                "selected_task_id": result.get("selected_task_id"),
                 "analysis_citations": result.get("analysis_citations", []), "analysis_run_id": result.get("analysis_run_id")},
         ]
+        navigate = result.get("task_created", False)
         InterviewRooms().owned(db, user_id, interview_id)
         result = db.execute(update(InterviewSchedule).where(InterviewSchedule.id == interview_id,
             InterviewSchedule.created_by_user_id == user_id, InterviewSchedule.copilot_version == request.version
@@ -108,7 +130,7 @@ class InterviewCopilot:
             db.rollback()
             raise RoomConflict("This conversation changed. Reload it before sending again.")
         db.commit()
-        return self.context(db, user_id, interview_id)
+        return {**self.context(db, user_id, interview_id), "open_practical_exercise": navigate}
 
     @staticmethod
     def _analysis(db, user_id, interview_id, message):

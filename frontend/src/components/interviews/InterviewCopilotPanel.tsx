@@ -8,15 +8,17 @@ import { AssistantBubble, AssistantComposer, AssistantIdentity, AssistantWorking
 
 type Question = { question: string; requirement: string; source_ids: number[] };
 type Message = { role: "user" | "assistant"; content: string; questions: Question[];
+  task_options?: { id: string; title: string; summary: string; duration_minutes: number; response_type: string }[]; task_created?: boolean;
   sources: { chunk_id: number; document_title: string; excerpt: string }[]; analysis_citations?: Citation[]; analysis_run_id?: number };
 export type CopilotContext = {
+  open_practical_exercise?: boolean;
   candidate: { name: string; email: string | null; phone: string | null; location: string | null;
     skills: string[]; qualifications: string[]; experience_years: number | null; recent_roles: string[] };
   job_title: string; required_skills: string[]; preferred_skills: string[]; qualifications: string[];
   minimum_experience: number | null; selection_criteria: string[]; messages: Message[]; version: number;
 };
 
-export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = false }: { interviewId: number; fill?: boolean; pageScroll?: boolean }) {
+export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = false, activeTab, onTabChange, onOpenPractical }: { interviewId: number; fill?: boolean; pageScroll?: boolean; activeTab?: string; onTabChange?: (id: string) => void; onOpenPractical?: () => void }) {
   const [context, setContext] = useState<CopilotContext>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string>();
@@ -34,14 +36,15 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
   }, [interviewId, attempt]);
   useEffect(() => { history.current?.scrollTo?.({ top: history.current.scrollHeight, behavior: "smooth" }); }, [context?.messages.length, busy]);
 
-  async function send(text: string) {
+  async function send(text: string, selectedTaskId?: string) {
     if (!context || !text.trim() || lock.current) return;
     lock.current = true; setBusy(true); setError(undefined);
     try {
       const result = await apiRequest<CopilotContext>(`/interview-rooms/${interviewId}/copilot`, {
-        method: "POST", body: JSON.stringify({ message: text.trim(), version: context.version }),
+        method: "POST", body: JSON.stringify({ message: text.trim(), version: context.version, ...(selectedTaskId ? { selected_task_id: selectedTaskId } : {}) }),
       });
       setContext(result); setMessage("");
+      if (result.open_practical_exercise) onOpenPractical?.();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not suggest questions. Please retry."); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -81,9 +84,11 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
   const assistant = <section aria-label="Interview assistant" className="hiresense-interview-assistant flex min-w-0 flex-col">
       <header className={assistantChatStyles.header}><div className="flex items-center gap-2.5"><AssistantIdentity subtitle="Private interview support" /></div></header>
       <div ref={history} role="log" aria-label="Interview assistant conversation" aria-live="polite" className={`h-[25rem] max-h-[60svh] min-h-48 ${assistantChatStyles.conversation}`}>
-        {!context.messages.length ? <AssistantBubble role="assistant"><p>Ask for interview questions, follow-ups, or insights from this interview.</p><button type="button" disabled={busy} className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></AssistantBubble> : null}
+        {!context.messages.length ? <AssistantBubble role="assistant"><p>Ask for interview questions, short practical tasks, or insights from this interview.</p><button type="button" disabled={busy} className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50" onClick={() => void send("Suggest 3 interview questions relevant to this job description.")}>Suggest questions</button></AssistantBubble> : null}
         {context.messages.map((item, index) => <AssistantBubble key={index} role={item.role} label={item.role === "user" ? "Your message" : "Assistant reply"}>
           <p className="whitespace-pre-wrap break-words leading-6">{item.content}</p>
+          {item.task_options?.length ? <div className="mt-3 space-y-2">{item.task_options.map(option => <section className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3" key={option.id}><div className="flex justify-between gap-2"><h3 className="text-sm font-semibold text-slate-800">{option.title}</h3><span className="shrink-0 text-xs font-medium text-indigo-700">{option.duration_minutes} min</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{option.summary}</p><button className="mt-3 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || context.messages.slice(index + 1).some(m => m.task_created)} onClick={() => void send(`Create task: ${option.title}`, option.id)}>Use this task</button></section>)}</div> : null}
+          {item.task_created ? <button className="mt-3 text-sm font-semibold text-indigo-700" onClick={onOpenPractical}>Open practical exercise →</button> : null}
           {item.analysis_run_id ? item.analysis_citations?.map((citation, i) => <TranscriptCitation key={i} citation={citation} runId={item.analysis_run_id!} interviewId={interviewId} />) : null}
           {item.questions.length ? <ol className="mt-3 list-decimal space-y-3 pl-5">{item.questions.map((question, i) => <li key={i}><p className="leading-6">{question.question}</p><p className="mt-1 text-xs text-slate-500">Job requirement: {question.requirement} · Sources: {question.source_ids.map((value) => `#${value}`).join(", ")}</p></li>)}</ol> : null}
           {item.sources.length ? <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-blue-700">Knowledge sources ({item.sources.length})</summary>{item.sources.map((source) => <blockquote key={source.chunk_id} className="mt-2 border-l-2 border-blue-200 pl-3"><p className="text-xs font-semibold">#{source.chunk_id} · {source.document_title}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">{source.excerpt}</p></blockquote>)}</details> : null}
@@ -95,6 +100,6 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
       </AssistantComposer>
     </section>;
   return <aside aria-label="Private interview assistance" className={`min-w-0 ${fill ? "hiresense-private-panel" : ""}`}>
-    <MeetingTabs fill={fill} pageScroll={pageScroll} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
+    <MeetingTabs fill={fill} pageScroll={pageScroll} activeId={activeTab} onActiveChange={onTabChange} label="Private interviewer tools" tabs={[{ id: "candidate", label: "Candidate info", content: candidateInfo }, { id: "assistant", label: "Assistant", content: assistant }]} />
   </aside>;
 }

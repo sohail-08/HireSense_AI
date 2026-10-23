@@ -19,7 +19,7 @@ def test_plain_highlights_keep_original_explanations_and_provenance():
         for old, new in zip(result["evidence_summary"][key], projected[key]):
             assert new["text"] == old["text"] and new["evidence_ids"] == old["evidence_ids"]
     assert result == before
-    assert result["score_summary"]["cv_weight"] == 40 and result["score_summary"]["interview_weight"] == 60
+    assert (result["score_summary"]["cv_weight"], result["score_summary"]["interview_weight"], result["score_summary"]["practical_weight"]) == (30, 60, 10)
 
 
 def test_uncertainty_stays_a_check_not_a_performance_weakness():

@@ -1,6 +1,6 @@
 """Private, interview-scoped practical exercises. Submitted attempts are immutable."""
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -64,3 +64,16 @@ class WorkSampleAssessment(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class WorkSampleDecision(Base):
+    """One immutable human decision; legacy AI reviews stay untouched."""
+    __tablename__ = "work_sample_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("work_sample_exercises.id", ondelete="CASCADE"), unique=True)
+    attempt_id: Mapped[int] = mapped_column(ForeignKey("work_sample_attempts.id", ondelete="CASCADE"), unique=True)
+    submission_hash: Mapped[str] = mapped_column(String(64))
+    correct: Mapped[bool] = mapped_column(Boolean)
+    note: Mapped[str] = mapped_column(Text, default="")
+    decided_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

@@ -1,11 +1,13 @@
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.schemas.work_sample import SuggestedTask
 
 
 class CopilotRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message: str = Field(min_length=1, max_length=2000)
     version: int = Field(ge=0)
+    selected_task_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
 
     @field_validator("message")
     @classmethod
@@ -39,7 +41,10 @@ class CopilotMessage(BaseModel):
     content: str
     questions: list[SuggestedQuestion] = Field(default_factory=list)
     sources: list[QuestionSource] = Field(default_factory=list)
-    tool_name: Literal["suggest_interview_questions", "help", "interview_analysis"] | None = None
+    tool_name: Literal["suggest_interview_questions", "help", "interview_analysis", "suggest_practical_tasks", "create_practical_task"] | None = None
+    task_options: list[SuggestedTask] = Field(default_factory=list)
+    selected_task_id: str | None = None
+    task_created: bool = False
     analysis_citations: list[dict] = Field(default_factory=list)
     analysis_run_id: int | None = None
 
@@ -65,3 +70,4 @@ class InterviewCopilotContext(BaseModel):
     selection_criteria: list[str]
     messages: list[CopilotMessage]
     version: int
+    open_practical_exercise: bool = False

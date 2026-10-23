@@ -3,7 +3,7 @@
 Evidence-grounded semantic CV matching, private pgvector passages, stable result
 reuse, and calibration checks are described in [robust CV screening](docs/robust-cv-screening.md).
 
-Final candidate rankings (CV 40% + interview 60%), question scores, optional evidence,
+Final candidate rankings (interview 60% + CV 30% + practical task 10%), question scores, optional evidence,
 and private HTML/PDF reports are documented in [Feature 6](docs/consolidated-assessments.md).
 
 Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
@@ -14,11 +14,12 @@ and interviewer correction/version history are documented in [Feature 5](docs/in
 ### Innovation Feature — Live Work-Sample Studio
 
 The interview console includes a practical-exercise workspace for technical and
-nontechnical roles: manual or AI-assisted task preparation, reusable private
-templates, candidate readiness, server-controlled timing, live read-only work,
-autosave, immutable submissions, optional linked discussion evidence, and
-human-approved assessments with exact source citations. Practical results remain
-separate from final ranking weights. No candidate code is executed and no AI-use
+nontechnical roles: assistant-suggested or manual task preparation, reusable private
+templates, candidate readiness, a maximum 15-minute working period, live read-only
+work, autosave and one immutable submission. The interviewer discusses the work
+and approves correctness for 100 marks or rejects it for 0. Final ranking uses
+60% interview, 30% CV and 10% practical; pending decisions remain unranked.
+No candidate code is executed and no AI-use
 or cheating detection is performed. See [setup and safeguards](docs/live-work-samples.md).
 
 Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`

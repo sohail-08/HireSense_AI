@@ -18,6 +18,33 @@ beforeEach(() => {
   api.mockReset(); api.mockResolvedValue(context);
   Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
 });
+
+test("selecting a suggested task sends only its saved ID and opens the practical workspace after success", async () => {
+  const option = { id: "a".repeat(32), title: "Fix a validation bug", summary: "Validate two supplied API inputs.", duration_minutes: 10, response_type: "code" };
+  const suggested = { ...context, version: 1, messages: [{ role: "assistant" as const, content: "Choose a task.", questions: [], sources: [], task_options: [option] }] };
+  api.mockResolvedValueOnce(suggested).mockResolvedValueOnce({ ...suggested, version: 2, open_practical_exercise: true,
+    messages: [...suggested.messages, { role: "assistant", content: "Private task created.", questions: [], sources: [], task_created: true }] });
+  const open = vi.fn();
+  render(<InterviewCopilotPanel interviewId={12} activeTab="assistant" onOpenPractical={open} />);
+  await screen.findByText("Fix a validation bug");
+  expect(open).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Use this task" }));
+  await waitFor(() => expect(open).toHaveBeenCalledOnce());
+  expect(JSON.parse(api.mock.calls[1][1].body)).toEqual({ message: "Create task: Fix a validation bug", version: 1, selected_task_id: option.id });
+  expect((screen.getByRole("button", { name: "Use this task" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a failed task creation does not navigate or consume the suggestion", async () => {
+  const option = { id: "a".repeat(32), title: "Quote a price", summary: "Calculate a total.", duration_minutes: 5, response_type: "text" };
+  api.mockResolvedValueOnce({ ...context, version: 1, messages: [{ role: "assistant", content: "Choose a task.", questions: [], sources: [], task_options: [option] }] })
+    .mockRejectedValueOnce(new Error("This task changed. Reload."));
+  const open = vi.fn();
+  render(<InterviewCopilotPanel interviewId={12} activeTab="assistant" onOpenPractical={open} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Use this task" }));
+  await screen.findByText("This task changed. Reload.");
+  expect(open).not.toHaveBeenCalled();
+  expect((screen.getByRole("button", { name: "Use this task" }) as HTMLButtonElement).disabled).toBe(false);
+});
 test("shows saved candidate details and requests cited questions for this interview", async () => {
   api.mockResolvedValueOnce(context).mockResolvedValueOnce({ ...context, version: 1, messages: [{ role: "assistant", content: "Try this question.",
     questions: [{ question: "How do you manage React state?", requirement: "React", source_ids: [7] }],

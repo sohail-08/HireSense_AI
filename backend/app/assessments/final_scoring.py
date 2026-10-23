@@ -5,10 +5,11 @@ import json
 import copy
 from app.agents.interview_analysis import score_pair
 
-FORMULA_VERSION = "cv40-interview60-v2"
-CV_WEIGHT = 40
+FORMULA_VERSION = "cv30-interview60-practical10-v3"
+CV_WEIGHT = 30
 INTERVIEW_WEIGHT = 60
-POLICY = f"Final score = {CV_WEIGHT}% CV score + {INTERVIEW_WEIGHT}% interview score. The interview score is the average of the scored questions."
+PRACTICAL_WEIGHT = 10
+POLICY = f"Final score = {INTERVIEW_WEIGHT}% interview + {CV_WEIGHT}% CV + {PRACTICAL_WEIGHT}% practical task. Practical correctness is approved by the interviewer (100 or 0)."
 DIMENSIONS = ("relevance", "accuracy", "completeness", "quality")
 
 
@@ -29,9 +30,32 @@ def cv_value(cv):
     return value
 
 
+def practical_value(report, source):
+    interviews = source.get("interviews", [])
+    if not interviews:
+        return None
+    selected = max(interviews, key=lambda i: (i.get("date", ""), i["id"]))["id"]
+    entries = [p for p in source.get("practical_assessments", []) if p["interview_id"] == selected]
+    if len(entries) != 1:
+        return None
+    entry = entries[0]
+    decision = entry.get("assessment") or {}
+    if (entry.get("review_status") != "reviewed" or decision.get("policy") != "interviewer-correctness-binary-v1"
+        or type(decision.get("correct")) is not bool or not decision.get("decision_id")
+        or decision.get("submission_hash") != entry.get("submission_hash")
+        or decision.get("exercise_id") != entry.get("exercise_id") or not decision.get("approved_by") or not decision.get("approved_at")):
+        return None
+    expected = 100 if decision["correct"] else 0
+    if decision.get("score") != expected or entry not in report.get("practical_assessments", []):
+        return None
+    return Fraction(expected)
+
+
 def score_summary(report, source):
     cv = report.get("cv")
-    result = {"formula_version": FORMULA_VERSION, "cv_weight": CV_WEIGHT, "interview_weight": INTERVIEW_WEIGHT,
+    practical = practical_value(report, source)
+    result = {"formula_version": FORMULA_VERSION, "cv_weight": CV_WEIGHT, "interview_weight": INTERVIEW_WEIGHT, "practical_weight": PRACTICAL_WEIGHT,
+        "practical_score": decimal(practical) if practical is not None else None,
         "cv_score": cv.get("final_score") if cv else None, "interview_score": None, "final_score": None,
         "question_count": 0, "unanswered_count": 0, "ready": False, "reason": "Interview not scored yet", "policy": POLICY}
     if not cv or cv.get("final_score") is None or not cv.get("compatible"):
@@ -92,11 +116,16 @@ def score_summary(report, source):
         result["reason"] = "Score the interview answers using the same scoring rules first."
         return result
     interview_score = sum(scores, Fraction(0)) / len(scores)
-    final = (cv_value(cv) * CV_WEIGHT + interview_score * INTERVIEW_WEIGHT) / 100
+    result.update(interview_score=decimal(interview_score), exact_interview_score=exact(interview_score),
+        question_count=len(scores), rubric_version=next(iter(rubrics)))
+    if practical is None:
+        result["reason"] = "The interviewer must approve or reject the practical task for the selected interview before the final score is available."
+        return result
+    final = (cv_value(cv) * CV_WEIGHT + interview_score * INTERVIEW_WEIGHT + practical * PRACTICAL_WEIGHT) / 100
     result.update(interview_score=decimal(interview_score), final_score=decimal(final),
         exact_interview_score=exact(interview_score), exact_final_score=exact(final),
         question_count=len(scores), rubric_version=next(iter(rubrics)), ready=True,
-        reason=f"The final score weights the CV score at {CV_WEIGHT}% and the interview score at {INTERVIEW_WEIGHT}%.")
+        reason=f"Final score: interview {INTERVIEW_WEIGHT}% + CV {CV_WEIGHT}% + practical task {PRACTICAL_WEIGHT}%.")
     return result
 
 
@@ -122,7 +151,7 @@ def rank_reports(reports):
         json.dumps(r["result"]["cv"]["configuration"], sort_keys=True),
         r["result"]["cv"]["formula_version"], r["result"]["score_summary"]["rubric_version"],
         r["result"]["score_summary"].get("formula_version"), r["result"]["score_summary"].get("cv_weight"),
-        r["result"]["score_summary"].get("interview_weight")) for r in ready}
+        r["result"]["score_summary"].get("interview_weight"), r["result"]["score_summary"].get("practical_weight")) for r in ready}
     issue = "The candidates used different scoring rules. Rank their CVs and score their interviews using the same rules first." if len(signatures) > 1 else None
     def value(r):
         v = r["result"]["score_summary"]["exact_final_score"]
