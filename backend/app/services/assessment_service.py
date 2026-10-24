@@ -227,7 +227,8 @@ class AssessmentService:
     def delete_sources(db, *, application_ids=(), interview_ids=(), expired=False):
         rows = list(db.scalars(select(AssessmentRun)))
         ids = [r.id for r in rows if r.application_id in application_ids or
-            any(i["id"] in interview_ids for i in r.snapshot.get("interviews", [])) or (expired and not unexpired(r))]
+            any(i["id"] in interview_ids for i in r.snapshot.get("interviews", [])) or
+            any(i["interview_id"] in interview_ids for i in r.snapshot.get("practical_assessments", [])) or (expired and not unexpired(r))]
         comparisons = list(db.scalars(select(AssessmentComparison)))
         cids = [c.id for c in comparisons if set(c.assessment_ids) & set(ids) or
             set(c.snapshot.get("selected_cohort_application_ids", [])) & set(application_ids) or

@@ -17,6 +17,72 @@ from test_interview_rooms import room_setup, setup, records  # noqa: F401
 from supervisor_fakes import QueueToolModel
 
 
+class TaskModel:
+    def __init__(self):
+        self.calls = []
+
+    def generate_json(self, **kwargs):
+        self.calls.append(json.loads(kwargs["prompt"]))
+        if "options" in kwargs["schema"].get("properties", {}):
+            return {"options": [{"title": title, "summary": "Fix a small API validation issue using supplied examples.",
+                "duration_minutes": 10, "response_type": "code"} for title in ("API validation", "Error handling")]}
+        from test_work_samples import TASK
+        return {**TASK, "title": "API validation", "duration_minutes": 15}
+
+
+def task_copilot():
+    return InterviewCopilot(KnowledgeBaseService(HashEmbeddingProvider()), TaskModel(), QueueToolModel(["suggest_practical_tasks"]))
+
+
+def test_task_suggestions_selection_and_navigation_are_explicit_private_and_persistent(room_setup):
+    from app.models.work_sample import WorkSampleExercise, WorkSampleAttempt
+    db, owner, *_ = room_setup[0]
+    row = room_setup[4]
+    service = task_copilot()
+    ideas = service.ask(db, owner.id, row.id, CopilotRequest(message="Draft a practical task", version=0))
+    options = ideas["messages"][-1]["task_options"]
+    assert len(options) == 2 and not ideas["open_practical_exercise"]
+    assert db.scalar(select(WorkSampleExercise)) is None
+    assert "job_description" in service.model.calls[0]["job_context"]
+    assert "candidate" not in service.model.calls[0]["job_context"]
+    selected = options[0]
+    created = service.ask(db, owner.id, row.id, CopilotRequest(message="Create the selected task", version=1, selected_task_id=selected["id"]))
+    assert created["open_practical_exercise"] and created["version"] == 2
+    assert created["messages"][-1]["task_created"]
+    task = db.scalar(select(WorkSampleExercise))
+    assert task.status == "draft" and task.task["duration_minutes"] == 10
+    assert "criteria" not in task.task
+    assert db.scalar(select(WorkSampleAttempt)) is None  # No sharing or timer side effect.
+    assert service.context(db, owner.id, row.id)["open_practical_exercise"] is False
+
+
+@pytest.mark.parametrize("case", ["forged_id", "old_chat", "changed_draft", "changed_job"])
+def test_invalid_or_stale_task_selection_cannot_create_or_overwrite_work(room_setup, case):
+    from app.models.job import JobPosting, JobDescription
+    from app.models.work_sample import WorkSampleExercise
+    from app.schemas.work_sample import SaveTask, Task
+    from app.services.work_sample import WorkSampleService
+    from test_work_samples import TASK
+    db, owner, *_ = room_setup[0]
+    row = room_setup[4]
+    service = task_copilot()
+    result = service.ask(db, owner.id, row.id, CopilotRequest(message="Suggest tasks", version=0))
+    selected = result["messages"][-1]["task_options"][0]["id"]
+    if case == "forged_id": selected = "f" * 32
+    elif case == "changed_draft":
+        WorkSampleService(rooms=room_setup[1]).save_task(db, owner.id, row.id, SaveTask(task=Task(**TASK), version=0))
+    elif case == "changed_job":
+        posting = db.get(JobPosting, row.job_posting_id)
+        db.get(JobDescription, posting.job_description_id).content += " Changed job scope."
+        db.commit()
+    with pytest.raises(RoomConflict):
+        service.ask(db, owner.id, row.id, CopilotRequest(message="Create task", version=0 if case == "old_chat" else 1, selected_task_id=selected))
+    db.rollback()
+    assert service.context(db, owner.id, row.id)["version"] == 1
+    exercise = db.scalar(select(WorkSampleExercise))
+    assert exercise.task == TASK if case == "changed_draft" else exercise is None
+
+
 class FakeModel:
     def __init__(self):
         self.calls = []
@@ -88,7 +154,7 @@ def test_context_and_rag_history_are_private_persistent_and_cited(room_setup):
     assert service.context(db, owner.id, row.id)["messages"] == result["messages"]
     assert result["messages"][1]["tool_name"] == "suggest_interview_questions"
     assert service.supervisor_model.calls == 1
-    assert set(service.supervisor_model.bindings[0]["names"]) == {"suggest_interview_questions", "help", "interview_analysis"}
+    assert set(service.supervisor_model.bindings[0]["names"]) == {"suggest_interview_questions", "help", "interview_analysis", "suggest_practical_tasks"}
     assert "candidate" not in service.supervisor_model.context
     assert apps[0].candidate.email not in json.dumps(service.supervisor_model.context)
     with pytest.raises(RoomConflict):

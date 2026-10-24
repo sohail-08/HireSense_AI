@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     transcription_agent_name: str = "hiresense-transcriber"
     transcription_interim_results: bool = True
     transcription_retention_days: int = Field(default=30, ge=1, le=3650)
+    work_sample_retention_days: int = Field(default=30, ge=1, le=3650)
     transcription_start_timeout_seconds: int = Field(default=45, ge=10, le=180)
     transcription_lease_seconds: int = Field(default=20, ge=10, le=120)
     deepgram_model: Literal["nova-3"] = "nova-3"

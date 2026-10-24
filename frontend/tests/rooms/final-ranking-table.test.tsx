@@ -47,7 +47,7 @@ it("keeps missing scores distinct from scientific-notation zero scores", () => {
   expect(within(first).getByText("2.68%")).toBeTruthy();
   expect(within(first).getAllByText("0.00%")).toHaveLength(2);
   const second = screen.getByText("Candidate 2").closest("tr")!;
-  expect(within(second).getAllByText("—")).toHaveLength(3);
+  expect(within(second).getAllByText("—")).toHaveLength(4);
   expect(within(second).getByText("Interview not scored yet")).toBeTruthy();
   expect(JSON.stringify(ranking)).toBe(original);
 });

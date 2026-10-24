@@ -4,8 +4,9 @@
 
 1. In **CV Screening**, select a job, choose the CV scoring weights, and rank CVs.
 2. Conduct the interviews and save the transcripts.
-3. In **Assessment**, select the job and click **Calculate final ranking**.
-4. Read the table: rank, candidate, CV score, interview score, final score.
+3. Let the AI verify/score the live practical response, then approve its result.
+4. In **Assessment**, select the job and click **Calculate final ranking**.
+   Read rank, candidate, CV score, interview score, practical score and final score.
 5. Search candidates by name and use the pagination controls for larger lists.
    Filtering and paging never renumber the saved ranks or recalculate scores.
 6. Open the **View details** button to inspect question scores in a modal. The
@@ -24,14 +25,14 @@ areas to improve are short, grouped highlights (three visible per card). Unasses
 topics and verification points stay in separate collapsed sections. Use **Show all**
 for additional highlights or **Sources** for original explanations and evidence.
 The concise wording is a deterministic presentation of validated labels and source
-statuses, not a new AI judgment. Original findings, scores and 40/60 weights are
-unchanged; existing saved reports adopt the presentation without being regenerated.
+statuses, not a new AI judgment. Existing saved reports adopt this presentation
+without changing their original findings, scores or saved weights.
 
 The main screen does not expose source hashes, requirement matrices, review
 checkboxes, version selectors, or a multi-step comparison form. Evidence is optional
 to inspect, not a gate that blocks the ranking. The existing CV Assessments page
 and its approved category weights are unchanged. The job selector and calculation
-action share a compact card with CV/interview weight chips. Table score bars are
+action share a compact card with CV/interview/practical weight chips. Table score bars are
 decorative: exact decimal formatting and server-provided ranks remain authoritative.
 Missing scores remain dashes, and zero scores remain zero. No model work or export
 is started by opening, searching, paging or inspecting the ranking.
@@ -40,11 +41,15 @@ is started by opening, searching, paging or inspecting the ranking.
 
 The interviewer approved this fixed formula:
 
-**Final score = CV score × 40% + interview score × 60%.**
+**Final score = interview score × 60% + CV score × 30% + practical score × 10%.**
 
-For example, CV 80% and interview 60% give a final score of 68%.
+For example, CV 80%, interview 60% and an approved practical score of 75% give
+67.5%. An approved practical 0 gives 60%. A pending, failed or unverified practical
+review is not zero and withholds the final score/rank. The LLM verifies correctness
+and proposes 0–100 marks; the interviewer only approves the saved result.
 
-Formula `cv40-interview60-v2` replaces the previous 50/50 policy. Click **Calculate
+Formula `cv30-interview60-practical10-llm-v4` keeps the 60/30/10 weights but requires
+verified, interviewer-approved LLM practical scores instead of manual binary marks. Click **Calculate
 final ranking** to update existing totals. Validated interview grades and CV scores
 are reused; changing these weights does not itself require another AI assessment.
 Historical reports retain their saved weights and totals, and old rankings/reports
@@ -89,7 +94,7 @@ The coordinator stores its state in the existing `assessment_comparisons` JSON
 snapshot and linked assessment IDs. No schema migration, separate database, or
 new service is needed. The original CV ranks and successful historical report
 versions are preserved. A changed transcript, CV score, job requirement, selected
-interview/analysis, or application cohort prompts **Calculate again**. Old reports
+interview/analysis, practical decision, or application cohort prompts **Calculate again**. Old reports
 are never relabelled with an invented final score.
 
 ## Main implementation files
@@ -121,7 +126,7 @@ and bounded by a hard subprocess deadline. A failed export cannot invalidate sco
 
 The supplied WBS rows 36–42 and business requirements Features 5–6 cover question
 answer analysis, consolidated assessment, reports and candidate comparison. This
-simpler UI retains those functions while using the interviewer's approved 40/60
+simpler UI retains those functions while using the interviewer's approved 60/30/10
 policy. The original WBS spreadsheet and requirements PDF were not modified.
 
 ## Verification and synthetic samples

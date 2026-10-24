@@ -40,6 +40,7 @@ from app.models.transcription import TranscriptionSession, TranscriptionConsent,
 from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
 from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
 from app.models.cv_evidence import CVPassage
+from app.models.work_sample import WorkSampleTemplate, WorkSampleExercise, WorkSampleAttempt, WorkSampleAssessment, WorkSampleDecision
 
 __all__ = [
     "CVPassage",

@@ -11,6 +11,7 @@ const sdk = getSdk();
 
 const api = vi.hoisted(() => ({ exchange: vi.fn(), candidateStatus: vi.fn(), waiting: vi.fn(), candidateMedia: vi.fn(), candidateConnected: vi.fn(), candidateLeave: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
+vi.mock("../../src/components/interviews/workSampleApi", async (original) => ({ ...await original<any>(), workSampleApi: { candidateRead: vi.fn(async () => ({ exercise: null, server_now: "2030-10-14T02:00:00Z" })) } }));
 const info = { job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "scheduled", waiting: false, admitted: false, link_expires_at: "2030-11-13T02:00:00Z" };
 function open() { return render(<MemoryRouter initialEntries={["/interview/join/" + "a".repeat(43)]}><Routes><Route path="/interview/join/:token" element={<CandidateInterviewPage />} /></Routes></MemoryRouter>); }
 beforeEach(() => {

@@ -3,13 +3,25 @@
 Evidence-grounded semantic CV matching, private pgvector passages, stable result
 reuse, and calibration checks are described in [robust CV screening](docs/robust-cv-screening.md).
 
-Final candidate rankings (CV 50% + interview 50%), question scores, optional evidence,
+Final candidate rankings (interview 60% + CV 30% + practical task 10%), question scores, optional evidence,
 and private HTML/PDF reports are documented in [Feature 6](docs/consolidated-assessments.md).
 
 Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
 and interviewer correction/version history are documented in [Feature 5](docs/interview-analysis.md).
 
 ## Current milestone
+
+### Innovation Feature — Live Work-Sample Studio
+
+The interview console includes a practical-exercise workspace for technical and
+nontechnical roles: assistant-suggested or manual task preparation, reusable private
+templates, candidate readiness, a maximum 15-minute working period, live read-only
+work, autosave and one immutable submission. The LLM verifies the saved work and
+proposes a correctness score (0–100); the interviewer only approves that score.
+Unverified or unapproved scores remain pending. Final ranking uses
+60% interview, 30% CV and 10% practical; pending decisions remain unranked.
+No candidate code is executed and no AI-use
+or cheating detection is performed. See [setup and safeguards](docs/live-work-samples.md).
 
 Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
 calendar attachments and rescheduling are implemented. Both the central assistant

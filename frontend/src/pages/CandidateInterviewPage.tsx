@@ -6,6 +6,7 @@ import { roomApi, RoomApiError, type CandidateRoomInfo, type DeviceChoices, type
 import { accessMessage, formatRoomTime } from "../components/interviews/roomState";
 import { TranscriptionProvider, TranscriptionPanel } from "../components/interviews/TranscriptionPanel";
 import { MeetingIcon } from "../components/interviews/MeetingIcon";
+import { CandidateWorkSample } from "../components/interviews/CandidateWorkSample";
 
 export function CandidateInterviewPage() {
   const { token } = useParams();
@@ -50,7 +51,10 @@ export function CandidateInterviewPage() {
           } finally { busy.current = false; }
         }
       }).catch((failure) => {
-        if (active) setFatal(failure instanceof RoomApiError ? failure : new RoomApiError("network_error", 0));
+        if (active) {
+          if (failure instanceof RoomApiError && failure.status > 0 && failure.status < 500) setFatal(failure);
+          else setMessage("Connection interrupted. Keep this page open; interview status will retry.");
+        }
       }).finally(() => { polling = false; });
     }, 2000);
     return () => { active = false; window.clearInterval(timer); };
@@ -95,6 +99,7 @@ export function CandidateInterviewPage() {
           </div>
           </TranscriptionProvider>
         </>}
+        {info?.admitted ? <div className="mt-5"><CandidateWorkSample closed={Boolean(fatal && fatal.status > 0 && fatal.status < 500)} /></div> : null}
       </div>
     </main>
   );

@@ -141,6 +141,7 @@ details[open] > .hiresense-console-link-options .hiresense-console-link-chevron 
 .hiresense-meeting-tabs-segmented > [role="tablist"] > [role="tab"] { flex: 1; min-width: 0; min-height: 2.75rem; border: 1px solid transparent; border-radius: 0.625rem; padding: 0.5rem; font-size: 0.75rem; line-height: 1.25rem; color: #64748b; }
 .hiresense-meeting-tabs-segmented > [role="tablist"] > [role="tab"][aria-selected="true"] { border-color: var(--color-blue-200); background: var(--color-blue-50); color: var(--color-blue-700); box-shadow: 0 1px 3px #17133310; }
 .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel:not([hidden]) { overflow: hidden; margin-top: 0.625rem; scrollbar-gutter: auto; }
+.hiresense-console:not(.hiresense-console-review) .hiresense-console-tools > .hiresense-meeting-tabs-segmented > .hiresense-meeting-panel[data-panel-id="workspace-practical"]:not([hidden]) { overflow-y: auto; scrollbar-gutter: stable; }
 .hiresense-private-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 .hiresense-private-panel[data-loading="true"] { display: block; overflow-y: auto; }
 .hiresense-private-panel > .hiresense-meeting-tabs-fill { flex: 1; height: auto; min-height: 0; }

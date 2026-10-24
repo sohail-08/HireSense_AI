@@ -11,7 +11,8 @@ export type CV = { final_score: string | null; categories: Record<string, string
   document_id: number; original_cv_rank: number | null; original_cohort: number[]; configuration_id: number; formula_version: string;
   written_justification: string; configuration: { category_weights: Record<string, string> }; breakdown: { counts: Record<string, number> } };
 export type ReportData = { identification: { application_id: number; job_posting_id: number; candidate_name: string; job_title: string; requirement_version: string };
-  score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; cv_weight?: number; interview_weight?: number; formula_version?: string; ready: boolean; reason: string; question_count: number; unanswered_count: number };
+  practical_assessments?: import("../interviews/workSampleApi").PracticalReport[];
+  score_summary?: { cv_score: string | null; interview_score: string | null; final_score: string | null; cv_weight?: number; interview_weight?: number; practical_score?: string | null; practical_weight?: number; formula_version?: string; ready: boolean; reason: string; question_count: number; unanswered_count: number };
   simple_summary?: { strengths: { text: string; evidence_ids: string[] }[]; improvements: { text: string; evidence_ids: string[] }[] };
   evidence_summary?: Record<"strengths" | "weaknesses" | "evidence_gaps" | "verification", { text: string; summary_text?: string; evidence_ids: string[] }[]>;
   cv: CV | null; completeness: string; missing: string[]; flags: string[]; policy: string; evidence: Record<string, Evidence>; matrix: MatrixRow[];
@@ -33,7 +34,7 @@ export type Comparison = { id: number; created_at: string; stale_source_assessme
 export type Artifact = { id: number; status: string; format: "html" | "pdf"; error?: string; sha256?: string };
 export type FinalRanking = { id: number | null; status: string; stage: string; policy: string; stale: boolean; error?: string;
   incompatibilities: string[]; candidates: { application_id: number; candidate_name: string; cv_score: string | null;
-  interview_score: string | null; final_score: string | null; final_rank: number | null; assessment_id: number | null; reason: string }[] };
+  interview_score: string | null; practical_score?: string | null; final_score: string | null; final_rank: number | null; assessment_id: number | null; reason: string }[] };
 export const assessmentApi = {
   ranking: (job: number) => apiRequest<FinalRanking>(`/assessments/jobs/${job}/ranking`),
   calculate: (job: number) => apiRequest<FinalRanking>(`/assessments/jobs/${job}/ranking`, { method: "POST", body: JSON.stringify({ confirmed: true }) }),

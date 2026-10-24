@@ -11,6 +11,7 @@ import { InterviewAnalysisPanel } from "../components/interviews/InterviewAnalys
 import { MeetingTabs } from "../components/interviews/MeetingTabs";
 import { MeetingIcon } from "../components/interviews/MeetingIcon";
 import { PreviewModal } from "../components/common/PreviewModal";
+import { WorkSamplePanel } from "../components/interviews/WorkSamplePanel";
 
 export function InterviewerConsolePage() {
   const id = Number(useParams().interviewId);
@@ -22,6 +23,10 @@ export function InterviewerConsolePage() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState("workspace-transcript");
+  const [privateTab, setPrivateTab] = useState("candidate");
+  const [exerciseRefresh, setExerciseRefresh] = useState(0);
+  const openPractical = () => { setWorkspaceTab("workspace-practical"); setExerciseRefresh(value => value + 1); };
   const [confirmLink, setConfirmLink] = useState<"rotate" | "revoke">();
   useEffect(() => {
     let active = true;
@@ -103,19 +108,20 @@ export function InterviewerConsolePage() {
              /> : null}
           </div> : null}
           <aside className="hiresense-console-tools" aria-label="Interviewer workspace">
-          <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} variant="segmented" label="Workspace panel" tabs={[
+          <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} activeId={workspaceTab} onActiveChange={setWorkspaceTab} variant="segmented" label="Workspace panel" tabs={[
             { id: "workspace-transcript", label: "Transcript & analysis", content: <div className="hiresense-console-transcript">
               <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} label="Interview workspace" tabs={[
             { id: "transcript", label: "Live transcript", content: <TranscriptionPanel closed={Boolean(closed)} panelScroll={!closed} pageScroll={Boolean(closed)} /> },
             { id: "analysis", label: "Answer analysis", content: <InterviewAnalysisPanel key={id} interviewId={id} /> },
               ]} />
             </div> },
-            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel fill={!closed} pageScroll={Boolean(closed)} key={id} interviewId={id} /></div> },
+            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel activeTab={privateTab} onTabChange={setPrivateTab} onOpenPractical={openPractical} fill={!closed} pageScroll={Boolean(closed)} key={id} interviewId={id} /></div> },
+            { id: "workspace-practical", label: "Practical exercise", content: <WorkSamplePanel key={id} interviewId={id} closed={Boolean(closed)} refreshKey={exerciseRefresh} onAskAssistant={() => { setWorkspaceTab("workspace-private"); setPrivateTab("assistant"); }} /> },
           ]} />
           </aside>
           </div>
           </TranscriptionProvider>
-          {confirmEnd ? <PreviewModal title="End this interview?" onClose={() => setConfirmEnd(false)} busy={busy}><p className="text-slate-600">Everyone will be disconnected and the candidate will no longer be able to rejoin.</p><div className="mt-5 flex flex-wrap justify-end gap-3"><button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" disabled={busy} onClick={() => setConfirmEnd(false)}>Keep interview open</button><button className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white" disabled={busy} onClick={() => void end()}>Confirm end interview</button></div></PreviewModal> : null}
+          {confirmEnd ? <PreviewModal title="End this interview?" onClose={() => setConfirmEnd(false)} busy={busy}><p className="text-slate-600">Everyone will be disconnected and the candidate will no longer be able to rejoin. Any unfinished practical exercise will stop; its latest server-saved work will be preserved, not marked as a candidate-confirmed submission.</p><div className="mt-5 flex flex-wrap justify-end gap-3"><button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" disabled={busy} onClick={() => setConfirmEnd(false)}>Keep interview open</button><button className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white" disabled={busy} onClick={() => void end()}>Confirm end interview</button></div></PreviewModal> : null}
           {confirmLink ? <PreviewModal title={confirmLink === "rotate" ? "Replace candidate link?" : "Revoke candidate access?"} onClose={() => setConfirmLink(undefined)} busy={busy}><p className="text-slate-600">Old candidate access and sessions will stop working. No replacement email is sent automatically.</p><div className="mt-5 flex justify-end gap-3"><button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" disabled={busy} onClick={() => setConfirmLink(undefined)}>Cancel</button><button className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white" disabled={busy} onClick={() => { const operation = confirmLink; setConfirmLink(undefined); if (operation === "rotate") void copyLink("/rotate"); else void action(async () => setInfo(await roomApi.revoke(id))); }}>Confirm</button></div></PreviewModal> : null}
         </>}
       </div>

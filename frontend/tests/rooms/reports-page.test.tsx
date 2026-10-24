@@ -93,7 +93,8 @@ it("keeps saved scores visible and lets the user retry when calculation fails", 
   expect(await screen.findByRole("alert")).toBeTruthy();
   await waitFor(() => expect((screen.getByRole("button", { name: "Calculate final ranking" }) as HTMLButtonElement).disabled).toBe(false));
   expect(screen.getByText("10.00%")).toBeTruthy();
-  expect(screen.getByText("CV 40%")).toBeTruthy();
+  expect(screen.getByText("CV 30%")).toBeTruthy();
+  expect(screen.getByText("Practical 10%")).toBeTruthy();
   expect(screen.getByText("Interview 60%")).toBeTruthy();
 });
 

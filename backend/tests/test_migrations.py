@@ -29,6 +29,9 @@ def test_baseline_migration_creates_schema(tmp_path):
 
     assert "users" in inspector.get_table_names()
     assert "alembic_version" in inspector.get_table_names()
+    assert {"work_sample_templates", "work_sample_exercises", "work_sample_attempts", "work_sample_assessments", "work_sample_decisions"}.issubset(inspector.get_table_names())
+    grading_policy = next(c for c in inspector.get_columns("work_sample_exercises") if c["name"] == "grading_policy")
+    assert grading_policy["nullable"] and grading_policy["default"] is None  # Historical work is not opted in.
     assert "cv_passages" in inspector.get_table_names()
     assert {"input_fingerprint", "processing_metadata"}.issubset(c["name"] for c in inspector.get_columns("screening_runs"))
     assert {"scoring_configurations", "scoring_runs", "candidate_scores", "scoring_request_keys"}.issubset(inspector.get_table_names())

@@ -94,7 +94,7 @@ class FinalRankingService:
         for app_id in ids:
             source = resolve_sources(db, user_id, app_id, GenerateAssessment())
             candidates.append({"application_id": app_id, "candidate_name": source["identification"]["candidate_name"],
-                "cv_score": (source.get("cv") or {}).get("final_score"), "interview_score": None, "final_score": None,
+                "cv_score": (source.get("cv") or {}).get("final_score"), "interview_score": None, "practical_score": None, "final_score": None,
                 "final_rank": None, "assessment_id": None, "reason": "Calculate the final ranking to score interview answers."})
         return {"id": None, "status": "not_started", "stage": "not_started", "policy": POLICY, "candidates": candidates,
             "stale": False, "incompatibilities": []}
@@ -117,11 +117,11 @@ class FinalRankingService:
             summary = (item or {}).get("result", {}).get("score_summary", {})
             candidates.append({"application_id": app_id, "candidate_name": current["identification"]["candidate_name"],
                 "cv_score": summary.get("cv_score", (current.get("cv") or {}).get("final_score")),
-                "interview_score": summary.get("interview_score"), "final_score": summary.get("final_score"),
+                "interview_score": summary.get("interview_score"), "practical_score": summary.get("practical_score"), "final_score": summary.get("final_score"),
                 "final_rank": (item or {}).get("final_rank"), "assessment_id": plan.get("assessment_id"),
                 "reason": summary.get("reason", plan.get("error", "Interview not scored yet"))})
         candidates.sort(key=lambda c: (c["final_rank"] is None, c["final_rank"] or 0, c["application_id"]))
-        return {"id": row.id, "status": snapshot["status"], "stage": snapshot["stage"], "policy": POLICY,
+        return {"id": row.id, "status": snapshot["status"], "stage": snapshot["stage"], "policy": snapshot.get("policy", POLICY),
             "candidates": candidates, "stale": stale, "incompatibilities": snapshot.get("incompatibilities", []),
             "error": snapshot.get("error")}
 

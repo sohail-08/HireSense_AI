@@ -6,8 +6,8 @@ from langgraph.graph import START, END, StateGraph
 from app.agents.interview_analysis import canonical_quote, digest, provider_schema
 from app.schemas.assessment import SummarySelection, ReportData
 
-PROMPT_VERSION = "consolidation-evidence-summary-v4-cv40-interview60"
-POLICY = "Historical CV-only comparison. Calculate the final ranking to include interview scores using CV 40% + interview 60%."
+PROMPT_VERSION = "consolidation-evidence-summary-v6-approved-llm-practical-score"
+POLICY = "Calculate final ranking using interview 60% + CV 30% + practical task 10%."
 
 
 class State(TypedDict, total=False):
@@ -265,7 +265,7 @@ def build_report(snapshot):
     result = {"identification": copy.deepcopy(snapshot["identification"]), "cv": {k: copy.deepcopy(v) for k, v in cv.items() if k not in {"source_blocks", "matches"}} if cv else None,
         "interviews": interviews, "matrix": matrix, "evidence": evidence, "completeness": "partial" if missing or flags else "complete",
         "missing": sorted(set(missing)), "flags": sorted(set(flags)), "facts": facts, "summary": {}, "policy": POLICY,
-        "evidence_summary": evidence_summary}
+        "evidence_summary": evidence_summary, "practical_assessments": copy.deepcopy(snapshot.get("practical_assessments", []))}
     from app.assessments.performance_summary import report_performance_summary
     result["evidence_summary"] = report_performance_summary(result)
     return result

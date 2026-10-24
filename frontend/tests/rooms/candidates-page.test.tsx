@@ -141,7 +141,7 @@ it("requires explicit deletion confirmation and removes the row after success", 
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(screen.queryByRole("button", { name: "Inspect Ada Candidate" })).toBeNull();
   expect(apiRequest).toHaveBeenCalledWith("/candidates/applications/1", { method: "DELETE" });
-  expect(document.activeElement).toBe(screen.getByLabelText("Search candidates"));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Search candidates")));
 });
 
 it("keeps the candidate and shows the error when deletion fails", async () => {

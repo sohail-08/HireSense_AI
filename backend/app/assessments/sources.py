@@ -188,13 +188,17 @@ def resolve_sources(db, user_id, application_id, request):
             "reviews": [{"id": r.id, "run_id": r.run_id, "kind": r.kind, "target_id": r.target_id,
                 "payload": copy.deepcopy(r.payload), "created_by": r.created_by, "created_at": utc(r.created_at).isoformat()}
                 for r in reviews if analysis and r.run_id == analysis.id]})
+    from app.services.work_sample import WorkSampleService
+    practical = WorkSampleService.report_sources(db, user_id, app.id)
+    expires.extend(datetime.fromisoformat(p["expires_at"]) for p in practical)
     snapshot = {"identification": {"application_id": app.id, "job_posting_id": app.job_posting_id,
         "job_title": job.title, "candidate_name": candidate.name if candidate and candidate.name else f"Application #{app.id}",
         "requirement_version": version}, "requirements": requirements, "cv": cv, "interviews": interviews,
         "missing": sorted(set(missing)), "flags": sorted(set(flags)), "selection_policy": SELECTION_POLICY,
         "selection": request.model_dump(exclude={"new_version"}),
         "expires_at": min(expires).isoformat() if expires else None,
-        "current_requirement_version": current_version, "current_cv_sha256": latest_cv.sha256 if latest_cv else None}
+        "current_requirement_version": current_version, "current_cv_sha256": latest_cv.sha256 if latest_cv else None,
+        "practical_assessments": practical}
     # Stable source identity, not unrelated job/application counters or timestamps.
     snapshot["source_key"] = digest({k: v for k, v in snapshot.items() if k not in {"identification", "expires_at"}})
     return snapshot
