@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     cv_max_pages: int = Field(default=40, ge=1, le=500)
     cv_max_characters: int = Field(default=150_000, ge=1_000, le=2_000_000)
     cv_min_extract_characters: int = Field(default=80, ge=1, le=10_000)
+    cv_ocr_enabled: bool = True
+    cv_ocr_language: str = Field(default="eng", pattern=r"^[a-zA-Z0-9_]+(?:\+[a-zA-Z0-9_]+)*$")
+    cv_ocr_min_confidence: float = Field(default=80, ge=50, le=100)
+    cv_ocr_max_uncertain_ratio: float = Field(default=0.15, ge=0, le=0.5)
+    cv_ocr_max_pages: int = Field(default=8, ge=1, le=40)
+    cv_ocr_timeout_seconds: int = Field(default=120, ge=10, le=300)
+    cv_ocr_max_image_side: int = Field(default=3500, ge=1500, le=4500)
     screening_batch_max_applications: int = Field(default=50, ge=1, le=500)
     screening_evidence_top_k: int = Field(default=6, ge=2, le=12)
     screening_engine_revision: str = "semantic-evidence-v1"

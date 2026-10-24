@@ -19,6 +19,7 @@ from app.services.scoring_service import ScoringService, fingerprint
 from app.services.scoring_calculation import display_score
 from app.services.interview_content import allocate_slots, render_email, calendar_invitation, SMTPInvitationSender, utc
 from app.services.interview_links import InterviewLinks, JOIN_PLACEHOLDER, redact_join_links, ACCESS_POLICY
+from app.screening.ocr import blocking_extraction_warnings
 
 UTC = timezone.utc
 ACTIVE = ("scheduled", "rescheduled")
@@ -86,7 +87,7 @@ class InterviewService:
         if application.status in {ApplicationStatus.WITHDRAWN, ApplicationStatus.REJECTED}:
             reasons.append("Application is withdrawn or rejected")
         document = db.scalar(select(CVDocument).where(CVDocument.application_id == application.id).order_by(CVDocument.id.desc()))
-        if not document or document.status != CVProcessingStatus.PROCESSED or document.extraction_warnings:
+        if not document or document.status != CVProcessingStatus.PROCESSED or document.error_message or blocking_extraction_warnings(document):
             reasons.append("CV processing is incomplete or has unresolved document problems")
         if db.scalar(select(InterviewSchedule.id).where(InterviewSchedule.application_id == application.id,
             InterviewSchedule.stage == stage, InterviewSchedule.status.in_(ACTIVE))):

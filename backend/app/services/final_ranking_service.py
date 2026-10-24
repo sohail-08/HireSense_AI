@@ -15,6 +15,7 @@ from app.schemas.assessment import GenerateAssessment
 from app.schemas.interview_analysis import StartAnalysis
 from app.services.assessment_service import AssessmentService, unexpired
 from app.services.interview_analysis import InterviewAnalysisService
+from app.services.application_identity import current_application_ids
 
 
 def source_identity(source):
@@ -52,8 +53,7 @@ class FinalRankingService:
         previous = self.latest(db, job_id)
         if previous and previous.snapshot["status"] == "processing":
             return self.read(db, user_id, job_id)
-        ids = list(db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == job_id)
-            .order_by(CandidateApplication.id)))
+        ids = current_application_ids(db, job_id)
         if not ids: raise ValueError("No candidates have applied for this job yet.")
         sources = [resolve_sources(db, user_id, app_id, GenerateAssessment()) for app_id in ids]
         fingerprint = digest([FORMULA_VERSION, self.scoring_policy(), [source_identity(s) for s in sources]])
@@ -89,7 +89,7 @@ class FinalRankingService:
         self.owned_job(db, user_id, job_id)
         row = self.latest(db, job_id)
         if row: return self.present(db, user_id, row)
-        ids = list(db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == job_id)))
+        ids = current_application_ids(db, job_id)
         candidates = []
         for app_id in ids:
             source = resolve_sources(db, user_id, app_id, GenerateAssessment())
@@ -102,7 +102,7 @@ class FinalRankingService:
     def present(self, db, user_id, row):
         self.owned_job(db, user_id, row.job_posting_id)
         snapshot = row.snapshot
-        current_ids = list(db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == row.job_posting_id)))
+        current_ids = current_application_ids(db, row.job_posting_id)
         stale = sorted(current_ids) != sorted(snapshot["selected_cohort_application_ids"]) or snapshot.get("scoring_policy") != self.scoring_policy() or snapshot.get("formula_version") != FORMULA_VERSION
         candidates = []
         saved = {r["application_id"]: r for r in snapshot.get("assessments", [])}

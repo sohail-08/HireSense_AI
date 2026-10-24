@@ -152,6 +152,8 @@ class CandidateIdentityService:
         if admitted and not row.candidate_admitted_at:
             raise RoomAccessError("not_admitted", 403)
         session = db.scalar(select(CandidateInterviewSession).where(CandidateInterviewSession.session_hash == secret_hash(token)))
+        if session is None:
+            raise RoomAccessError("invalid_session", 401)
         return row, session
 
     def state(self, db, row, session=None):
@@ -177,6 +179,26 @@ class CandidateIdentityService:
         if session is None:
             result.update(similarity=check.similarity if valid else None, threshold=check.threshold if valid else None,
                 manual_note=check.manual_note if valid and check.status == "manual" else None)
+        else:
+            # Candidate endpoints expose only consent/capture workflow state.
+            # A successful match, mismatch and manual decision have the same
+            # public completion state; comparison details stay interviewer-only.
+            completed = bool(valid and check.checked_at and (check.status == "manual" or
+                (active and check.reference_generation == ref.generation and check.status in {"matched", "unverified"})))
+            public_status = "submitted" if completed else reason if reason in {"not_checked", "pending_consent", "declined", "withdrawn"} else "preparing" if reason in {"queued", "processing"} else "unavailable"
+            messages = {
+                "submitted": "Verification submitted. Your interviewer will review it.",
+                "not_checked": "Consent saved. Camera samples can be captured after you join.",
+                "pending_consent": "Choose whether to allow optional photo verification.",
+                "declined": "Photo verification skipped. You can continue with your interview.",
+                "withdrawn": "Consent withdrawn. Your HireSense face data has been deleted.",
+                "preparing": "Preparing photo verification.",
+                "unavailable": "Photo verification is unavailable. You can continue with your interview.",
+            }
+            result = {key: result[key] for key in ("enabled", "reference_ready", "reference_available", "version",
+                "consented", "notice_version", "notice", "reference_expires_at")}
+            result.update(status=public_status, message=messages[public_status], capture_available=bool(
+                result["consented"] and active and row.candidate_admitted_at and check.status != "manual"))
         return result
 
     def candidate_state(self, db, token):

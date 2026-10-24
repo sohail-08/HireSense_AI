@@ -216,8 +216,20 @@ def test_mixed_pdf_with_image_only_page_is_not_partially_scored(tmp_path, monkey
     pages = [SimpleNamespace(extract_text=lambda: "Synthetic readable Python CV", images=[]),
         SimpleNamespace(extract_text=lambda: "", images=[object()])]
     monkeypatch.setattr(module, "PdfReader", lambda path: SimpleNamespace(is_encrypted=False, pages=pages))
-    with pytest.raises(module.CVReviewRequired, match="image-only.*OCR"):
-        module.CVParser(_settings(tmp_path))._parse_pdf(tmp_path / "synthetic.pdf")
+    from app.screening.ocr import OCRReadError
+    class UnreadableOCR:
+        def read_page(self, *args, **kwargs):
+            raise OCRReadError("CV OCR confidence is too low; upload a clearer scan")
+    with pytest.raises(module.CVReviewRequired, match="OCR confidence is too low"):
+        module.CVParser(_settings(tmp_path), ocr=UnreadableOCR())._parse_pdf(tmp_path / "synthetic.pdf")
+
+
+def test_image_only_failure_remains_actionable_and_contains_no_private_details():
+    from app.services.screening_service import safe_screening_error
+    from app.screening.parsing import CVReviewRequired
+    message = "A CV page is image-only and needs OCR or a text-based replacement. No candidate score was assigned."
+    assert safe_screening_error(CVReviewRequired(message)) == message
+    assert "PRIVATE" not in safe_screening_error(RuntimeError("PRIVATE file path and CV content"))
 
 
 def test_identical_cv_results_reused_across_applications_without_ai(tmp_path):

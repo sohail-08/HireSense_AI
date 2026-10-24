@@ -194,6 +194,8 @@ class ScoringService:
         applications = list(db.scalars(query.order_by(CandidateApplication.id)))
         if ids is not None and len(applications) != len(ids):
             raise LookupError("Selected applications must belong to this job")
+        from app.services.application_identity import canonical_applications
+        applications = canonical_applications(db, applications)
         inputs = []
         for app in applications:
             document = db.scalar(select(CVDocument).where(CVDocument.application_id == app.id).order_by(CVDocument.created_at.desc(), CVDocument.id.desc()))
@@ -226,7 +228,7 @@ class ScoringService:
                 "requirement_version": run.requirement_version, "formula_version": run.formula_version, "status": run.status,
                 "created_at": run.created_at, "input_hash": run.input_hash}
 
-    def detail(self, db, *, user_id, run_id):
+    def detail(self, db, *, user_id, run_id, include_contacts=False):
         run = db.get(ScoringRun, run_id)
         if not run:
             raise LookupError("Scoring run not found")
@@ -245,5 +247,12 @@ class ScoringService:
                             "screening_run_id": score.screening_run_id, "rank": score.rank, "review_state": score.review_state,
                             "final_score": breakdown["final_score"], "display_score": display_score(breakdown["final_score"]),
                             "breakdown": breakdown, "written_justification": score.written_justification})
+            ocr_pages = (screening.processing_metadata or {}).get("evidence", {}).get("ocr", {}).get("pages", []) if screening else []
+            if ocr_pages:
+                results[-1]["source_extraction"] = {"method": "ocr", "pages": [page["page"] for page in ocr_pages if not page.get("blank")]}
+            if include_contacts:
+                application = db.get(CandidateApplication, score.application_id)
+                candidate = db.get(Candidate, application.candidate_id) if application and application.candidate_id else None
+                results[-1]["candidate_email"] = candidate.email if candidate else None
         return {**self.summary(run), "configuration": run.snapshot["configuration"], "snapshot_version": run.snapshot["snapshot_version"],
                 "application_ids": sorted(names), "results": results}

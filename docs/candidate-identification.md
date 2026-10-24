@@ -41,6 +41,11 @@ Final weights remain interview 60%, CV 30%, practical 10%.
    areas to explore. A manual confirmation requires a note and a joined candidate;
    it is labelled separately from a photo match. Unclear results never reject a
    candidate, block an interview, or award/deduct marks.
+   Match outcomes, similarity values, thresholds, check timestamps and manual
+   notes are interviewer-only, including at the API boundary. Candidates see
+   only consent, capture availability and a neutral submission acknowledgement.
+   They retain access to the privacy notice, decline/withdrawal controls and
+   camera recapture where available; no outcome is revealed after recapture.
 
 ## Privacy and security
 

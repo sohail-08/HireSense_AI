@@ -26,6 +26,8 @@ type BreakdownRequirement = Requirement & EvidenceRequirement & {
 };
 type Result = {
   id: number; application_id: number; candidate_name: string; rank: number | null;
+  candidate_email?: string | null;
+  source_extraction?: { method: "ocr"; pages: number[] };
   review_state: string; final_score: string; display_score: string;
   breakdown: {
     categories: Record<Category, { score: string | null; category_weight: string; total_requirement_weight: string; earned_requirement_weight: string }>;
@@ -63,6 +65,9 @@ function EvidenceModal({ result, onClose, restoreFocus }: { result: Result; onCl
       <button type="button" autoFocus aria-label="Close evidence" onClick={onClose} className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-blue-600">Close</button>
     </header>
     <div className="overflow-y-auto px-5 pb-5 sm:px-6">
+    {result.source_extraction?.method === "ocr" ? <p className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900">
+      <strong>Scanned CV · OCR</strong><span className="mt-1 block text-xs">Evidence was transcribed from PDF {result.source_extraction.pages.length === 1 ? "page" : "pages"} {result.source_extraction.pages.join(", ")}. Check important details against the original scan.</span>
+    </p> : null}
     {result.breakdown.review_flags.length ? <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
       Some CV details could not be confirmed. Requirements without supporting evidence are marked Unmet; this does not mean the candidate lacks the skill.
     </p> : null}
@@ -79,12 +84,12 @@ function EvidenceModal({ result, onClose, restoreFocus }: { result: Result; onCl
 
 type Props = {
   jobId: number; refreshToken: string; applicationCount: number; pendingCount: number;
-  processing: boolean; ready: boolean; progress?: string; processingError?: string;
+  processing: boolean; ready: boolean; progress?: string; processingError?: string; failedCount?: number;
   onScreenPending: () => Promise<boolean>;
   jobSelector: ReactNode;
 };
 
-export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, onScreenPending, jobSelector }: Props) {
+export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, failedCount = 0, onScreenPending, jobSelector }: Props) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [proposal, setProposal] = useState<Proposal>();
@@ -229,14 +234,17 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         {!applicationCount ? <p className="mt-3 text-sm text-slate-500">No candidates have applied for this job yet.</p> : null}
       </> : null}
       {processing ? <p role="status" className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{progress ?? "Preparing candidate CVs and ranking…"}</p>
-        : notice ? <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p> : null}
-      {run && pendingCount > 0 && !processing ? <p className="mt-3 text-sm text-amber-800">New or updated CVs are waiting. Select “Rank candidates” to include them.</p> : null}
+        : notice && !processingError ? <p role="status" className={"mt-4 rounded-xl p-3 text-sm " + (failedCount ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
+          {failedCount ? `Ranking incomplete: ${run?.results.length ?? 0} candidate${run?.results.length === 1 ? "" : "s"} ranked. ${failedCount} CV${failedCount === 1 ? " could" : "s could"} not be processed and ${failedCount === 1 ? "has" : "have"} not been scored.` : notice}</p> : null}
+      {run && pendingCount > 0 && !processing ? <p className="mt-3 text-sm text-amber-800">{failedCount
+        ? "Correct the CV issues shown above before retrying. Any other new or updated CVs will be included when you rank again."
+        : "New or updated CVs are waiting. Select “Rank candidates” to include them."}</p> : null}
       {run && categories.some(category => weightUnits(weights[category]) !== weightUnits(run.configuration.category_weights[category])) ? <p className="mt-3 text-sm text-amber-800">Select “Rank candidates” to apply your changes. Current results use {categories.map(category => categoryLabels[category].toLowerCase() + " " + run.configuration.category_weights[category] + "%").join(", ")}.</p> : null}
       {run && proposal && (run.requirement_version !== proposal.requirement_version || run.formula_version !== proposal.formula_version) ? <p className="mt-3 text-sm text-amber-800">The job requirements or scoring rules have changed. Rank candidates again to update these results.</p> : null}
       {ranked.length ? <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
         <thead className="border-b border-slate-200 text-slate-500"><tr><th className="px-2 py-3">Rank</th><th className="px-2 py-3">Candidate</th><th className="px-2 py-3">Score</th><th className="px-2 py-3"><span className="sr-only">Evidence</span></th></tr></thead>
         <tbody>{visibleResults.map((result) => <tr key={result.id} className="border-b border-slate-100 last:border-0">
-          <td className="px-2 py-4 font-semibold">{result.rank ?? "—"}</td><td className="px-2 py-4 font-medium">{result.candidate_name}</td>
+          <td className="px-2 py-4 font-semibold">{result.rank ?? "—"}</td><td className="px-2 py-4 font-medium"><span>{result.candidate_name}</span>{result.candidate_email ? <span className="mt-1 block break-all text-xs font-normal text-slate-500">{result.candidate_email}</span> : null}</td>
           <td className="whitespace-nowrap px-2 py-4 font-semibold text-blue-700">{result.display_score + "%"}</td>
           <td className="px-2 py-4 text-right"><button type="button" id={"inspect-score-" + result.id} onClick={event => { evidenceTrigger.current = event.currentTarget; setEvidence(result); }}
             aria-label={`Inspect evidence for ${result.candidate_name}`} aria-haspopup="dialog" className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">Inspect evidence</button></td>

@@ -141,6 +141,7 @@ export function ScreeningPage() {
         refreshToken={String(refreshVersion) + "-" + currentBatch?.id + "-" + currentBatch?.status}
         applicationCount={activeDashboard?.applications.length ?? selectedJob?.application_count ?? 0}
         pendingCount={pendingCount} processing={processing} ready={Boolean(activeDashboard)}
+        failedCount={Math.max(failedApplications.length, currentBatch?.status === "completed_with_errors" ? currentBatch.failed_applications + currentBatch.review_applications : 0)}
         processingError={currentBatch?.status === "failed" ? currentBatch.error_message ?? "Candidate processing failed. Please try again." : undefined}
         progress={currentBatch && processing ? currentBatch.processed_applications + " of " + currentBatch.total_applications + " CVs prepared" : undefined}
         onScreenPending={screenPending}

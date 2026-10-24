@@ -199,6 +199,11 @@ def resolve_sources(db, user_id, application_id, request):
         "expires_at": min(expires).isoformat() if expires else None,
         "current_requirement_version": current_version, "current_cv_sha256": latest_cv.sha256 if latest_cv else None,
         "practical_assessments": practical}
+    if (app.response_data or {}).get("_identity_repair"):
+        # A repaired display identity requires a fresh report, not reuse of a
+        # report naming another submission. Unaffected report keys stay unchanged.
+        snapshot["identity_revision"] = digest([getattr(candidate, key, None) for key in
+            ("name", "email", "phone", "linkedin_url", "portfolio_url", "location")])
     # Stable source identity, not unrelated job/application counters or timestamps.
     snapshot["source_key"] = digest({k: v for k, v in snapshot.items() if k not in {"identification", "expires_at"}})
     return snapshot

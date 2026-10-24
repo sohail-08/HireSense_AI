@@ -112,8 +112,11 @@ def test_results_are_explicit_and_do_not_expose_templates(identity, case):
     if case == "low_similarity": t.engine.vector = [0., 1.] + [0.] * 126
     elif case != "matched": t.engine.error = case
     result = t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
-    assert result["status"] == case
-    assert "similarity" not in result and "embedding" not in json.dumps(result, default=str)
+    assert result["status"] == "submitted"
+    assert result["message"] == "Verification submitted. Your interviewer will review it."
+    assert result["capture_available"] is True
+    assert not {"similarity", "threshold", "manual_note", "checked_at"} & result.keys()
+    assert "embedding" not in json.dumps(result, default=str)
     own = t.service.interviewer_state(t.db, t.owner.id, t.row.id)
     assert own["status"] == case
     if case == "matched": assert own["similarity"] == 1
@@ -171,7 +174,7 @@ def test_expiry_and_manual_fallback_are_separate_from_matching(identity):
     ref = t.service.reference(t.db, t.application.id)
     ref.expires_at = t.clock.value - timedelta(seconds=1)
     t.db.commit(); t.service.tick(); t.db.expire_all()
-    assert t.service.candidate_state(t.db, t.cookie)["status"] == "expired"
+    assert t.service.candidate_state(t.db, t.cookie)["status"] == "unavailable"
     ref = t.service.reference(t.db, t.application.id)
     assert not ref.photo_cipher and not ref.embedding_cipher
     with pytest.raises(RoomConflict): t.service.manual(t.db, t.owner.id, t.row.id, "Confirmed in person")
@@ -180,6 +183,9 @@ def test_expiry_and_manual_fallback_are_separate_from_matching(identity):
     t.db.commit()
     result = t.service.manual(t.db, t.owner.id, t.row.id, "Confirmed using the interview introduction.")
     assert result["status"] == "manual" and result["similarity"] is None
+    public = t.service.candidate_state(t.db, t.cookie)
+    assert public["status"] == "submitted" and not public["capture_available"]
+    assert "manual_note" not in public and "checked_at" not in public
     with pytest.raises((RoomAccessError, LookupError, PermissionError)):
         t.service.interviewer_state(t.db, t.other.id, t.row.id)
 
@@ -234,5 +240,39 @@ def test_disabled_feature_and_missing_models_never_return_a_match(identity):
     prepare(t)
     t.service.settings = t.service.settings.model_copy(update={"identity_enabled": False})
     current = t.service.candidate_state(t.db, t.cookie)
-    assert current["status"] == "model_unavailable" and not current["reference_ready"]
+    assert current["status"] == "unavailable" and not current["reference_ready"]
     with pytest.raises(RoomConflict): t.service.verify(t.db, t.cookie, [pixels()]*3, current["version"])
+
+
+@pytest.mark.parametrize("outcome", ["matched", "low_similarity"])
+def test_candidate_http_responses_hide_outcomes_but_interviewer_can_read_them(identity, outcome):
+    import base64
+    from app.config import get_settings
+    from app.security import create_access_token
+    t = identity
+    prepared = prepare(t)
+    if outcome == "low_similarity":
+        t.engine.vector = [0., 1.] + [0.] * 126
+    app = FastAPI(); app.include_router(routes.router)
+    app.dependency_overrides[get_db] = lambda: t.db
+    app.dependency_overrides[routes.service] = lambda: t.service
+    origin = {"Origin": get_settings().frontend_url.rstrip("/")}
+    candidate = "/api/interview-rooms/candidate/identity"
+    with TestClient(app) as client:
+        client.cookies.set(COOKIE_NAME, t.cookie)
+        verified = client.post(candidate + "/verify", headers=origin, json={
+            "frames": [base64.b64encode(pixels()).decode()] * 3, "version": prepared["version"]})
+        assert verified.status_code == 200
+        assert verified.json()["status"] == "submitted"
+        assert client.get(f"/api/interview-rooms/{t.row.id}/identity").status_code == 401
+        private = client.get(f"/api/interview-rooms/{t.row.id}/identity", headers={"Authorization": "Bearer " + create_access_token(t.owner.id)})
+        assert private.status_code == 200 and private.json()["status"] == outcome
+        responses = [verified, client.get(candidate),
+            client.post(candidate + "/consent", headers=origin, json={"allow": True, "notice_version": NOTICE}),
+            client.post(candidate + "/withdraw", headers=origin, json={"confirmed": True})]
+        for response in responses:
+            assert response.status_code == 200
+            payload = response.json()
+            assert not {"similarity", "threshold", "checked_at", "manual_note", "reason"} & payload.keys()
+            assert payload["status"] not in {"matched", "low_similarity", "manual", "unverified"}
+            assert payload["message"] not in {"Reference photo matched", "Unable to verify a match. Retry or ask for manual verification."}

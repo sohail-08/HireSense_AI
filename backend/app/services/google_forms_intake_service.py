@@ -22,6 +22,7 @@ from app.models.candidate import (
 from app.models.job import JobDescription, JobPosting
 from app.services.candidate_application_service import google_form_reference
 from app.services.google_forms_notifications import sheet_snapshots
+from app.services.application_identity import bind_profile, submitted_profile, canonical_applications
 
 
 HEADER_ALIASES = {
@@ -208,6 +209,22 @@ class GoogleFormsIntakeService:
                     result["skipped_deleted"] += 1
                     continue
                 existing = existing_by_row.get(row_number)
+                if existing is not None:
+                    old_profile = submitted_profile(existing.response_data or {}, self.settings)
+                    new_profile = submitted_profile(record, self.settings)
+                    # A sheet row number can move after insertion/deletion/sorting.
+                    # It cannot authorize replacing a different person's submission.
+                    from app.services.application_identity import normal
+                    old_record = existing.response_data or {}
+                    old_files = old_record.get("_google_import", {}).get("drive_file_ids", [])
+                    new_files = self._drive_file_ids(self._value(values, mapping.get("cv")))
+                    timestamp_keys = {normal(self.settings.google_forms_timestamp_column), *HEADER_ALIASES["timestamp"]}
+                    old_time = next((str(v).strip() for k,v in old_record.items() if normal(k) in timestamp_keys), "")
+                    new_time = self._value(values, mapping.get("timestamp"))
+                    if (any(old_profile[k] and normal(old_profile[k]) != normal(new_profile[k]) for k in ("name", "email"))
+                            or (old_files and set(old_files) != set(new_files))
+                            or (old_time and new_time and old_time != new_time)):
+                        existing = None
                 if existing is None:
                     existing = db.scalar(
                         select(CandidateApplication).where(
@@ -220,6 +237,9 @@ class GoogleFormsIntakeService:
                         )
                     )
                 if existing is not None:
+                    # Profiles belong to this submission, not every row using its email.
+                    profile = submitted_profile(record, self.settings)
+                    bind_profile(db, existing, profile)
                     if existing.job_posting_id != posting.id:
                         existing.job_posting_id = posting.id
                         result["reassigned_applications"] += 1
@@ -245,6 +265,7 @@ class GoogleFormsIntakeService:
                                 except (RuntimeError, ValueError) as exc:
                                     retry_warnings.append(str(exc))
                     existing.response_data = {
+                        **{k:v for k,v in (existing.response_data or {}).items() if str(k).startswith("_") and k != "_google_import"},
                         **record,
                         "_google_import": {
                             "spreadsheet_id": spreadsheet_id,
@@ -356,6 +377,11 @@ class GoogleFormsIntakeService:
                     for warning in row_warnings
                 )
 
+            db.flush()
+            all_imports = list(db.scalars(select(CandidateApplication).where(
+                CandidateApplication.job_posting_id.in_([p.id for p, _ in postings]),
+                CandidateApplication.source == ApplicationSource.GOOGLE_FORM)))
+            canonical_applications(db, all_imports, mark_repeats=True)
             db.commit()
             return result
         except Exception:
@@ -422,6 +448,8 @@ class GoogleFormsIntakeService:
                 CandidateApplication.job_posting_id == job_posting_id
             )
         rows = db.execute(query).all()
+        visible_ids = {a.id for a in canonical_applications(db, [a for a, _, _ in rows])}
+        rows = [row for row in rows if row[0].id in visible_ids]
         application_ids = [application.id for application, _, _ in rows]
         documents_by_application: dict[int, list[CVDocument]] = {}
         if application_ids:
@@ -596,14 +624,9 @@ class GoogleFormsIntakeService:
         portfolio_url: str,
         location: str,
     ) -> Candidate:
-        candidate = None
-        if email:
-            candidate = db.scalar(
-                select(Candidate).where(func.lower(Candidate.email) == email)
-            )
-        if candidate is None:
-            candidate = Candidate(email=email or None)
-            db.add(candidate)
+        # Email is an unverified form field, not a global identity/ownership key.
+        candidate = Candidate(email=email or None)
+        db.add(candidate)
         updates = {
             "name": name[:200],
             "phone": phone[:50],

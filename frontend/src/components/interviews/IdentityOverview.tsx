@@ -28,7 +28,7 @@ export function IdentityOverview({ interviewId }: { interviewId: number }) {
   }
   const matched = !error && state?.status === "matched";
   return <section aria-label="Candidate identity status" className={`mt-4 rounded-2xl border p-4 ${matched ? "border-emerald-100 bg-emerald-50/50" : "border-indigo-100 bg-indigo-50/30"}`}>
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{matched ? "Joining photo match" : "Scheduled candidate"}</p>
+    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Photo verification</p><span className="rounded-full bg-white/80 px-2 py-1 text-xs font-medium text-indigo-700">Interviewer only</span></div>
     <p className="mt-1 text-sm font-semibold text-slate-800">{error || state?.message || "Checking identification status…"}</p>
     {state?.checked_at && !error ? <p className="mt-1 text-xs text-slate-500">Checked {new Date(state.checked_at).toLocaleString()} · {state.status === "manual" ? "Human confirmation" : "Compared with application photo"}</p> : null}
     <p className="mt-2 text-xs leading-5 text-slate-500">Not legal-ID verification or continuous monitoring. No effect on assessment scores.</p>
