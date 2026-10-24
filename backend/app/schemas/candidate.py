@@ -24,6 +24,11 @@ class CandidateCreate(BaseModel):
 class CandidateResponse(CandidateCreate):
     model_config = ConfigDict(from_attributes=True)
 
+    # A read must preserve saved/imported contacts, including non-deliverable
+    # reserved-domain examples. EmailStr remains enforced on CandidateCreate;
+    # invitation services independently validate recipients before sending.
+    email: str | None = None
+
     id: int
     created_at: datetime
     updated_at: datetime

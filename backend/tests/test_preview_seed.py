@@ -4,6 +4,11 @@ from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from pypdf import PdfReader
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from app.database import get_db
+from app.routes import candidates
+from app.security import require_interviewer
 from app.database import Base
 from app.models.user import User, UserRole
 from app.models.candidate import CandidateApplication, CVDocument
@@ -27,6 +32,16 @@ def test_seed_complete_flow_is_readable_idempotent_and_has_no_external_effects(t
         owner = User(name="Owner", email="owner@example.test", password_hash="unused", role=UserRole.INTERVIEWER)
         db.add(owner); db.commit()
         first = preview_seed.seed_recruitment(db, owner.id, session_factory=factory)
+        api = FastAPI(); api.include_router(candidates.router)
+        api.dependency_overrides[get_db] = lambda: db
+        api.dependency_overrides[require_interviewer] = lambda: owner
+        with TestClient(api) as client:
+            response = client.get("/api/candidates/applications")
+            assert response.status_code == 200
+            assert len(response.json()) == 5
+            assert all(row["candidate"]["email"].endswith("@example.test") for row in response.json())
+            filtered = client.get("/api/candidates/applications", params={"job_posting_id": first[0]["job_posting_id"]})
+            assert filtered.status_code == 200 and len(filtered.json()) == 3
         assert [j["title"] for j in first] == ["Backend Engineer", "HR Executive"]
         assert db.scalar(select(func.count(CandidateApplication.id))) == 5
         assert db.scalar(select(func.count(InterviewSchedule.id))) == 5

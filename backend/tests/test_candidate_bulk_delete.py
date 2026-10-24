@@ -11,7 +11,29 @@ from app.models.job import JobDescription, JobPosting
 from app.routes import candidates
 from app.security import create_access_token, require_interviewer
 from app.services.candidate_application_service import CandidateApplicationService
+from app.schemas.candidate import CandidateCreate
+from pydantic import ValidationError
 from test_screening import _application_with_docx, _records, _settings
+
+
+@pytest.mark.parametrize("stored_email", ["preview@example.test", "historical-invalid-address", None])
+def test_candidate_list_preserves_stored_contacts_without_failing_other_rows(batch, stored_email):
+    db, _, _, first, second, *_ = batch
+    candidate = db.get(Candidate, first.candidate_id)
+    candidate.email = stored_email
+    db.commit()
+    client = batch[8]
+    response = client.get("/api/candidates/applications")
+    assert response.status_code == 200
+    rows = {row["id"]: row for row in response.json()}
+    assert set(rows) == {first.id, second.id}
+    assert rows[first.id]["candidate"]["email"] == stored_email
+
+
+def test_new_candidate_inputs_still_require_valid_email_addresses():
+    with pytest.raises(ValidationError): CandidateCreate(email="not-an-email")
+    with pytest.raises(ValidationError): CandidateCreate(email="preview@example.test")
+    assert CandidateCreate(email="candidate@example.com").email == "candidate@example.com"
 
 
 @pytest.fixture
