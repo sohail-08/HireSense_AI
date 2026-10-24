@@ -255,6 +255,7 @@ class GoogleFormsIntakeService:
                             "warnings": retry_warnings,
                         },
                     }
+                    self._import_face(db, existing, values, mapping, retry_warnings)
                     result["issues"].extend(
                         {
                             "row_number": row_number,
@@ -345,6 +346,7 @@ class GoogleFormsIntakeService:
                         "warnings": row_warnings,
                     },
                 }
+                self._import_face(db, application, values, mapping, row_warnings)
                 result["imported_applications"] += 1
                 result["issues"].extend(
                     {
@@ -468,6 +470,7 @@ class GoogleFormsIntakeService:
             field: self._find_header(headers, preferred, HEADER_ALIASES[field])
             for field, preferred in configured.items()
         }
+        mapping["photo"] = self._find_header(headers, self.settings.google_forms_photo_column, ("candidate photo", "upload your photo"))
         if mapping["cv"] is None:
             raise ValueError(
                 "The configured CV column was not found in the response sheet. "
@@ -487,6 +490,22 @@ class GoogleFormsIntakeService:
                 f"Available headers: {', '.join(headers)}"
             )
         return mapping
+
+    def _import_face(self, db, application, values, mapping, warnings):
+        if mapping.get("photo") is None:
+            return
+        from app.services.candidate_identity import CandidateIdentityService
+        candidate = db.get(Candidate, application.candidate_id)
+        form_email = self._value(values, mapping.get("email")).strip().casefold()
+        if not candidate or not candidate.email or form_email != candidate.email.casefold():
+            warnings.append("Photo reference was not imported: application identity needs review.")
+            return
+        try:
+            CandidateIdentityService(self.settings).import_photo(db, application, self.reader,
+                self._drive_file_ids(self._value(values, mapping.get("photo"))))
+        except Exception:
+            # Photo failure must not fail CV intake or disclose biometric/provider data.
+            warnings.append("Photo verification is unavailable; the interview can use manual identity confirmation.")
 
     @staticmethod
     def _find_header(

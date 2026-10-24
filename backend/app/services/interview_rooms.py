@@ -83,6 +83,8 @@ class InterviewRooms:
                 raise RoomAccessError("expired_link", 410)
 
     def revoke_sessions(self, db, row):
+        from app.services.candidate_identity import CandidateIdentityService
+        CandidateIdentityService.invalidate(db, row.id)
         db.execute(update(CandidateInterviewSession).where(CandidateInterviewSession.interview_id == row.id,
             CandidateInterviewSession.revoked_at.is_(None)).values(revoked_at=self.now()))
 
@@ -260,6 +262,8 @@ class InterviewRooms:
     def leave(self, db, *, candidate_token=None, user_id=None, interview_id=None):
         row = self.session(db, candidate_token, lock=True) if user_id is None else self.owned(db, user_id, interview_id, lock=True)
         if user_id is None:
+            from app.services.candidate_identity import CandidateIdentityService
+            CandidateIdentityService.invalidate(db, row.id)
             row.candidate_last_seen_at = None
             if not row.candidate_admitted_at:
                 row.candidate_waiting_at, row.room_status = None, "scheduled"

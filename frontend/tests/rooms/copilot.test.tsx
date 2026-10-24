@@ -7,6 +7,7 @@ import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 import { readFileSync } from "node:fs";
 import { SupervisorChatPanel } from "../../src/components/jobs/SupervisorChatPanel";
 const api = vi.hoisted(() => vi.fn());
+vi.mock("../../src/components/interviews/IdentityOverview", () => ({ IdentityOverview: () => null }));
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: api }));
 const context: CopilotContext = {
   candidate: { name: "Test Candidate", email: "test@example.test", phone: "01234", location: null,

@@ -58,6 +58,8 @@ class CandidateContext(BaseModel):
     qualifications: list[str]
     experience_years: float | None
     recent_roles: list[str]
+    cv_score: str | None = None
+    probe_areas: list[dict] = Field(default_factory=list)
 
 
 class InterviewCopilotContext(BaseModel):

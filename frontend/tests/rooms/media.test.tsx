@@ -7,6 +7,7 @@ import { DisconnectReason, Track } from "livekit-client";
 import { InterviewMediaRoom } from "../../src/components/interviews/InterviewMediaRoom";
 import { getSdk } from "./setup";
 const sdk = getSdk();
+vi.mock("../../src/components/interviews/CandidateIdentity", () => ({ CandidateIdentity: () => null, CandidateCameraIdentity: () => null }));
 
 const props = { access: { server_url: "wss://test-project.livekit.cloud", participant_token: "fake-media-only", expires_at: "2030-10-14T02:02:00Z", role: "candidate" as const }, devices: { username: "Candidate", audioEnabled: true, videoEnabled: false, audioDeviceId: "mic-1", videoDeviceId: "camera-1" }, onConnected: vi.fn(), onLeave: vi.fn(), onEnded: vi.fn() };
 test("renders camera/microphone states, remote audio and a graceful mobile sharing fallback", () => {

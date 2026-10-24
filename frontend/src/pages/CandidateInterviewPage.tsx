@@ -7,6 +7,7 @@ import { accessMessage, formatRoomTime } from "../components/interviews/roomStat
 import { TranscriptionProvider, TranscriptionPanel } from "../components/interviews/TranscriptionPanel";
 import { MeetingIcon } from "../components/interviews/MeetingIcon";
 import { CandidateWorkSample } from "../components/interviews/CandidateWorkSample";
+import { CandidateIdentity } from "../components/interviews/CandidateIdentity";
 
 export function CandidateInterviewPage() {
   const { token } = useParams();
@@ -88,6 +89,7 @@ export function CandidateInterviewPage() {
           {info.media_notice ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-amber-900">{info.media_notice}</p> : null}
           <TranscriptionProvider>
           <div className="mt-5 min-w-0 space-y-5">
+            {(view === "prejoin" || view === "waiting") ? <CandidateIdentity /> : null}
             {view === "prejoin" ? <DeviceCheck role="candidate" onReady={(choices) => void ready(choices)} /> : null}
             {view === "waiting" ? <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="hiresense-prejoin-stage"><div className="flex max-w-md flex-col items-center gap-4"><span className="rounded-3xl bg-slate-800 p-5"><MeetingIcon name="person" className="h-10 w-10 text-blue-300"/></span><h2 className="text-xl font-semibold">{info.admitted && info.media_notice ? "Admitted — audio/video unavailable" : "Waiting for interviewer"}</h2><p role="status" className="text-sm leading-6 text-slate-400">{info.admitted && info.media_notice ? "The interviewer admitted you. Audio/video will connect once the media service is configured." : message || "You’re ready. Your interviewer will let you in shortly. You are not connected to the meeting yet."}</p></div></div><div className="flex flex-wrap items-center justify-between gap-3 p-5"><p className="text-sm text-slate-500">Microphone: {devices?.audioEnabled ? "ready" : "off"} · Camera: {devices?.videoEnabled ? "ready" : "off"}</p><button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50" onClick={() => void leave()}>Leave waiting room</button></div></section> : null}
             {view === "room" && access && devices ? <InterviewMediaRoom access={access} devices={devices}

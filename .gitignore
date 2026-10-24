@@ -25,3 +25,4 @@ service-account-key*.json
 backend/secrets/
 backend/storage/
 output/
+tmp/pdfs/

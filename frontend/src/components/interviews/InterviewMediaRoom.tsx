@@ -7,6 +7,7 @@ import type { MediaAccess, DeviceChoices } from "./roomApi";
 import { deviceMessage } from "./roomState";
 import { TranscriptReceiver } from "./TranscriptionPanel";
 import { MeetingIcon } from "./MeetingIcon";
+import { CandidateCameraIdentity } from "./CandidateIdentity";
 
 // Never let browser diagnostics accidentally print a media JWT or signaling URL.
 setLogLevel(LogLevel.silent);
@@ -80,6 +81,7 @@ export function InterviewMediaRoom({ access, devices, onConnected, onLeave, onEn
         onDisconnected={(reason) => reason === DisconnectReason.ROOM_DELETED ? onEnded() : onLeave()}>
         <Controls role={access.role} onEnd={onEnd} onDeviceError={showError} onShareError={shareError} />
         <TranscriptReceiver />
+        {access.role === "candidate" ? <div className="p-3"><CandidateCameraIdentity /></div> : null}
       </LiveKitRoom>
     </section>
   );

@@ -8,6 +8,7 @@ import { RoomApiError } from "../../src/components/interviews/roomApi";
 import { accessMessage } from "../../src/components/interviews/roomState";
 import { getSdk } from "./setup";
 const sdk = getSdk();
+vi.mock("../../src/components/interviews/CandidateIdentity", () => ({ CandidateIdentity: () => null, CandidateCameraIdentity: () => null }));
 
 const api = vi.hoisted(() => ({ exchange: vi.fn(), candidateStatus: vi.fn(), waiting: vi.fn(), candidateMedia: vi.fn(), candidateConnected: vi.fn(), candidateLeave: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
