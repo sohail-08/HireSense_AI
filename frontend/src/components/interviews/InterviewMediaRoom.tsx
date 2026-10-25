@@ -18,17 +18,29 @@ function Controls({ role, onEnd, onDeviceError, onShareError }: {
   const connection = useConnectionState();
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
   const { isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
+  const [selfFocused, setSelfFocused] = useState(false);
+  const selfName = role === "interviewer" ? "Interviewer" : "Candidate";
+  const peerName = role === "interviewer" ? "Candidate" : "Interviewer";
+  const mainName = selfFocused ? selfName : peerName;
   const screen = tracks.find(item => item.source === Track.Source.ScreenShare && item.publication?.track);
   const canShare = typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const reconnecting = String(connection).toLowerCase().includes("reconnect");
+  const microphoneLabel = isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone";
+  const cameraLabel = isCameraEnabled ? "Turn camera off" : "Turn camera on";
+  const shareLabel = isScreenShareEnabled ? "Stop sharing screen" : "Share screen";
   const button = "hiresense-meeting-control";
   const cameras = <div className="hiresense-camera-grid">
     {["Interviewer", "Candidate"].map(name => {
       const ref = tracks.find(item => item.source === Track.Source.Camera && item.participant.name === name);
       const self = name.toLowerCase() === role;
-      return <div key={name} className="hiresense-camera-tile" aria-label={`${name} video tile`}>
+      const preview = name !== mainName;
+      const switchLabel = self ? "Show your video in main view" : `Show ${name.toLowerCase()} in main view`;
+      return <div key={name} className="hiresense-camera-tile" data-view={screen ? "rail" : preview ? "preview" : "main"} aria-label={`${name} video tile`}>
         {ref ? <ParticipantTile trackRef={ref} /> : <div className="hiresense-camera-placeholder"><MeetingIcon name="person" className="h-12 w-12 text-slate-500"/><p>{self ? "Your camera is off" : `Waiting for ${name.toLowerCase()}…`}</p></div>}
         <span className="hiresense-video-label">{self ? `You (${name})` : name}</span>
+        {!screen && preview ? <button type="button" className="hiresense-preview-switch" aria-label={switchLabel} title={switchLabel} onClick={() => setSelfFocused(value => !value)}>
+          <span className="hiresense-preview-switch-icon"><MeetingIcon name="swap" className="h-4 w-4" /></span>
+        </button> : null}
       </div>;
     })}
   </div>;
@@ -37,20 +49,20 @@ function Controls({ role, onEnd, onDeviceError, onShareError }: {
       <p role="status" className="flex items-center gap-2 text-slate-300"><span className={`h-2 w-2 rounded-full ${connection === "connected" ? "bg-emerald-400" : "bg-amber-400"}`} />{reconnecting ? "Reconnecting… Please keep this page open." : connection === "connected" ? "Connected" : "Connecting to your interview…"}</p>
       <span className="flex items-center gap-1.5 text-slate-400"><MeetingIcon name="lock" className="h-3.5 w-3.5"/>Private interview · No recording</span>
     </div>
-    <div className="hiresense-video-stage" data-sharing={Boolean(screen)} aria-label="Interview video area">
+    <div className="hiresense-video-stage" data-sharing={Boolean(screen)} data-main-participant={screen ? "screen" : mainName.toLowerCase()} aria-label="Interview video area">
       {screen ? <div className="hiresense-screen-tile" aria-label="Candidate shared screen"><ParticipantTile trackRef={screen} /><span className="hiresense-video-label">{role === "candidate" ? "You are sharing your screen" : "Candidate’s screen"}</span></div> : null}
       {cameras}
     </div>
     <RoomAudioRenderer /><StartAudio className="hiresense-start-audio" label="Enable interview audio" />
     <div className="hiresense-meeting-controls" aria-label="Meeting controls">
-      <TrackToggle className={button} source={Track.Source.Microphone} showIcon={false} aria-pressed={isMicrophoneEnabled} onDeviceError={onDeviceError}><MeetingIcon name="microphone"/>{isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}</TrackToggle>
-      <TrackToggle className={button} source={Track.Source.Camera} showIcon={false} aria-pressed={isCameraEnabled} onDeviceError={onDeviceError}><MeetingIcon name="camera"/>{isCameraEnabled ? "Turn camera off" : "Turn camera on"}</TrackToggle>
+      <TrackToggle className={button} source={Track.Source.Microphone} showIcon={false} aria-label={microphoneLabel} title={microphoneLabel} aria-pressed={isMicrophoneEnabled} onDeviceError={onDeviceError}><MeetingIcon name="microphone" slashed={!isMicrophoneEnabled}/></TrackToggle>
+      <TrackToggle className={button} source={Track.Source.Camera} showIcon={false} aria-label={cameraLabel} title={cameraLabel} aria-pressed={isCameraEnabled} onDeviceError={onDeviceError}><MeetingIcon name="camera" slashed={!isCameraEnabled}/></TrackToggle>
       {role === "candidate" ? canShare || isScreenShareEnabled ? <TrackToggle className={button + " hiresense-share-control"} source={Track.Source.ScreenShare} showIcon={false}
-        aria-pressed={isScreenShareEnabled} captureOptions={{ audio: false, contentHint: "detail", selfBrowserSurface: "exclude", systemAudio: "exclude" }} onDeviceError={onShareError}>
-        <MeetingIcon name="screen"/>{isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}</TrackToggle>
-        : <button type="button" className={button} disabled aria-describedby="screen-share-unavailable"><MeetingIcon name="screen"/>Share screen</button> : null}
-      <DisconnectButton className={button + " hiresense-leave-control"}><MeetingIcon name="leave"/>Leave room</DisconnectButton>
-      {onEnd ? <button type="button" className={button + " hiresense-end-control"} onClick={onEnd}><MeetingIcon name="leave"/>End interview for everyone</button> : null}
+        aria-label={shareLabel} title={shareLabel} aria-pressed={isScreenShareEnabled} captureOptions={{ audio: false, contentHint: "detail", selfBrowserSurface: "exclude", systemAudio: "exclude" }} onDeviceError={onShareError}>
+        <MeetingIcon name="screen"/></TrackToggle>
+        : <button type="button" className={button} disabled aria-label="Share screen" title="Share screen" aria-describedby="screen-share-unavailable"><MeetingIcon name="screen"/></button> : null}
+      <DisconnectButton className={button + " hiresense-leave-control"} aria-label="Leave room" title="Leave room"><MeetingIcon name="leave"/><span>Leave</span></DisconnectButton>
+      {onEnd ? <button type="button" className={button + " hiresense-end-control"} aria-label="End interview for everyone" title="End interview for everyone" onClick={onEnd}><MeetingIcon name="leave"/><span>End for all</span></button> : null}
     </div>
     {role === "candidate" && !canShare && !isScreenShareEnabled ? <p id="screen-share-unavailable" className="px-4 pb-4 text-center text-xs leading-5 text-slate-400">This browser cannot share your screen. Use a supported desktop browser to present; you can still join the interview here.</p> : null}
     {isScreenShareEnabled ? <p role="status" className="px-4 pb-4 text-center text-xs text-blue-200">Your screen is visible to the interviewer. Select Stop sharing screen when you’re done.</p> : null}

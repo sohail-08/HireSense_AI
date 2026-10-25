@@ -57,8 +57,8 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
   const candidate = context.candidate;
   const candidateInfo = <section className="min-w-0 break-words p-5">
       <h2 className="text-sm font-semibold text-slate-500">Candidate information</h2>
-      <div className="mt-4 flex items-center gap-3"><CandidatePhoto interviewId={interviewId} name={candidate.name} /><div className="min-w-0"><h3 className="break-words text-lg font-bold">{candidate.name}</h3>
-      <p className="text-sm text-slate-600">{context.job_title}</p>
+      <div role="group" aria-label="Candidate profile" className="mt-5 flex flex-col items-center gap-4 pb-5 text-center"><CandidatePhoto interviewId={interviewId} name={candidate.name} /><div className="min-w-0 max-w-full"><h3 className="break-words text-xl font-bold text-slate-900">{candidate.name}</h3>
+      <p className="mt-1 text-sm text-slate-600">{context.job_title}</p>
       </div></div>
       <IdentityOverview interviewId={interviewId} />
       {candidate.cv_score != null ? <p className="mt-4 rounded-xl bg-teal-50 p-3 text-sm text-teal-900">Saved CV score <strong className="float-right">{displayPercent(candidate.cv_score)}</strong></p> : null}

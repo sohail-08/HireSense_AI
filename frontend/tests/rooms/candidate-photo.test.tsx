@@ -17,6 +17,11 @@ test("loads the private uploaded photo with the authenticated blob API", async (
   const view = render(<CandidatePhoto interviewId={12} name="Ada" />);
   const image = await screen.findByRole("img", { name: "Ada's uploaded application photo" });
   expect(image.getAttribute("src")).toBe("blob:private-photo");
+  expect(image.className).toContain("object-contain");
+  expect(image.parentElement?.className).toContain("w-48");
+  expect(image.parentElement?.className).toContain("sm:w-56");
+  expect(image.parentElement?.className).toContain("aspect-[4/5]");
+  expect(image.parentElement?.className).toContain("max-w-full");
   expect(apiBlob).toHaveBeenCalledWith("/interview-rooms/12/candidate-photo", { signal: expect.any(AbortSignal) });
   view.unmount();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:private-photo");

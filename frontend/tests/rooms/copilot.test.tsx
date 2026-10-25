@@ -54,6 +54,12 @@ test("shows saved candidate details and requests cited questions for this interv
   const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} />);
   await screen.findByText("Test Candidate");
   expect(screen.getByTestId("candidate-photo").getAttribute("data-interview")).toBe("12");
+  const profile = screen.getByRole("group", { name: "Candidate profile" });
+  expect(profile.className).toContain("flex-col");
+  expect(profile.className).toContain("items-center");
+  expect(profile.className).toContain("text-center");
+  expect(within(profile).getByRole("heading", { name: "Test Candidate" })).toBeTruthy();
+  expect(profile.firstElementChild).toBe(screen.getByTestId("candidate-photo"));
   expect(screen.getByLabelText("Private interview assistance")).toBeTruthy();
   expect(screen.getByText("test@example.test")).toBeTruthy();
   expect(screen.getByText("Experience: 3 years")).toBeTruthy();

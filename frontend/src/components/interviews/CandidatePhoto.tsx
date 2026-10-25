@@ -23,9 +23,9 @@ export function CandidatePhoto({ interviewId, name }: { interviewId: number; nam
     return () => { active = false; controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [interviewId]);
   const current = photo?.interviewId === interviewId ? photo.url : undefined;
-  return <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-700">
-    {current ? <img src={current} alt={`${name}'s uploaded application photo`} className="h-full w-full object-cover"
+  return <span className="flex aspect-[4/5] w-48 max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-indigo-600 shadow-sm sm:w-56">
+    {current ? <img src={current} alt={`${name}'s uploaded application photo`} className="h-full w-full object-contain"
       referrerPolicy="no-referrer" onError={() => setPhoto(undefined)} />
-      : <MeetingIcon name="person" className="h-8 w-8" />}
+      : <MeetingIcon name="person" className="h-20 w-20" />}
   </span>;
 }
