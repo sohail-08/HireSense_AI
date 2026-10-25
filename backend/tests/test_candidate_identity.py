@@ -66,7 +66,7 @@ def identity(room_setup, tmp_path):
         row=row, clock=clock, engine=engine, reader=reader, cookie=cookie, application=app, media=media)
 
 
-def prepare(t, admit=True):
+def prepare(t, admit=True, capture=True):
     state = t.service.live_consent(t.db, t.cookie, True)
     ref = t.service.reference(t.db, t.application.id)
     t.db.commit()
@@ -75,6 +75,11 @@ def prepare(t, admit=True):
     if admit:
         t.rooms.waiting(t.db, t.cookie)
         t.rooms.admit(t.db, t.owner.id, t.row.id)
+        t.media.present = [t.media.identity(t.row.room_name, role) for role in ("interviewer", "candidate")]
+        t.rooms.connected(t.db, candidate_token=t.cookie)
+        if capture:
+            current = t.service.interviewer_state(t.db, t.owner.id, t.row.id)
+            t.service.request_capture(t.db, t.owner.id, t.row.id, current["version"])
     return t.service.candidate_state(t.db, t.cookie)
 
 
@@ -114,7 +119,7 @@ def test_results_are_explicit_and_do_not_expose_templates(identity, case):
     result = t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
     assert result["status"] == "submitted"
     assert result["message"] == "Verification submitted. Your interviewer will review it."
-    assert result["capture_available"] is True
+    assert result["capture_available"] is False
     assert not {"similarity", "threshold", "manual_note", "checked_at"} & result.keys()
     assert "embedding" not in json.dumps(result, default=str)
     own = t.service.interviewer_state(t.db, t.owner.id, t.row.id)
@@ -122,6 +127,70 @@ def test_results_are_explicit_and_do_not_expose_templates(identity, case):
     if case == "matched": assert own["similarity"] == 1
     with pytest.raises(RoomConflict):
         t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
+
+
+def test_consent_and_room_entry_do_not_authorize_capture_without_interviewer_request(identity):
+    t = identity
+    state = prepare(t, capture=False)
+    assert state["consented"] and not state["capture_available"]
+    with pytest.raises(RoomConflict, match="interviewer"):
+        t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
+    assert len(t.engine.calls) == 1
+    t.db.rollback()
+    private = t.service.request_capture(t.db, t.owner.id, t.row.id, state["version"])
+    assert private["capture_pending"]
+    current = t.service.candidate_state(t.db, t.cookie)
+    assert current["capture_available"] and current["version"] > state["version"]
+    assert not {"capture_allowed", "capture_pending", "similarity"} & current.keys()
+
+
+def test_capture_requires_owner_consent_join_and_current_version(identity):
+    t = identity
+    with pytest.raises(RoomConflict): t.service.request_capture(t.db, t.owner.id, t.row.id, 1)
+    t.db.rollback()
+    state = prepare(t, admit=False)
+    with pytest.raises(RoomConflict): t.service.request_capture(t.db, t.owner.id, t.row.id, state["version"])
+    t.db.rollback()
+    state = prepare(t, capture=False)
+    with pytest.raises((PermissionError, LookupError)):
+        t.service.request_capture(t.db, t.other.id, t.row.id, state["version"])
+    t.db.rollback()
+    with pytest.raises(RoomConflict): t.service.request_capture(t.db, t.owner.id, t.row.id, state["version"] + 1)
+
+
+def test_capture_requests_expire_and_a_new_request_invalidates_old_samples(identity):
+    t = identity
+    state = prepare(t)
+    t.clock.value += timedelta(seconds=46)
+    assert not t.service.candidate_state(t.db, t.cookie)["capture_available"]
+    with pytest.raises(RoomConflict): t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
+    t.db.rollback()
+    current = t.service.request_capture(t.db, t.owner.id, t.row.id, state["version"])
+    assert current["version"] > state["version"]
+    with pytest.raises(RoomConflict): t.service.verify(t.db, t.cookie, [pixels()] * 3, state["version"])
+    t.db.rollback()
+    public = t.service.verify(t.db, t.cookie, [pixels()] * 3, current["version"])
+    assert public["status"] == "submitted" and not public["capture_available"]
+
+
+def test_capture_http_endpoint_is_interviewer_only(identity):
+    from app.security import create_access_token
+    t = identity
+    state = prepare(t, capture=False)
+    app = FastAPI(); app.include_router(routes.router)
+    app.dependency_overrides[get_db] = lambda: t.db
+    app.dependency_overrides[routes.service] = lambda: t.service
+    path = f"/api/interview-rooms/{t.row.id}/identity/capture"
+    with TestClient(app) as client:
+        client.cookies.set(COOKIE_NAME, t.cookie)
+        assert client.post(path, json={"version": state["version"]}).status_code == 401
+        assert client.post(path, json={"version": state["version"]}, headers={
+            "Authorization": "Bearer " + create_access_token(t.other.id)}).status_code == 403
+        result = client.post(path, json={"version": state["version"]}, headers={
+            "Authorization": "Bearer " + create_access_token(t.owner.id)})
+        assert result.status_code == 200 and result.json()["capture_pending"]
+        assert result.headers["cache-control"] == "no-store"
+    assert len(t.engine.calls) == 1  # Enrollment only, via the fake engine.
 
 
 @pytest.mark.parametrize("choice", ["decline", "withdraw"])
@@ -177,6 +246,8 @@ def test_expiry_and_manual_fallback_are_separate_from_matching(identity):
     assert t.service.candidate_state(t.db, t.cookie)["status"] == "unavailable"
     ref = t.service.reference(t.db, t.application.id)
     assert not ref.photo_cipher and not ref.embedding_cipher
+    t.row.candidate_joined_at = None
+    t.db.commit()
     with pytest.raises(RoomConflict): t.service.manual(t.db, t.owner.id, t.row.id, "Confirmed in person")
     t.db.rollback()
     t.row.candidate_joined_at, t.row.room_status = t.clock.value, "active"

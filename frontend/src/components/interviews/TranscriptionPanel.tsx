@@ -111,7 +111,7 @@ export function TranscriptReceiver() {
   const room = useRoomContext();
   const context = useContext(TranscriptionContext);
   useEffect(() => {
-    if (!context) return;
+    if (!context?.interviewer) return;
     let active = true;
     const topic = "hiresense.transcript.v1";
     room.registerTextStreamHandler(topic, async (reader, sender) => {
@@ -129,7 +129,7 @@ export function TranscriptReceiver() {
     room.on(RoomEvent.Reconnected, reconnect);
     void context.restore();
     return () => { active = false; room.unregisterTextStreamHandler(topic); room.off(RoomEvent.Reconnected, reconnect); };
-  }, [room, context?.receive, context?.restore]);
+  }, [room, context?.interviewer, context?.receive, context?.restore]);
   return null;
 }
 
@@ -152,7 +152,7 @@ export function TranscriptionPanel({ closed = false, panelScroll = false, pageSc
     const host = panelScroll ? scroll.current?.closest<HTMLElement>('[role="tabpanel"]') : scroll.current;
     if (host && follow.current) host.scrollTop = host.scrollHeight;
   }, [context?.finals, context?.interim, panelScroll, pageScroll, closed, context?.status?.consented]);
-  if (!context) return null;
+  if (!context?.interviewer) return null;
   const { status, finals, interim, error, busy, interviewer } = context;
   if (!status) return <section className="mt-5 rounded-2xl bg-white p-5"><h2 className="font-semibold">Live transcript</h2><p role="status">{error || "Loading transcription status…"}</p></section>;
   const running = ["starting", "active", "stopping"].includes(status.status);

@@ -92,8 +92,7 @@ export function InterviewMediaRoom({ access, devices, onConnected, onLeave, onEn
         onMediaDeviceFailure={() => setError("A camera or microphone failed. Check permissions or choose another input when you rejoin.")}
         onDisconnected={(reason) => reason === DisconnectReason.ROOM_DELETED ? onEnded() : onLeave()}>
         <Controls role={access.role} onEnd={onEnd} onDeviceError={showError} onShareError={shareError} />
-        <TranscriptReceiver />
-        {access.role === "candidate" ? <div className="p-3"><CandidateCameraIdentity /></div> : null}
+        {access.role === "interviewer" ? <TranscriptReceiver /> : <CandidateCameraIdentity />}
       </LiveKitRoom>
     </section>
   );

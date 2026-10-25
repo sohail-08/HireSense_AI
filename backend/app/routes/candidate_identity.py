@@ -40,6 +40,11 @@ class Confirm(BaseModel):
     confirmed: Literal[True]
 
 
+class CaptureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: int = Field(strict=True, ge=1)
+
+
 @router.get("/api/interview-rooms/candidate/identity")
 def state(request: Request, response: Response, db: Session = Depends(get_db), identity=Depends(service)):
     sensitive(response)
@@ -87,6 +92,13 @@ def private_state(interview_id: int, response: Response, db: Session = Depends(g
 def manual(interview_id: int, data: Manual, response: Response, db: Session = Depends(get_db), user=Depends(require_interviewer), identity=Depends(service)):
     sensitive(response)
     return run(db, lambda: identity.manual(db, user.id, interview_id, data.note))
+
+
+@router.post("/api/interview-rooms/{interview_id}/identity/capture")
+def capture(interview_id: int, data: CaptureRequest, response: Response, db: Session = Depends(get_db),
+        user=Depends(require_interviewer), identity=Depends(service)):
+    sensitive(response)
+    return run(db, lambda: identity.request_capture(db, user.id, interview_id, data.version))
 
 
 class IdentityBodyLimit:

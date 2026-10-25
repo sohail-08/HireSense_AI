@@ -188,6 +188,12 @@ details[open] > .hiresense-console-link-options .hiresense-console-link-chevron 
 .hiresense-console .hiresense-device-check .lk-button { min-height: 2.5rem; padding: 0.5rem 0.75rem; font-size: 0.75rem; }
 .hiresense-console .hiresense-meeting-panel > section { padding: 1rem; }
 .hiresense-console .hiresense-meeting-panel > .hiresense-interview-assistant { padding: 0; }
+.hiresense-candidate-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.hiresense-candidate-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; gap: 0.75rem; min-width: 0; min-height: 0; }
+.hiresense-candidate-grid > .hiresense-console-media-slot { overflow: hidden; }
+.hiresense-candidate-workspace { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; min-height: 0; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.hiresense-candidate-workspace > section { flex-shrink: 0; }
+.hiresense-candidate-waiting { display: flex; flex: 1; flex-direction: column; min-height: 0; height: 100%; }
 @media (max-width: 899px) {
   .hiresense-console { padding: 0.5rem; }
   .hiresense-console-shell { gap: 0.5rem; }
@@ -205,6 +211,9 @@ details[open] > .hiresense-console-link-options .hiresense-console-link-chevron 
   .hiresense-console .hiresense-video-stage[data-sharing="true"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 4rem; }
   .hiresense-console .hiresense-video-stage[data-sharing="true"] .hiresense-camera-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
   .hiresense-console .hiresense-video-stage[data-sharing="true"] .hiresense-camera-tile[data-view="rail"] { height: 100%; aspect-ratio: auto; }
+  .hiresense-candidate-header { align-items: flex-start; flex-direction: column; gap: 0.5rem; }
+  .hiresense-candidate-header > div:last-child { align-items: flex-start; }
+  .hiresense-candidate-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
 }
 @media (max-width: 479px) {
   .hiresense-console-end-label { display: none; }

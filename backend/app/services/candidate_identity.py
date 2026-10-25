@@ -21,8 +21,10 @@ from app.services.interview_content import utc
 from app.services.interview_links import secret_hash
 
 NOTICE = "hiresense-face-v1"
+CAPTURE_REQUEST_SECONDS = 45
 NOTICE_TEXT = "Optional photo-based face verification. With your consent, HireSense converts your encrypted application photo into a face template and compares short camera samples locally, not through Gemini. It does not affect assessment scores or prove legal identity. The photo copy is removed after template extraction; encrypted photos/templates expire after 30 days or 7 days after interview, whichever is sooner. You may decline or withdraw and use manual verification. The original Google Drive upload remains controlled by the application-form owner."
 MESSAGES = {
+    "capture_requested": "Camera samples requested. Ask the candidate to face the camera.",
     "matched": "Reference photo matched", "not_checked": "Photo match not checked", "declined": "Face matching declined",
     "pending_consent": "Application photo received · awaiting consent in HireSense",
     "manual": "Manually confirmed by interviewer", "withdrawn": "Face verification consent withdrawn",
@@ -170,22 +172,31 @@ class CandidateIdentityService:
                 reason = "declined"
             elif active and check.status in {"matched", "unverified"}:
                 reason = "matched" if check.status == "matched" else check.reason
+            elif active and check.status == "capture_requested":
+                reason = "capture_requested"
         result = {"enabled": self.settings.identity_enabled, "reference_ready": active,
             "reference_available": bool(self.settings.identity_enabled and ref and ref.consent != "withdrawn" and utc(ref.expires_at) > self.now() and (ref.photo_cipher or active)),
             "status": "matched" if reason == "matched" else "manual" if reason == "manual" else reason,
             "message": MESSAGES.get(reason, MESSAGES["unverified"]), "version": check.version if valid else 0,
             "consented": bool(valid and check.live_consent_at and ref and ref.consent == "given" and utc(ref.expires_at) > self.now() and check.reference_generation == ref.generation), "checked_at": check.checked_at if valid else None,
             "notice_version": NOTICE, "notice": NOTICE_TEXT.replace("30 days", f"{self.settings.identity_retention_days} days").replace("7 days", f"{self.settings.identity_post_interview_days} days"), "reference_expires_at": ref.expires_at if ref else None}
+        capture_allowed = bool(result["consented"] and active and row.candidate_admitted_at
+            and row.candidate_joined_at and row.room_status in {"ready", "active"})
+        capture_pending = bool(capture_allowed and check.status == "capture_requested" and check.capture_requested_at
+            and utc(check.capture_requested_at) > self.now() - timedelta(seconds=CAPTURE_REQUEST_SECONDS))
         if session is None:
             result.update(similarity=check.similarity if valid else None, threshold=check.threshold if valid else None,
-                manual_note=check.manual_note if valid and check.status == "manual" else None)
+                manual_note=check.manual_note if valid and check.status == "manual" else None,
+                capture_allowed=capture_allowed, capture_pending=capture_pending)
+            if reason == "capture_requested" and not capture_pending:
+                result["message"] = "Camera request expired. You can request fresh samples."
         else:
             # Candidate endpoints expose only consent/capture workflow state.
             # A successful match, mismatch and manual decision have the same
             # public completion state; comparison details stay interviewer-only.
             completed = bool(valid and check.checked_at and (check.status == "manual" or
                 (active and check.reference_generation == ref.generation and check.status in {"matched", "unverified"})))
-            public_status = "submitted" if completed else reason if reason in {"not_checked", "pending_consent", "declined", "withdrawn"} else "preparing" if reason in {"queued", "processing"} else "unavailable"
+            public_status = "submitted" if completed else "not_checked" if reason == "capture_requested" else reason if reason in {"not_checked", "pending_consent", "declined", "withdrawn"} else "preparing" if reason in {"queued", "processing"} else "unavailable"
             messages = {
                 "submitted": "Verification submitted. Your interviewer will review it.",
                 "not_checked": "Consent saved. Camera samples can be captured after you join.",
@@ -197,8 +208,7 @@ class CandidateIdentityService:
             }
             result = {key: result[key] for key in ("enabled", "reference_ready", "reference_available", "version",
                 "consented", "notice_version", "notice", "reference_expires_at")}
-            result.update(status=public_status, message=messages[public_status], capture_available=bool(
-                result["consented"] and active and row.candidate_admitted_at and check.status != "manual"))
+            result.update(status=public_status, message=messages[public_status], capture_available=capture_pending)
         return result
 
     def candidate_state(self, db, token):
@@ -228,6 +238,7 @@ class CandidateIdentityService:
         check.live_consent_at = self.now() if allow else None
         check.status, check.reason = ("not_checked", "not_checked") if allow else ("declined", "declined")
         check.similarity, check.checked_at, check.manual_note, check.manual_by = None, None, None, None
+        check.capture_requested_at = None
         check.version += 1
         db.commit()
         return self.state(db, row, session)
@@ -241,6 +252,8 @@ class CandidateIdentityService:
             raise RoomConflict("No active application-photo reference is available.")
         if not check or not check.live_consent_at or check.reference_generation != ref.generation or check.session_id != session.id or check.join_generation != row.join_generation or check.version != version:
             raise RoomConflict("Confirm consent again before capturing camera samples.")
+        if not self.state(db, row, session)["capture_available"]:
+            raise RoomConflict("The interviewer must request fresh camera samples after you join.")
         generation, encrypted, model_version = ref.generation, ref.embedding_cipher, ref.model_version
         db.rollback()  # Never hold room locks during local model inference.
         similarity, reason = None, "model_unavailable"
@@ -260,12 +273,14 @@ class CandidateIdentityService:
         ref, check = self.reference(db, row.application_id), self.check(db, row.id)
         if (not ref or ref.generation != generation or ref.consent != "given" or utc(ref.expires_at) <= self.now()
                 or not check or check.version != version or not check.live_consent_at or check.session_id != session.id
-                or check.reference_generation != generation or check.join_generation != row.join_generation):
+                or check.reference_generation != generation or check.join_generation != row.join_generation
+                or not self.state(db, row, session)["capture_available"]):
             raise RoomConflict("Consent or the reference changed. No result was saved.")
         check.reference_generation = generation
         check.status, check.reason = ("matched" if reason == "matched" else "unverified"), reason
         check.similarity, check.threshold, check.model_version = similarity, self.settings.identity_similarity_threshold, model_version
         check.checked_at, check.version = self.now(), check.version + 1
+        check.capture_requested_at = None
         db.commit()
         return self.state(db, row, session)
 
@@ -285,6 +300,28 @@ class CandidateIdentityService:
         db.commit()
         return result
 
+    def request_capture(self, db, user_id, interview_id, version):
+        row = self.rooms.owned(db, user_id, interview_id, lock=True)
+        state = self.state(db, row)
+        if not state["capture_allowed"]:
+            raise RoomConflict("The candidate must consent, join and have a ready photo reference before capture.")
+        check = self.check(db, row.id)
+        session = db.get(CandidateInterviewSession, check.session_id)
+        if (not session or session.revoked_at or utc(session.expires_at) <= self.now()
+                or session.join_generation != row.join_generation or session.interview_id != row.id
+                or session.application_id != row.application_id):
+            raise RoomConflict("No active candidate session is available.")
+        if check.version != version:
+            raise RoomConflict("Photo verification changed. Refresh before requesting capture.")
+        if not state["capture_pending"]:
+            check.status, check.reason = "capture_requested", "capture_requested"
+            check.capture_requested_at = self.now()
+            check.checked_at, check.similarity, check.threshold = None, None, None
+            check.manual_by, check.manual_note = None, None
+            check.version += 1
+        db.commit()
+        return self.state(db, row)
+
     def manual(self, db, user_id, interview_id, note):
         row = self.rooms.owned(db, user_id, interview_id, lock=True)
         if not row.candidate_joined_at or row.room_status not in {"active", "ready"}:
@@ -300,6 +337,7 @@ class CandidateIdentityService:
             db.add(check)
         check.status, check.reason, check.session_id, check.join_generation = "manual", "manual", session.id, row.join_generation
         check.checked_at, check.manual_by, check.manual_note = self.now(), user_id, note
+        check.capture_requested_at = None
         check.similarity, check.threshold = None, None
         check.version += 1
         db.commit()
@@ -311,6 +349,7 @@ class CandidateIdentityService:
         if check:
             check.status, check.reason, check.live_consent_at, check.checked_at = "not_checked", "not_checked", None, None
             check.similarity, check.manual_by, check.manual_note = None, None, None
+            check.capture_requested_at = None
             check.version += 1
 
     @staticmethod

@@ -39,6 +39,7 @@ class IdentityCheck(Base):
     threshold: Mapped[float | None] = mapped_column(Float)
     model_version: Mapped[str | None] = mapped_column(String(160))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    capture_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     manual_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     manual_note: Mapped[str | None] = mapped_column(String(500))
     version: Mapped[int] = mapped_column(Integer, default=0)

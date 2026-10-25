@@ -25,17 +25,23 @@ Final weights remain interview 60%, CV 30%, practical 10%.
    In Docker use `docker compose exec -T backend python -m app.identity.provision`.
    Runtime inference never downloads files. The provisioner pins and verifies
    YuNet and SFace SHA-256 hashes and stores their licence notices alongside them.
-4. Rebuild the web services and apply Alembic revision `0027_candidate_identity`
+4. Rebuild the web services and apply Alembic revision `0028_interviewer_face_capture`
    through the normal backend entrypoint. Existing candidates are not enrolled
    by the migration. Keep the existing private storage mount persistent.
-5. On the candidate's private pre-interview page, the checkbox starts unchecked.
-   **Allow photo verification** records the current notice and consent, then
-   prepares an encrypted face template locally. No template is created before
-   this app consent. **Continue without face matching** provides the manual path.
-6. Once admitted and joined with camera enabled, the app reuses the existing
-   LiveKit local camera track to send three temporary JPEG samples. It does not
-   open another camera, record video, or save those samples. The backend compares
-   all three samples to the application's template using local CPU inference.
+5. The candidate console keeps the call fixed on the left and a scrollable task
+   workspace on the right. One unchecked permissions checkbox explicitly enables
+   available transcription and photo verification, without extra action buttons.
+   A collapsed privacy notice explains processing and retention. Leaving the box
+   unchecked never blocks joining. Unchecking stops transcription and withdraws
+   biometric consent; the deletion/withdrawal APIs remain available.
+6. After the candidate consents and joins, the interviewer selects **Capture face**
+   (or **Capture face again**) in Candidate info. A versioned request expires after
+   45 seconds and is bound to the current interview/session/reference. Only then
+   does a headless candidate-side collector reuse the existing LiveKit camera to
+   send three temporary JPEG samples. No additional device is opened or recording
+   stored. Capture is not initiated automatically by consent or room entry, and
+   the candidate has no capture/retake controls. Leaving, switching off the camera,
+   withdrawing consent or an expired request cancels sampling or rejects results.
 7. The interviewer sees an explicit matched/unverified/manual/missing/declined
    status next to the scheduled candidate profile, saved CV score and CV-backed
    areas to explore. A manual confirmation requires a note and a joined candidate;
@@ -44,8 +50,8 @@ Final weights remain interview 60%, CV 30%, practical 10%.
    Match outcomes, similarity values, thresholds, check timestamps and manual
    notes are interviewer-only, including at the API boundary. Candidates see
    only consent, capture availability and a neutral submission acknowledgement.
-   They retain access to the privacy notice, decline/withdrawal controls and
-   camera recapture where available; no outcome is revealed after recapture.
+   They retain the compact consent checkbox and privacy details; no outcome is
+   revealed after recapture. Captions and saved transcripts are interviewer-only.
 
 ## Privacy and security
 

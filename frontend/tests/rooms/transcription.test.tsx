@@ -123,14 +123,14 @@ it("renders messenger-style bubbles with distinct sides, exact times and no repe
   expect(css).toContain(".hiresense-transcript-message { max-width: 90%; }");
 });
 
-it("puts the candidate's own live captions on the right without fetching saved history", async () => {
+it("does not render or subscribe to live captions in a candidate context", async () => {
   vi.mocked(transcriptionApi.status).mockResolvedValue(active);
   vi.mocked(transcriptionApi.history).mockClear();
-  show(true); await screen.findByText("Transcription active");
-  await receive(line);
-  await receive({ ...line, id: "b".repeat(64), sequence: 2, speaker: "INTERVIEWER", text: "A live question", start_offset_ms: 2300, end_offset_ms: 3300 });
-  expect(screen.getByRole("article", { name: "Candidate · 00:01 · Final" }).getAttribute("data-side")).toBe("outgoing");
-  expect(screen.getByRole("article", { name: "Interviewer · 00:02 · Final" }).getAttribute("data-side")).toBe("incoming");
+  const view = show(true);
+  await waitFor(() => expect(transcriptionApi.status).toHaveBeenCalled());
+  expect(view.container.textContent).toBe("");
+  expect(screen.queryByRole("article")).toBeNull();
+  expect(room.registerTextStreamHandler).not.toHaveBeenCalled();
   expect(transcriptionApi.history).not.toHaveBeenCalled();
 });
 
@@ -208,7 +208,7 @@ describe("transcription controls and captions", () => {
     page.unmount();
     vi.mocked(transcriptionApi.history).mockClear();
     show(true);
-    await screen.findByText("Transcription active");
+    await waitFor(() => expect(transcriptionApi.status).toHaveBeenCalledWith(undefined));
     expect(transcriptionApi.history).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Start transcription" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Stop transcription" })).toBeNull();
