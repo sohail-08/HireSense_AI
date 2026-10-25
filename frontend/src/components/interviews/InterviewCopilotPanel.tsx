@@ -3,8 +3,8 @@ import { apiRequest } from "../../api/apiClient";
 import { TranscriptCitation } from "./TranscriptCitation";
 import type { Citation } from "./analysisApi";
 import { MeetingTabs } from "./MeetingTabs";
-import { MeetingIcon } from "./MeetingIcon";
 import { IdentityOverview } from "./IdentityOverview";
+import { CandidatePhoto } from "./CandidatePhoto";
 import { displayPercent } from "../candidates/scoringDisplay";
 import { AssistantBubble, AssistantComposer, AssistantIdentity, AssistantWorking, assistantChatStyles } from "../assistant/AssistantChatUI";
 
@@ -57,7 +57,7 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
   const candidate = context.candidate;
   const candidateInfo = <section className="min-w-0 break-words p-5">
       <h2 className="text-sm font-semibold text-slate-500">Candidate information</h2>
-      <div className="mt-4 flex items-center gap-3"><span className="rounded-2xl bg-blue-50 p-3 text-blue-600"><MeetingIcon name="person" className="h-7 w-7"/></span><div className="min-w-0"><h3 className="break-words text-lg font-bold">{candidate.name}</h3>
+      <div className="mt-4 flex items-center gap-3"><CandidatePhoto interviewId={interviewId} name={candidate.name} /><div className="min-w-0"><h3 className="break-words text-lg font-bold">{candidate.name}</h3>
       <p className="text-sm text-slate-600">{context.job_title}</p>
       </div></div>
       <IdentityOverview interviewId={interviewId} />

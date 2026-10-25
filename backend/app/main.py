@@ -37,6 +37,7 @@ from app.routes.assessments import router as assessments_router
 from app.routes.work_samples import router as work_samples_router
 from app.services.work_sample import WorkSampleService, work_sample_worker
 from app.routes.candidate_identity import router as identity_router, IdentityBodyLimit
+from app.routes.candidate_photos import router as candidate_photos_router
 from app.services.candidate_identity import CandidateIdentityService, identity_worker
 from app.storage import (
     ensure_cv_storage_root,
@@ -123,6 +124,7 @@ app.include_router(supervisor_router)
 app.include_router(assessments_router)
 app.include_router(work_samples_router)
 app.include_router(identity_router)
+app.include_router(candidate_photos_router)
 app.add_middleware(IdentityBodyLimit)
 
 

@@ -47,7 +47,7 @@ class GoogleWorkspaceReader(Protocol):
 
 
 class GoogleServiceAccountReader:
-    def __init__(self, credential_file: str | Path, *, sheet_timeout_seconds: int | None = None):
+    def __init__(self, credential_file: str | Path, *, sheet_timeout_seconds: int | None = None, file_timeout_seconds: int | None = None):
         path = Path(credential_file).expanduser()
         if not path.is_file():
             raise RuntimeError(
@@ -71,10 +71,12 @@ class GoogleServiceAccountReader:
             **sheet_transport,
             cache_discovery=False,
         )
+        file_transport = ({"http": AuthorizedHttp(credentials, http=Http(timeout=file_timeout_seconds))}
+            if file_timeout_seconds is not None else {"credentials": credentials})
         self._drive = build(
             "drive",
             "v3",
-            credentials=credentials,
+            **file_transport,
             cache_discovery=False,
         )
 

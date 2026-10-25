@@ -49,6 +49,21 @@ Final weights remain interview 60%, CV 30%, practical 10%.
 
 ## Privacy and security
 
+- The interviewer-only Candidate info panel displays the application's uploaded
+  portrait beside the candidate name. A private, authenticated endpoint resolves
+  the scheduled application's saved Google Form photo and reads the original
+  through the existing read-only Drive integration. It strips metadata, bounds
+  image size, returns a non-cacheable JPEG, and keeps no additional stored copy.
+  Missing or inaccessible photos retain the generic profile icon. Candidate
+  sessions cannot access this endpoint, and Drive links are never made public.
+  This ordinary application-photo display does not run face matching or create
+  templates; biometric withdrawal and processing-copy deletion remain unchanged.
+  Original application uploads remain under the form owner's retention policy.
+- Docker packages backend source into the image; it is not a live source mount.
+  After code changes, rebuild with `docker compose build backend frontend` before
+  safely recreating the web services. If the portrait API returns plain
+  `404 Not Found`, check that the running backend includes the photo route,
+  rather than treating it as a missing Google Form upload.
 - Reference photos and templates are Fernet-encrypted using an independent key.
   Set `IDENTITY_ENCRYPTION_KEY` to a valid Fernet key, or keep the automatically
   created private `storage/identity-secrets/template.key` with the persistent
