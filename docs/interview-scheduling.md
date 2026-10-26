@@ -87,6 +87,11 @@ delivery receipt. Configure domain authentication and privacy policies separatel
    Nothing is sent during selection or preview.
 7. Select **Confirm & send**. Schedules and delivery snapshots are committed first;
    background workers then send each email. The UI polls sent/failed/uncertain status.
+   The delivery card shows summary counts, processed progress and per-candidate
+   badges. In-flight attempts display **Sending** even while the SMTP safety
+   claim is internally `uncertain`; only finished uncertain attempts display
+   **Unconfirmed**. Progress counts completed attempts, not inbox delivery.
+   Only eligible failed attempts offer Retry; no email is automatically resent.
 8. **Interviews** lists candidates, readable dates/times, status badges and a dedicated
    **Actions** column. Button-styled links open the interview console, completed
    interview details and assessment reports. There is no Delivery column. Each row

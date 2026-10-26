@@ -7,6 +7,7 @@ import { PreviewModal } from "../common/PreviewModal";
 import { buildInterviewSchedule } from "./interviewSchedule";
 import { formatDateTime, formatTimeRange } from "../../utils/dateTime";
 import { useSectionReveal } from "../common/useSectionReveal";
+import { InvitationDeliveryStatus } from "./InvitationDeliveryStatus";
 
 type Recipient = { application_id: number; name: string; email?: string | null; masked_email?: string | null; rank?: number; score?: string;
   local_start?: string; local_end?: string; timezone?: string; duration_minutes?: number; subject?: string; body?: string;
@@ -152,6 +153,6 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
       <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" disabled={busy} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40" onClick={() => setModal(undefined)}>Back to schedule</button>
         <button type="button" disabled={busy} className={buttonStyle} onClick={() => void confirm()}>{busy ? "Confirming…" : `Confirm & send ${preview.recipient_count} invitation(s)`}</button></div>
     </PreviewModal> : null}
-    {batch ? <div id="invitation-delivery" className="workflow-section mt-4 rounded-xl bg-slate-50 p-4 text-sm" role="status"><p className="font-semibold">{batch.status === "sending" ? "Sending invitations…" : "Invitation results"}</p><p className="mt-1">{batch.sent ?? 0} sent · {batch.failed ?? 0} failed · {batch.uncertain ?? 0} uncertain</p><ul className="mt-3 space-y-2">{batch.deliveries?.map((item) => <li key={item.id}>{batch.recipients.find((recipient) => recipient.application_id === item.application_id)?.name ?? `Application #${item.application_id}`}: {item.in_flight ? "sending" : item.status}{item.error_category ? " · " + item.error_category.replaceAll("_", " ") : ""}{item.retryable ? <button type="button" disabled={busy} onClick={() => void retry(item.id, item.attempts)} className="ml-3 font-semibold text-blue-700">Retry failed delivery</button> : null}</li>)}</ul>{batch.status === "completed" && batch.uncertain ? <p className="mt-3 text-amber-800">Uncertain delivery is not automatically retried. Check your SMTP provider before another action.</p> : null}</div> : null}
+    {batch ? <InvitationDeliveryStatus batch={batch} busy={busy} onRetry={(id, attempts) => void retry(id, attempts)} /> : null}
   </section>;
 }

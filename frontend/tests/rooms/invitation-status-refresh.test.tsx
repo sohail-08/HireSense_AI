@@ -30,5 +30,6 @@ it("preserves sending progress and the receipt when confirmed candidates leave t
   fireEvent.click(await screen.findByRole("button", { name: "Confirm & send 1 invitation(s)" }));
   expect(await screen.findByText("Sending invitations…")).toBeTruthy();
   expect(await screen.findByText("Invitation results", {}, { timeout: 4000 })).toBeTruthy();
-  expect(screen.getByText("1 sent · 0 failed · 0 uncertain")).toBeTruthy();
+  expect(screen.getByLabelText("Sent invitations").textContent).toContain("1");
+  expect(screen.getByLabelText("Pending invitations").textContent).toContain("0");
 });
