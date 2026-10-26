@@ -8,8 +8,10 @@ import { FinalRankingTable } from "../components/assessments/FinalRankingTable";
 import type { ScreeningJobOption } from "../types";
 import { StyledSelect } from "../components/common/StyledSelect";
 import { PreviewModal } from "../components/common/PreviewModal";
+import { useSectionReveal } from "../components/common/useSectionReveal";
 
 export function ConsolidatedAssessmentsPage() {
+  const reveal = useSectionReveal();
   const [params, setParams] = useSearchParams();
   const { setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion } = useSupervisor();
   const [jobs, setJobs] = useState<ScreeningJobOption[]>([]);
@@ -33,6 +35,10 @@ export function ConsolidatedAssessmentsPage() {
     }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) setJobsLoading(false); });
     return () => { alive = false; };
   }, []);
+  useEffect(() => {
+    const requested = Number(params.get("job"));
+    if (jobs.some(item => item.id === requested)) setJob(requested);
+  }, [params.get("job"), jobs]);
   useEffect(() => {
     setSelectedJobPostingId(job);
     return () => { setSelectedJobPostingId(undefined); setSelectedApplicationIds([]); };
@@ -71,7 +77,7 @@ export function ConsolidatedAssessmentsPage() {
     if (!job || calculationLock.current) return;
     calculationLock.current = true;
     setBusy(true); setError(""); setReport(undefined); setComparison(undefined); setParams({ job: String(job) }); setSelectedApplicationIds([]);
-    try { setRanking(await assessmentApi.calculate(job)); }
+    try { setRanking(await assessmentApi.calculate(job)); reveal("final-ranking"); }
     catch (e) { setError(e instanceof Error ? e.message : "The ranking could not be calculated. Try again."); }
     finally { calculationLock.current = false; setBusy(false); }
   }
@@ -96,7 +102,7 @@ export function ConsolidatedAssessmentsPage() {
     </section>
     {ranking ? <FinalRankingTable key={job} ranking={ranking} onDetails={(applicationId, assessmentId) => setParams({ job: String(job), application: String(applicationId), run: String(assessmentId) })} /> : jobsLoading || job && !error ? <section role="status" className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">Loading candidates…</section> : !jobs.length && !error ? <section className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center"><h2 className="font-semibold text-slate-700">No job postings yet</h2><p className="mt-2 text-sm text-slate-500">Create a job posting to start comparing candidates.</p><Link className="mt-4 inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white" to="/interviewer/jobs">Go to jobs</Link></section> : null}
     {detailsOpen ? <PreviewModal title={Number(params.get("comparison")) ? "Candidate comparison" : "Candidate assessment"} onClose={closeDetails}>
-      {detailError ? <div><p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{detailError}</p><button type="button" onClick={() => setDetailRetry(value => value + 1)} className="mt-3 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-blue-700">Try again</button></div> : report ? <AssessmentView key={report.id} report={report} /> : comparison ? <ComparisonView value={comparison} /> : <p role="status" className="py-8 text-center text-sm text-slate-500">Loading candidate details…</p>}
+      <div id="assessment-details" className="workflow-section">{detailError ? <div><p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{detailError}</p><button type="button" onClick={() => setDetailRetry(value => value + 1)} className="mt-3 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-blue-700">Try again</button></div> : report ? <AssessmentView key={report.id} report={report} /> : comparison ? <ComparisonView value={comparison} /> : <p role="status" className="py-8 text-center text-sm text-slate-500">Loading candidate details…</p>}</div>
     </PreviewModal> : null}
   </div>;
 }

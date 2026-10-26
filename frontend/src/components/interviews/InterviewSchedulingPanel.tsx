@@ -6,6 +6,7 @@ import { DateTimePicker } from "../common/DateTimePicker";
 import { PreviewModal } from "../common/PreviewModal";
 import { buildInterviewSchedule } from "./interviewSchedule";
 import { formatDateTime, formatTimeRange } from "../../utils/dateTime";
+import { useSectionReveal } from "../common/useSectionReveal";
 
 type Recipient = { application_id: number; name: string; email?: string | null; masked_email?: string | null; rank?: number; score?: string;
   local_start?: string; local_end?: string; timezone?: string; duration_minutes?: number; subject?: string; body?: string;
@@ -20,6 +21,7 @@ const buttonStyle = "rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text
 export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = [], scheduleIds, onUpdated, onBusyChange }:
   { jobId?: number; rankingRunId?: number; selectedIds?: number[]; scheduleIds?: number[]; onUpdated?: () => void; onBusyChange?: (busy: boolean) => void }) {
   const rescheduling = Boolean(scheduleIds?.length);
+  const reveal = useSectionReveal();
   const [selectionMode, setSelectionMode] = useState("manual");
   const [topN, setTopN] = useState("5");
   const [threshold, setThreshold] = useState("70");
@@ -90,7 +92,7 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
     await action(async () => {
       setBatch(await apiRequest<Invitation>(rescheduling ? "/interviews/reschedule/confirm" : `/interviews/batches/${preview.id}/confirm`, {
         method: "POST", body: JSON.stringify({ confirmed: true, confirmation_token: preview.confirmation_token, idempotency_key: confirmationKey.current }),
-      })); setPreview(undefined); setModal(undefined); onUpdated?.();
+      })); setPreview(undefined); setModal(undefined); onUpdated?.(); reveal("invitation-delivery");
     });
   }
   async function retry(id: number, attempts: number) { await action(async () => setBatch(await apiRequest<Invitation>(`/interviews/deliveries/${id}/retry`, {
@@ -114,7 +116,7 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
         {selection ? <p className="mt-3 text-sm text-slate-500">{selection.recipient_count} candidate(s) selected. <button type="button" className="font-semibold text-blue-700 hover:underline" onClick={() => setModal("selection")}>Review selection</button></p> : null}
       </> : <p className="mt-3 text-sm">{scheduleIds?.length} interview(s) selected.</p>}
       {rescheduling || selection?.recipient_count ? <>
-        <p className="mt-5 text-sm text-slate-500">One candidate per time slot · All times are in Dhaka time.</p>
+        <p id="interview-time-settings" className="workflow-section mt-5 text-sm text-slate-500">One candidate per time slot · All times are in Dhaka time.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <DateTimePicker label="Date" kind="date" value={fields.date} disabled={busy || batch?.status === "sending"} onChange={value => change("date", value)} />
           <DateTimePicker label="Start time" kind="time" value={fields.start_time} disabled={busy || batch?.status === "sending"} onChange={value => change("start_time", value)} />
@@ -134,7 +136,7 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
       </li>)}</ul>
       {selection.warnings.map(warning => <p key={warning} className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{warning}</p>)}
       {selection.excluded.length ? <details className="mt-4 text-sm"><summary className="font-medium">Excluded candidates ({selection.excluded.length})</summary><ul className="mt-2 space-y-2">{selection.excluded.map(item => <li key={item.application_id}>{item.name}: {item.reasons.join("; ")}</li>)}</ul></details> : null}
-      <div className="mt-5 flex justify-end"><button type="button" className={buttonStyle} onClick={() => setModal(undefined)}>{selection.recipient_count ? "Continue to schedule" : "Back to selection"}</button></div>
+      <div className="mt-5 flex justify-end"><button type="button" className={buttonStyle} onClick={() => { setModal(undefined); if (selection.recipient_count) reveal("interview-time-settings"); }}>{selection.recipient_count ? "Continue to schedule" : "Back to selection"}</button></div>
     </PreviewModal> : null}
     {modal === "invitation" && preview ? <PreviewModal title="Schedule & email preview" onClose={() => setModal(undefined)} busy={busy}>
       <ErrorMessage message={error} />
@@ -150,6 +152,6 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
       <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" disabled={busy} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40" onClick={() => setModal(undefined)}>Back to schedule</button>
         <button type="button" disabled={busy} className={buttonStyle} onClick={() => void confirm()}>{busy ? "Confirming…" : `Confirm & send ${preview.recipient_count} invitation(s)`}</button></div>
     </PreviewModal> : null}
-    {batch ? <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm" role="status"><p className="font-semibold">{batch.status === "sending" ? "Sending invitations…" : "Invitation results"}</p><p className="mt-1">{batch.sent ?? 0} sent · {batch.failed ?? 0} failed · {batch.uncertain ?? 0} uncertain</p><ul className="mt-3 space-y-2">{batch.deliveries?.map((item) => <li key={item.id}>{batch.recipients.find((recipient) => recipient.application_id === item.application_id)?.name ?? `Application #${item.application_id}`}: {item.in_flight ? "sending" : item.status}{item.error_category ? " · " + item.error_category.replaceAll("_", " ") : ""}{item.retryable ? <button type="button" disabled={busy} onClick={() => void retry(item.id, item.attempts)} className="ml-3 font-semibold text-blue-700">Retry failed delivery</button> : null}</li>)}</ul>{batch.status === "completed" && batch.uncertain ? <p className="mt-3 text-amber-800">Uncertain delivery is not automatically retried. Check your SMTP provider before another action.</p> : null}</div> : null}
+    {batch ? <div id="invitation-delivery" className="workflow-section mt-4 rounded-xl bg-slate-50 p-4 text-sm" role="status"><p className="font-semibold">{batch.status === "sending" ? "Sending invitations…" : "Invitation results"}</p><p className="mt-1">{batch.sent ?? 0} sent · {batch.failed ?? 0} failed · {batch.uncertain ?? 0} uncertain</p><ul className="mt-3 space-y-2">{batch.deliveries?.map((item) => <li key={item.id}>{batch.recipients.find((recipient) => recipient.application_id === item.application_id)?.name ?? `Application #${item.application_id}`}: {item.in_flight ? "sending" : item.status}{item.error_category ? " · " + item.error_category.replaceAll("_", " ") : ""}{item.retryable ? <button type="button" disabled={busy} onClick={() => void retry(item.id, item.attempts)} className="ml-3 font-semibold text-blue-700">Retry failed delivery</button> : null}</li>)}</ul>{batch.status === "completed" && batch.uncertain ? <p className="mt-3 text-amber-800">Uncertain delivery is not automatically retried. Check your SMTP provider before another action.</p> : null}</div> : null}
   </section>;
 }

@@ -6,11 +6,13 @@ import { SavedJobsCards } from "../components/jobs/SavedJobsCards";
 import { ManualJobModal } from "../components/jobs/ManualJobModal";
 import { JobDescriptionEditor } from "../components/jobs/JobDescriptionEditor";
 import { JobKnowledgeModal } from "../components/jobs/JobKnowledgeModal";
+import { useSectionReveal } from "../components/common/useSectionReveal";
 import type { JobDescriptionResponse } from "../types";
 
 const message = (failure: unknown) => failure instanceof Error ? failure.message : "Something went wrong. Please try again.";
 
 export function JobDescriptionPage() {
+  const reveal = useSectionReveal();
   const { response, loading: chatLoading,
     setSelectedJobDescriptionId, refreshVersion } = useSupervisor();
   const [jobs, setJobs] = useState<JobDescriptionResponse[]>([]);
@@ -121,7 +123,7 @@ export function JobDescriptionPage() {
     mutation.current = true; setBusy(true); setApproving(true); setError(""); setNotice("");
     try {
       const approved = await apiRequest<JobDescriptionResponse>(`/job-descriptions/${job.id}/approve`, { method: "POST" });
-      upsert(approved); setNotice("Job description approved.");
+      upsert(approved); setNotice("Job description approved."); reveal("job-publication");
     } catch (failure) { setError(message(failure)); }
     finally { mutation.current = false; setBusy(false); setApproving(false); }
   }
@@ -155,7 +157,7 @@ export function JobDescriptionPage() {
     {!detailsOpen ? feedback : null}
     <SavedJobsCards jobs={jobs} loading={loading} error={listError} busy={busy || chatLoading} onRetry={() => setReload(value => value + 1)}
       onOpen={openJob} onRevise={source => void reviseJob(source)} onDelete={source => void deleteJob(source)} onCreate={createManually} />
-    {creating && !detailsOpen ? <section aria-label="Current job workspace" className="mt-6 scroll-mt-24 rounded-2xl border border-blue-100 bg-blue-50/30 p-4 sm:p-5">
+    {creating && !detailsOpen ? <section aria-label="Current job workspace" data-workflow-ready={!loading && !chatLoading} className="mt-6 scroll-mt-24 rounded-2xl border border-blue-100 bg-blue-50/30 p-4 sm:p-5">
       <header className="mb-4"><div><h2 className="font-semibold text-slate-800">{job ? "Review your job description" : "Create a job"}</h2><p className="mt-1 text-sm text-slate-500">{job ? "Use Edit to make changes, or approve it when you are ready." : "Tell the assistant who you want to hire. It will use your knowledge base to draft the job description."}</p></div></header>
       {!job ? <div className="rounded-xl border border-blue-100 bg-white p-4 text-sm leading-6 text-slate-600"><p>Your draft will appear here. If the knowledge base has no suitable job description, the assistant will ask for the skills and duties you need.</p>{chatLoading ? <p role="status" className="mt-3 text-blue-700">Preparing your job description…</p> : null}</div> : null}
       {editor ? <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">{editor}</div> : null}

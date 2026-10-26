@@ -21,7 +21,7 @@ export type CopilotContext = {
   minimum_experience: number | null; selection_criteria: string[]; messages: Message[]; version: number;
 };
 
-export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = false, activeTab, onTabChange, onOpenPractical }: { interviewId: number; fill?: boolean; pageScroll?: boolean; activeTab?: string; onTabChange?: (id: string) => void; onOpenPractical?: () => void }) {
+export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = false, activeTab, onTabChange, onOpenPractical, onOpenAnalysis }: { interviewId: number; fill?: boolean; pageScroll?: boolean; activeTab?: string; onTabChange?: (id: string) => void; onOpenPractical?: () => void; onOpenAnalysis?: () => void }) {
   const [context, setContext] = useState<CopilotContext>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string>();
@@ -48,6 +48,7 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
       });
       setContext(result); setMessage("");
       if (result.open_practical_exercise) onOpenPractical?.();
+      else if (result.messages.at(-1)?.analysis_run_id) onOpenAnalysis?.();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not suggest questions. Please retry."); }
     finally { lock.current = false; setBusy(false); }
   }

@@ -279,6 +279,10 @@ details[open] > .hiresense-console-link-options .hiresense-console-link-chevron 
   transition: padding-right 300ms ease-out;
 }
 
+/* Explicit workflow actions reveal their destination below the sticky navbar. */
+.workflow-section { scroll-margin-top: calc(var(--interviewer-navbar-height, 74px) + 1rem); }
+[data-workflow-reveal="true"] { outline: 2px solid #a5b4fc; outline-offset: 4px; border-radius: 1rem; }
+
 .supervisor-chat-panel {
   height: 100dvh;
 }

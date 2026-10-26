@@ -219,7 +219,7 @@ export function DiscordJobPostPanel({
   }, [notice, open, publishing]);
 
   return (
-    <section className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-5">
+    <section id="job-publication" className="workflow-section rounded-2xl border border-indigo-200 bg-indigo-50/30 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-semibold text-slate-900">Discord job posting</h3>

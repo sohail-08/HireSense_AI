@@ -3,6 +3,7 @@ import { analysisApi, type AnalysisState } from "./analysisApi";
 import { transcriptTime } from "./transcriptionApi";
 import { TranscriptCitation } from "./TranscriptCitation";
 import { EvidenceSummary } from "../assessments/EvidenceSummary";
+import { useSectionReveal } from "../common/useSectionReveal";
 
 const dimensions = ["relevance", "accuracy", "completeness", "quality"] as const;
 const label = (text: string) => text.replaceAll("_", " ");
@@ -22,6 +23,7 @@ function shortReason(reason: string) {
 }
 
 export function InterviewAnalysisPanel({ interviewId }: { interviewId: number }) {
+  const reveal = useSectionReveal();
   const [state, setState] = useState<AnalysisState>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -44,7 +46,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   async function action(work: () => Promise<unknown>, message: string) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
-    try { await work(); setNotice(message); await refresh(); }
+    try { await work(); setNotice(message); await refresh(); if (message.startsWith("Analysis requested") || message === "The latest answer will be scored.") reveal("interview-analysis-results"); }
     catch (e) { setError(e instanceof Error ? e.message : "Analysis action failed."); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -70,6 +72,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
       <p className="text-xs leading-5 text-slate-500">The AI assigns 0–100 for relevance, accuracy, completeness and quality, using the answer and supporting evidence. Each contributes 25% of the answer score. Badges describe the result; they do not set the marks.</p>
       <p className="text-xs leading-5 text-slate-500">A verified off-topic answer or no answer earns 0. Partial answers receive proportionate credit. Unclear transcripts and service failures require a retry or verification, not an invented zero. Older saved results retain their original scoring policy until reanalyzed.</p>
     </div></details>
+    <div id="interview-analysis-results" className="workflow-section">
     {error || run?.error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error || run?.error}</p> : null}
     {notice && (!notice.startsWith("Analysis requested") || !run || ["queued", "processing"].includes(run.status)) ? <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p> : null}
     {incomplete && issues.length ? <div role="alert" className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Some answers could not be scored</p>{issues.slice(0, 3).map(message => <p className="mt-1" key={message}>{message}</p>)}</div> : null}
@@ -126,6 +129,6 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
           </li>;
         })}</ol></div>
       </details> : null}
-    </> : null}
+    </> : null}</div>
   </section>;
 }

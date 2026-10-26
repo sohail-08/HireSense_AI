@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
+import { useSectionReveal } from "../components/common/useSectionReveal";
 import { StyledSelect } from "../components/common/StyledSelect";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { notifyApplicationsChanged } from "../components/common/applicationNotificationEvents";
@@ -15,6 +16,7 @@ function message(error: unknown): string {
 }
 
 export function CandidatesPage() {
+  const reveal = useSectionReveal();
   const { refreshVersion, response } = useSupervisor();
   const [configuration, setConfiguration] = useState<GoogleFormsConfiguration>();
   const [postings, setPostings] = useState<CandidateJobPostingOption[]>([]);
@@ -127,7 +129,7 @@ export function CandidatesPage() {
     setSyncing(true); setError(undefined); setNotice(undefined); setSyncResult(undefined);
     try {
       const result = await apiRequest<GoogleFormsSyncResult>("/candidates/google-forms/sync", { method: "POST", body: JSON.stringify({}) });
-      setSyncResult(result); notifyApplicationsChanged();
+      setSyncResult(result); notifyApplicationsChanged(); reveal("candidate-list");
       await refreshApplications();
     } catch (failure) { setError(message(failure)); }
     finally { syncBusy.current = false; setSyncing(false); }
@@ -176,7 +178,7 @@ export function CandidatesPage() {
       </details> : null}
     </div> : null}
 
-    <section aria-labelledby="candidate-list-title" className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section id="candidate-list" data-workflow-ready={!loading} aria-labelledby="candidate-list-title" className="workflow-section mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">
           <h2 id="candidate-list-title" className="font-semibold text-slate-900">All candidates</h2>

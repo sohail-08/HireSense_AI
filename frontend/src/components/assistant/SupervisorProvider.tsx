@@ -2,12 +2,13 @@ import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
   type ReactNode,
 } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { ApiError, apiRequest } from "../../api/apiClient";
 import { SupervisorChatPanel } from "../jobs/SupervisorChatPanel";
 import { notifyApplicationsChanged } from "../common/applicationNotificationEvents";
 import type { ScreeningBatch, SupervisorChatResponse, SupervisorPhase } from "../../types";
+import { workflowDestination } from "./workflowDestination";
 
 const sessionKey = "hiresense_supervisor_session_id";
 const initialMessage = "Tell me the role you want to hire for, or ask me to sync responses, screen candidates, schedule interviews, or reschedule an interview.";
@@ -49,7 +50,11 @@ export function useSupervisor() {
 }
 
 export function SupervisorProvider({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const navigate = useNavigate();
+  const currentLocation = useRef(location.key);
+  currentLocation.current = location.key;
   const page = pathname.endsWith("/candidates") ? "candidates"
     : pathname.endsWith("/interviews") || pathname.endsWith("/schedule-interviews") ? "interviews"
     : pathname.endsWith("/assessments") ? "assessments"
@@ -167,8 +172,9 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setInput("");
     setMessages((current) => [...current, { role: "user", content: trimmed }]);
+    const origin = currentLocation.current;
     try {
-      applyResponse(await apiRequest<SupervisorChatResponse>("/supervisor/chat", {
+      const value = await apiRequest<SupervisorChatResponse>("/supervisor/chat", {
         method: "POST",
         body: JSON.stringify({
           session_id: sessionId.current,
@@ -178,7 +184,15 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
           selected_job_posting_id: selectedJobPostingId ?? null,
           selected_application_ids: selectedApplicationIds,
         }),
-      }));
+      });
+      applyResponse(value);
+      const destination = workflowDestination(value, selectedJobPostingId);
+      // A restored session, poll or response arriving after the user navigated
+      // elsewhere must never pull them away from their current work.
+      if (destination && currentLocation.current === origin) {
+        navigate(`${destination.path}#${destination.section}`, { state: { workflowSection: destination.section }, replace: destination.path.split("?")[0] === pathname });
+        if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
+      }
     } catch (error) {
       addTaskMessage("failure", error instanceof Error ? error.message : "The task failed. Please try again.");
       setRefreshVersion((current) => current + 1);

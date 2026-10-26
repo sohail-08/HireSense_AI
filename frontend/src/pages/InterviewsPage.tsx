@@ -59,7 +59,7 @@ export function InterviewsPage() {
     return () => { active = false; window.clearInterval(timer); };
   }, [needsRefresh]);
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <section id="interview-list" className="workflow-section mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div><h1 className="text-3xl font-bold tracking-tight">Interviews</h1>
           <p className="mt-2 text-sm text-slate-600">Open an interview, review past sessions, or change a schedule.</p></div>

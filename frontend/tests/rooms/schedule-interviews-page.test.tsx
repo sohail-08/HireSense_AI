@@ -37,6 +37,7 @@ it("loads only the latest ranking and never sends invitations on entry", async (
   expect(await screen.findByText("Candidate 1")).toBeTruthy();
   expect(screen.getByRole("region", { name: "Invitation form" }).textContent).toContain("Job 1 · Ranking 10");
   expect(screen.queryByText("Scoring weights")).toBeNull();
+  expect(screen.queryByText(/Already-scheduled candidates cannot/)).toBeNull();
   expect(apiRequest).not.toHaveBeenCalledWith("/scoring/runs/9");
   expect(vi.mocked(apiRequest).mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });

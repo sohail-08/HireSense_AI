@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../api/apiClient";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { JobPostingSelect } from "../components/candidates/JobPostingSelect";
@@ -15,6 +15,9 @@ type Candidate = { id: number; application_id: number; candidate_name: string; r
 type Ranking = { id: number; job_posting_id: number; status: string; results: Candidate[] };
 
 export function ScheduleInterviewsPage() {
+  const [params] = useSearchParams();
+  const requestedJob = Number(params.get("job"));
+  const appliedJob = useRef(0);
   const { refreshVersion, setSelectedJobPostingId, setSelectedApplicationIds } = useSupervisor();
   const [jobs, setJobs] = useState<ScreeningJobOption[]>([]);
   const [jobId, setJobId] = useState<number>();
@@ -44,6 +47,12 @@ export function ScheduleInterviewsPage() {
       .finally(() => { if (active) setLoadingJobs(false); });
     return () => { active = false; };
   }, [refreshVersion, reload]);
+
+  useEffect(() => {
+    if (appliedJob.current !== requestedJob && jobs.some(job => job.id === requestedJob)) {
+      appliedJob.current = requestedJob; setJobId(requestedJob);
+    }
+  }, [requestedJob, jobs]);
 
   useEffect(() => {
     let active = true;
@@ -104,7 +113,7 @@ export function ScheduleInterviewsPage() {
     </header>
     <ErrorMessage message={jobsError ?? rankingError ?? schedulesError} />
     {jobsError || rankingError || schedulesError ? <button type="button" onClick={() => setReload(value => value + 1)} className="mt-2 text-sm font-semibold text-blue-700">Try again</button> : null}
-    <section aria-labelledby="interview-candidates-title" className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section id="interview-candidates" aria-labelledby="interview-candidates-title" className="workflow-section mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 id="interview-candidates-title" className="text-lg font-semibold">Choose candidates</h2><p className="mt-1 text-sm text-slate-500">Based on the latest saved CV ranking.</p></div>
         <div className="w-full sm:w-80"><JobPostingSelect jobs={jobs} value={jobId} loading={loadingJobs || schedulingBusy} onChange={setJobId} /></div>
@@ -116,7 +125,6 @@ export function ScheduleInterviewsPage() {
           <div className="w-full sm:w-52"><StyledSelect label="Interview status" value={statusFilter} disabled={schedulingBusy || !statusesKnown} onChange={value => { setStatusFilter(value as SchedulingFilter); setPage(1); }}
             options={[{ value: "all", label: "All candidates" }, { value: "not_scheduled", label: "Not scheduled" }, { value: "scheduled", label: "Already scheduled" }, { value: "completed", label: "Completed" }]} /></div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">Already-scheduled candidates cannot receive a duplicate invitation. To change their time, use <Link to="/interviewer/interviews" className="font-semibold text-blue-700 underline">View scheduled interviews</Link>.</p>
         <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Ranked candidates for interview selection</caption>
           <thead className="border-b border-slate-200 text-xs text-slate-500"><tr>{["Select", "Rank", "Candidate", "CV score", "Interview status"].map(title => <th key={title} scope="col" className="px-2 py-3">{title}</th>)}</tr></thead>
           <tbody>{visible.map(candidate => {

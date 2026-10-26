@@ -22,6 +22,7 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.mocked(apiRequest).mockImplementation(async (path) => {
     if (path === "/screening/jobs") return [{ id: 1, title: "Synthetic Engineer", application_count: 1, pending_count: 0 }];
+    if (path === "/interviews/schedules?job_posting_id=1") return [];
     if (path === "/scoring/jobs/1/runs") return [{ id: 10, status: "completed" }];
     if (path === "/scoring/runs/10") return { id: 10, job_posting_id: 1, status: "completed", results: [{ id: 1, application_id: 7, rank: 1, display_score: "85.00", candidate_name: "Synthetic Candidate" }] };
     if (path === "/interviews/selection/preview") return { selection_token: "synthetic-selection", selected: [{ application_id: 7, name: "Synthetic Candidate", rank: 1, score: "85", email: "synthetic@example.test", masked_email: "s***@example.test" }], excluded: [], warnings: [], recipient_count: 1 };
