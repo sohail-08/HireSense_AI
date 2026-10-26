@@ -41,7 +41,8 @@ def applications(response: Response, job_posting_id: int = Query(gt=0), db: Sess
         owned = db.scalar(select(JobPosting.id).join(JobDescription).where(JobPosting.id == job_posting_id,
             JobDescription.created_by_user_id == user.id))
         if not owned: raise LookupError("Job posting not found")
-        ids = db.scalars(select(CandidateApplication.id).where(CandidateApplication.job_posting_id == job_posting_id).order_by(CandidateApplication.id))
+        from app.services.application_identity import current_application_ids
+        ids = current_application_ids(db, job_posting_id)
         return [assessment.list_application(db, user.id, i) for i in ids]
     return run(db, operation)
 

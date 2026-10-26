@@ -41,6 +41,7 @@ from app.models.interview_analysis import InterviewAnalysisControl, InterviewAna
 from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
 from app.models.cv_evidence import CVPassage
 from app.models.work_sample import WorkSampleTemplate, WorkSampleExercise, WorkSampleAttempt, WorkSampleAssessment, WorkSampleDecision
+from app.models.identity import FaceReference, IdentityCheck
 
 __all__ = [
     "CVPassage",

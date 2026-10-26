@@ -7,8 +7,9 @@ embedding similarity into a hiring score. The interviewer still chooses the same
 three CV category weights. Accepted outcomes remain Met (1), Partially met (0.5),
 and Unmet (0). There is no manual-review gate.
 
-1. Validate file integrity and parse PDF/DOCX source blocks. Image-only pages fail
-   safely instead of being silently omitted. This implementation does not add OCR.
+1. Validate file integrity and parse PDF/DOCX source blocks. Scanned or sparse-image
+   PDF pages use local, confidence-gated OCR. Unreliable pages fail safely instead
+   of being silently omitted or assigned zero. See [scanned-CV OCR](cv-ocr.md).
 2. Split long blocks into overlapping, exact source passages (900 characters,
    120 overlap), preserving original block IDs and offsets. No content is silently
    truncated. Complexity is bounded to 512 passages and 60 requirements per CV.
@@ -90,7 +91,7 @@ Per-job row locking protects the short cache-claim transaction, not provider cal
 Concurrent identical work is rejected with a retry message rather than evaluated
 twice. Unexpected provider/database errors do not disclose private payloads.
 
-Scanned, missing, corrupt, or failed CVs are not assigned zero scores or numerical
+Unreadable scans, missing, corrupt, or failed CVs are not assigned zero scores or numerical
 ranks by the screening/scoring services. Successful candidates in a mixed batch
 can still be scored. The UI explains which CVs failed, with optional details.
 This is a processing error state, not a fourth requirement outcome.

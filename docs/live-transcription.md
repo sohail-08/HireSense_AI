@@ -2,9 +2,9 @@
 
 ## Transcript presentation
 
-Captions use a two-sided messenger layout: the viewer's speech appears on the
+Captions are interviewer-only and use a two-sided messenger layout: the interviewer's speech appears on the
 right in dark blue; the other participant's speech appears on the left in soft
-mint. This switches with the viewer's role, including candidate live captions.
+mint. Candidates have no transcript panel or caption subscription.
 Exact elapsed timestamps sit below the bubbles. Repeated initial badges and
 visible role labels are omitted; accessible article names still identify the
 speaker, elapsed time and draft/final state. Close consecutive segments from the
@@ -25,7 +25,8 @@ No recording, evaluation, summarization, translation or mixed-speaker diarizatio
 implemented. The feature is disabled by default and the worker is an opt-in Compose profile.
 
 Microphone tracks -> Agents worker -> separate Nova-3 WebSockets -> LiveKit text
-streams -> React captions. Final text also goes through an authenticated, text-only
+streams addressed only to the assigned interviewer -> React captions. An empty
+recipient list fails closed and never becomes a broadcast. Final text also goes through an authenticated, text-only
 FastAPI repository boundary to PostgreSQL. The Nginx public site blocks the internal
 worker API; its bearer authentication remains mandatory even on the Docker network.
 The worker gets no candidate-login, JWT-signing, Google, Gemini or SMTP credentials.
@@ -120,8 +121,10 @@ Revocation requests stop; the worker checks the shared state on each heartbeat.
 Already queued speech may finalize during the bounded stop interval. Only the
 assigned active interviewer can start/stop, access persisted history or delete it.
 Candidate access is scoped to that candidate session and exposes no saved transcript
-history, CV, metrics or provider credentials. Live captions are visible to both
-consenting participants. Rejoining does not delete final text.
+history, CV, metrics, caption verification keys or provider credentials. The
+candidate's compact permissions checkbox records consent without exposing the
+transcript. Only the assigned interviewer receives live captions, addressed by
+server-provided participant identity. Rejoining does not delete final text.
 
 Endpoints follow `/api/interview-rooms/{id}/transcription/{status,consent,start,stop}`
 and `/api/interview-rooms/{id}/transcript` (GET paginated, DELETE after stop).

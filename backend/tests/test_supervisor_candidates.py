@@ -19,6 +19,7 @@ from app.services.screening_service import ScreeningService
 from app.services.supervisor_service import SupervisorService
 from app.services.job_description_service import JobDescriptionService
 from test_google_forms_intake import FakeGoogleReader, _settings
+from test_screening import FakeScreeningAI
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def scenario(tmp_path):
         model=model, job_description_service=None,
         job_edit_model=None, job_posting_service=None,
         candidate_intake_service=GoogleFormsIntakeService(FakeGoogleReader(), settings),
-        screening_service=ScreeningService(settings),
+        screening_service=ScreeningService(settings, ai=FakeScreeningAI()),
     )
     with Session(engine) as db:
         owner = User(name="Owner", email="owner@example.com", password_hash="hash", role=UserRole.INTERVIEWER)

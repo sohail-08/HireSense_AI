@@ -1,7 +1,8 @@
 import hashlib
 import re
 import zipfile
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from docx import Document
@@ -9,6 +10,7 @@ from pypdf import PdfReader
 
 from app.config import Settings
 from app.models.candidate import CVDocument
+from app.screening.ocr import LocalCVOCR, OCRReadError, ocr_page_notice
 
 
 SUPPORTED_SUFFIXES = {".pdf", ".docx"}
@@ -35,11 +37,13 @@ class ParsedCV:
     parser: str
     page_count: int | None
     warnings: list[str]
+    ocr: dict = field(default_factory=dict)
 
 
 class CVParser:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, *, ocr=None):
         self.settings = settings
+        self.ocr = ocr or LocalCVOCR(settings)
 
     def parse(self, document: CVDocument) -> ParsedCV:
         path = self._trusted_path(document.storage_path)
@@ -113,20 +117,40 @@ class CVParser:
                 )
             blocks: list[SourceBlock] = []
             warnings: list[str] = []
+            ocr_pages = []
+            deadline = time.monotonic() + self.settings.cv_ocr_timeout_seconds
             for page_number, page in enumerate(reader.pages, start=1):
                 text = self._clean_text(page.extract_text() or "")
+                locator = f"PDF page {page_number}"
+                # Sparse selectable headers may cover a scanned body. OCR replaces
+                # the whole page, never concatenates duplicate native/OCR text.
+                needs_ocr = not text or (len(text) < self.settings.cv_min_extract_characters and bool(page.images))
+                if not text and not page.images and hasattr(page, "get_contents") and not page.get_contents():
+                    warnings.append(f"PDF page {page_number} is blank")
+                    continue
+                if needs_ocr:
+                    if len(ocr_pages) >= self.settings.cv_ocr_max_pages:
+                        raise CVReviewRequired("CV OCR exceeds the scanned-page limit. Upload a shorter or text-based PDF/DOCX; no candidate score was assigned.")
+                    text, metadata = self.ocr.read_page(path, page_number, deadline=deadline)
+                    text = self._clean_text(text)
+                    ocr_pages.append(metadata)
+                    if text:
+                        locator += " (OCR)"
+                        warnings.append(ocr_page_notice(page_number))
                 if text:
                     blocks.append(
                         SourceBlock(
                             id=f"pdf-page-{page_number}",
-                            locator=f"PDF page {page_number}",
+                            locator=locator,
                             text=text,
                         )
                     )
                 else:
-                    if list(page.images):
-                        raise CVReviewRequired("A CV page is image-only and needs OCR or a text-based replacement. No candidate score was assigned.")
                     warnings.append(f"No text was extracted from PDF page {page_number}")
+                if sum(len(block.text) for block in blocks) > self.settings.cv_max_characters:
+                    raise CVReviewRequired("The CV exceeds the configured extraction complexity limit; upload a shorter CV.")
+        except OCRReadError as exc:
+            raise CVReviewRequired(str(exc)) from None
         except CVReviewRequired:
             raise
         except Exception as exc:
@@ -134,9 +158,10 @@ class CVParser:
         return ParsedCV(
             text="\n\n".join(block.text for block in blocks),
             blocks=blocks,
-            parser="pypdf",
+            parser="pypdf+tesseract" if ocr_pages else "pypdf",
             page_count=len(reader.pages),
             warnings=warnings,
+            ocr={"pages": ocr_pages} if ocr_pages else {},
         )
 
     def _parse_docx(self, path: Path) -> ParsedCV:

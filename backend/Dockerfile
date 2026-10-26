@@ -9,7 +9,8 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install --with-deps chromium \
-    && apt-get update && apt-get install -y --no-install-recommends fonts-noto-core \
+    && apt-get update && apt-get install -y --no-install-recommends \
+       fonts-noto-core poppler-utils tesseract-ocr tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home appuser
 

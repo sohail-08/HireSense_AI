@@ -1,6 +1,6 @@
 import React from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { CandidateScoringPanel } from "../../src/components/candidates/CandidateScoringPanel";
 import { apiRequest } from "../../src/api/apiClient";
 import { selectOption } from "./selectHelpers";
@@ -17,7 +17,7 @@ const configuration = {
   requirements: categories.map((category, index) => ({ requirement_id: `r${index}`, name: ["React", "Relevant experience", "Degree"][index],
     category, classification: "required", weight: "1", evaluation_criterion: "CV evidence", requirement_version: "requirements-v1" })),
 };
-const result = { id: 42, application_id: 7, candidate_name: "Synthetic Candidate", rank: 1, review_state: "scored",
+const result = { id: 42, application_id: 7, candidate_name: "Synthetic Candidate", candidate_email: "candidate@example.com", rank: 1, review_state: "scored",
   final_score: "85", display_score: "85.00", breakdown: {
     categories: Object.fromEntries(categories.map(category => [category, { score: "85", category_weight: configuration.category_weights[category] }])),
     requirements: configuration.requirements.map((requirement, index) => ({ ...requirement, status: ["met", "partially_met", "unmet"][index],
@@ -52,6 +52,7 @@ beforeEach(() => {
 it("groups the selector, compact weights and latest ranking without previous-ranking controls", async () => {
   render(<CandidateScoringPanel {...defaultProps} />);
   expect(await screen.findByText("Synthetic Candidate")).toBeTruthy();
+  expect(screen.getByText("candidate@example.com")).toBeTruthy();
   const ranking = screen.getByRole("region", { name: "Candidate ranking" });
   expect(within(ranking).getByLabelText("Job posting")).toBeTruthy();
   expect(within(ranking).getAllByRole("spinbutton")).toHaveLength(3);
@@ -115,6 +116,41 @@ it("queues pending CV screening after saving weights and prevents duplicate acti
   fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
   await waitFor(() => expect(defaultProps.onScreenPending).toHaveBeenCalledOnce());
   expect(vi.mocked(apiRequest).mock.calls.some(([path, options]) => path.endsWith("/runs") && options?.method === "POST")).toBe(false);
+});
+
+it("identifies OCR evidence and the original page references", async () => {
+  results = [Object.assign({}, result, { source_extraction: { method: "ocr", pages: [1, 3] } })];
+  render(<CandidateScoringPanel {...defaultProps} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Inspect evidence for Synthetic Candidate" }));
+  expect(screen.getByText("Scanned CV · OCR")).toBeTruthy();
+  expect(screen.getByText(/PDF pages 1, 3/)).toBeTruthy();
+  expect(screen.getByText(/Check important details against the original scan/)).toBeTruthy();
+});
+
+it("labels a partial ranking as incomplete instead of showing a green success", async () => {
+  render(<CandidateScoringPanel {...defaultProps} failedCount={1} />);
+  await screen.findByText("Synthetic Candidate");
+  fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
+  const status = await screen.findByText(/Ranking incomplete: 1 candidate ranked/);
+  expect(status.className).toContain("bg-amber-50");
+  expect(status.textContent).toContain("1 CV could not be processed and has not been scored");
+  expect(screen.queryByText("Ranking updated.")).toBeNull();
+});
+
+it("does not claim success when a queued screening batch finishes with unprocessed CVs", async () => {
+  const requests = vi.mocked(apiRequest).getMockImplementation()!;
+  vi.mocked(apiRequest).mockImplementation((path, options) => path === "/scoring/runs/10"
+    ? Promise.resolve({ ...saved, configuration_id: 4, results }) : requests(path, options));
+  const view = render(<CandidateScoringPanel {...defaultProps} pendingCount={1} />);
+  await screen.findByText("Synthetic Candidate");
+  fireEvent.click(screen.getByRole("button", { name: "Rank candidates" }));
+  await waitFor(() => expect(defaultProps.onScreenPending).toHaveBeenCalledOnce());
+  await act(async () => { view.rerender(<CandidateScoringPanel {...defaultProps} pendingCount={1} processing refreshToken="processing" />); });
+  await act(async () => { view.rerender(<CandidateScoringPanel {...defaultProps} pendingCount={1} failedCount={1} refreshToken="finished" />); });
+  await screen.findByText(/Ranking incomplete/);
+  expect(screen.queryByText("Ranking updated.")).toBeNull();
+  expect(screen.queryByText(/New or updated CVs are waiting/)).toBeNull();
+  expect(screen.getByText(/Correct the CV issues shown above/)).toBeTruthy();
 });
 
 it("paginates the complete sorted ranking without changing saved ranks or scores", async () => {

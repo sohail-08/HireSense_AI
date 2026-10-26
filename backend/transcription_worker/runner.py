@@ -20,9 +20,10 @@ def trusted_microphone(participant_identity, source, participants):
 
 class Publisher:
     """Coalesce interim revisions, bound final notifications, and never block STT."""
-    def __init__(self, room, session_id, signer=None, metrics=None):
+    def __init__(self, room, session_id, signer=None, metrics=None, *, destinations=()):
         self.room, self.session_id = room, session_id
         self.signer = signer
+        self.destinations = list(destinations)
         self.metrics = metrics if metrics is not None else {}
         self.interim, self.finals = {}, asyncio.Queue(maxsize=128)
         self.wake = asyncio.Event()
@@ -50,9 +51,12 @@ class Publisher:
 
     async def send(self, event, timeout):
         try:
+            if not self.destinations:
+                raise ValueError("No authorized caption recipient")
             envelope = self.signer.envelope(event) if self.signer else event
             # Small caption messages do not benefit from compression negotiation.
-            await asyncio.wait_for(self.room.local_participant.send_text(json.dumps(envelope), topic=TOPIC, compress=False), timeout)
+            await asyncio.wait_for(self.room.local_participant.send_text(json.dumps(envelope), topic=TOPIC,
+                destination_identities=self.destinations, compress=False), timeout)
             self.metrics["caption_messages_sent"] = self.metrics.get("caption_messages_sent", 0) + 1
             self.delivery_healthy = True
         except Exception:
@@ -80,7 +84,8 @@ class Runner:
         self.stop = asyncio.Event()
         self.metrics = {"reconnections": 0, "empty_results": 0, "low_confidence": 0, "audio_frames": 0}
         self.connection_status, self.failure = "connecting", None
-        self.publisher = Publisher(room, context["session_id"], signer, self.metrics)
+        recipients = [identity for identity, role in context["participants"].items() if role == "INTERVIEWER"]
+        self.publisher = Publisher(room, context["session_id"], signer, self.metrics, destinations=recipients)
         self.persistence = PersistenceQueue(backend, self.publisher.put, settings.transcription_queue_size, self.metrics)
         self.tracks, self.role_tracks = {}, {}
         self.resumes = {}

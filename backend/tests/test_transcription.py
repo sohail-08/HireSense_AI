@@ -263,11 +263,12 @@ def test_caption_key_is_bound_to_worker_claim_and_public_status(transcription):
     signer = CaptionSigner()
     t.service.claim(t.db, sid, claim, signer.public_key)
     t.service.claim(t.db, sid, claim, signer.public_key)  # idempotent retry
-    status = t.service.status(t.db, t.row, "CANDIDATE")
+    status = t.service.status(t.db, t.row, "INTERVIEWER")
     assert status["caption_public_key"] == signer.public_key
     assert set(status["caption_public_key"]) == {"kty", "crv", "x", "y"}
     with pytest.raises(TranscriptionConflict): t.service.claim(t.db, sid, claim, CaptionSigner().public_key)
     t.db.rollback()
     with pytest.raises(TranscriptionConflict): t.service.claim(t.db, sid, claim, {**signer.public_key, "d": "private"})
     t.db.rollback()
-    assert t.service.status(t.db, t.row, "CANDIDATE")["caption_public_key"] == signer.public_key
+    public = t.service.status(t.db, t.row, "CANDIDATE")
+    assert public["caption_public_key"] is None and public["worker_identity"] is None

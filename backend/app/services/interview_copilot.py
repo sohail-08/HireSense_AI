@@ -44,6 +44,13 @@ class InterviewCopilot:
             ScreeningRun.status == ScreeningRunStatus.COMPLETED,
         ).order_by(ScreeningRun.id.desc()).limit(1))
         cv = (run.extracted_profile or {}) if run else {}
+        from app.models.scoring import CandidateScore, ScoringRun
+        from app.models.screening import RequirementMatch, RequirementMatchStatus
+        score = db.scalar(select(CandidateScore).join(ScoringRun, ScoringRun.id == CandidateScore.scoring_run_id).where(
+            CandidateScore.application_id == row.application_id, ScoringRun.created_by_user_id == user_id,
+            ScoringRun.job_posting_id == row.job_posting_id, ScoringRun.status == "completed").order_by(ScoringRun.id.desc()))
+        probes = list(db.scalars(select(RequirementMatch).where(RequirementMatch.screening_run_id == run.id,
+            RequirementMatch.status != RequirementMatchStatus.MET).order_by(RequirementMatch.id).limit(3))) if run else []
         from app.models.interview_analysis import InterviewAnalysisRun
         from app.services.interview_analysis import now
         from datetime import datetime
@@ -63,7 +70,10 @@ class InterviewCopilot:
                 "qualifications": [item["qualification"] for item in cv.get("education", []) if item.get("qualification")],
                 "experience_years": cv.get("calculated_total_experience_years"),
                 "recent_roles": [item["title"] + (" · " + item["employer"] if item.get("employer") else "")
-                    for item in cv.get("employment", [])[:3] if item.get("title")]},
+                    for item in cv.get("employment", [])[:3] if item.get("title")],
+                "cv_score": str(score.final_score) if score and score.final_score is not None else None,
+                "probe_areas": [{"name": item.name, "reason": (item.evidence_gaps or [item.explanation])[0],
+                    "source": "Saved CV screening", "screening_run_id": run.id} for item in probes]},
             "job_title": jd.title, "required_skills": names(profile.required_skills),
             "preferred_skills": names(profile.preferred_skills), "qualifications": names(profile.qualifications),
             "minimum_experience": profile.min_years_experience, "selection_criteria": names(profile.selection_criteria),

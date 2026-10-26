@@ -14,7 +14,7 @@ vi.mock("livekit-client", async (original) => ({ ...await original<any>(), isBro
 
 const sdk = vi.hoisted(() => ({
   prejoins: 0, room: null as any, connection: "connected", microphone: true, camera: false, sharing: false,
-  tracks: [] as any[], toggles: {} as Record<string, any>,
+  tracks: [] as any[], toggles: {} as Record<string, any>, cameraTrack: undefined as any,
 }));
 
 export function getSdk() { return sdk; }
@@ -50,7 +50,7 @@ vi.mock("@livekit/components-react", async () => {
     DisconnectButton: ({ children, ...props }: any) => <button {...props} onClick={() => sdk.room?.onDisconnected() }>{children}</button>,
     useConnectionState: () => sdk.connection,
     useTracks: () => sdk.tracks,
-    useLocalParticipant: () => ({ isMicrophoneEnabled: sdk.microphone, isCameraEnabled: sdk.camera, isScreenShareEnabled: sdk.sharing }),
+    useLocalParticipant: () => ({ isMicrophoneEnabled: sdk.microphone, isCameraEnabled: sdk.camera, isScreenShareEnabled: sdk.sharing, cameraTrack: sdk.cameraTrack }),
     useRoomContext: () => ({ registerTextStreamHandler: vi.fn(), unregisterTextStreamHandler: vi.fn(), on: vi.fn(), off: vi.fn() }),
   };
 });
@@ -61,6 +61,6 @@ beforeEach(() => {
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn() } });
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value() { this.setAttribute("open", ""); } });
   Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value() { this.removeAttribute("open"); } });
-  sdk.prejoins = 0; sdk.room = null; sdk.connection = "connected"; sdk.microphone = true; sdk.camera = false; sdk.sharing = false; sdk.tracks = []; sdk.toggles = {};
+  sdk.prejoins = 0; sdk.room = null; sdk.connection = "connected"; sdk.microphone = true; sdk.camera = false; sdk.sharing = false; sdk.tracks = []; sdk.toggles = {}; sdk.cameraTrack = undefined;
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });

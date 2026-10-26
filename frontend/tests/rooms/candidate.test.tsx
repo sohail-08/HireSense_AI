@@ -7,7 +7,9 @@ import { CandidateInterviewPage } from "../../src/pages/CandidateInterviewPage";
 import { RoomApiError } from "../../src/components/interviews/roomApi";
 import { accessMessage } from "../../src/components/interviews/roomState";
 import { getSdk } from "./setup";
+import { readFileSync } from "node:fs";
 const sdk = getSdk();
+vi.mock("../../src/components/interviews/CandidateIdentity", () => ({ CandidateIdentity: () => null, CandidateCameraIdentity: () => null }));
 
 const api = vi.hoisted(() => ({ exchange: vi.fn(), candidateStatus: vi.fn(), waiting: vi.fn(), candidateMedia: vi.fn(), candidateConnected: vi.fn(), candidateLeave: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
@@ -55,7 +57,22 @@ test("devices and admission gate Cloud media", async () => {
   expect(screen.queryByLabelText("Ask the interview assistant")).toBeNull();
   expect(screen.queryByRole("tab", { name: "Candidate info" })).toBeNull();
   expect(screen.queryByRole("tab", { name: "Answer analysis" })).toBeNull();
+  expect(screen.queryByText("Live transcript")).toBeNull();
+  expect(screen.queryByLabelText("Transcript segments")).toBeNull();
+  const call = screen.getByRole("region", { name: "Your interview room" });
+  expect(call.contains(screen.getByTestId("media-room"))).toBe(true);
+  expect(screen.getByRole("complementary", { name: "Your interview workspace" }).contains(screen.getByTestId("media-room"))).toBe(false);
   expect((screen.getByRole("button", { name: "Share screen", exact: true }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("candidate layout fixes the left call to the viewport while only the workspace scrolls", () => {
+  const css = readFileSync("src/index.css", "utf8");
+  expect(css).toMatch(/\.hiresense-candidate-grid \{[^}]*grid-template-columns: minmax\(0, 1.7fr\) minmax\(20rem, 1fr\);[^}]*min-height: 0/);
+  expect(css).toContain(".hiresense-candidate-grid > .hiresense-console-media-slot { overflow: hidden; }");
+  expect(css).toMatch(/\.hiresense-candidate-workspace \{[^}]*overflow-y: auto/);
+  const page = readFileSync("src/pages/CandidateInterviewPage.tsx", "utf8");
+  expect(page).not.toContain("TranscriptionPanel");
+  expect(page).not.toContain("TranscriptionProvider");
 });
 
 test("leaving the waiting room does not complete the interview", async () => {

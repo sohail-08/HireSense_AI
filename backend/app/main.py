@@ -36,6 +36,9 @@ from app.services.assessment_service import AssessmentService
 from app.routes.assessments import router as assessments_router
 from app.routes.work_samples import router as work_samples_router
 from app.services.work_sample import WorkSampleService, work_sample_worker
+from app.routes.candidate_identity import router as identity_router, IdentityBodyLimit
+from app.routes.candidate_photos import router as candidate_photos_router
+from app.services.candidate_identity import CandidateIdentityService, identity_worker
 from app.storage import (
     ensure_cv_storage_root,
     ensure_knowledge_storage_root,
@@ -64,6 +67,7 @@ async def lifespan(app: FastAPI):
         InterviewAnalysisService.recover(db)
         AssessmentService.recover(db)
         WorkSampleService.recover(db)
+        CandidateIdentityService.recover(db)
 
     # Resume only previously confirmed, never-attempted deliveries. Uncertain
     # attempts remain uncertain; no automatic retry is performed for them.
@@ -72,6 +76,7 @@ async def lifespan(app: FastAPI):
     analysis_stop = asyncio.Event()
     analysis_task = asyncio.create_task(analysis_worker(analysis_stop))
     exercise_task = asyncio.create_task(work_sample_worker(analysis_stop))
+    identity_task = asyncio.create_task(identity_worker(analysis_stop))
 
     logger.info(
         "Database initialized and interviewer account ready"
@@ -82,6 +87,7 @@ async def lifespan(app: FastAPI):
     analysis_stop.set()
     await analysis_task
     await exercise_task
+    await identity_task
     if delivery_tasks:
         await asyncio.gather(*delivery_tasks, return_exceptions=True)
     await room_recovery
@@ -117,6 +123,9 @@ app.include_router(interview_rooms_router)
 app.include_router(supervisor_router)
 app.include_router(assessments_router)
 app.include_router(work_samples_router)
+app.include_router(identity_router)
+app.include_router(candidate_photos_router)
+app.add_middleware(IdentityBodyLimit)
 
 
 @app.exception_handler(RequestValidationError)

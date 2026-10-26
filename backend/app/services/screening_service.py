@@ -58,7 +58,7 @@ def safe_screening_error(exc):
     message = str(exc)
     prefixes = ("CV ", "The CV ", "The saved CV ", "The locally stored CV ", "The embedding model ",
         "The AI model ", "Gemini API ", "Gemini returned ", "Gemini JSON ", "Cached CV ", "Cached evidence ",
-        "An identical CV ", "Only PDF ", "The PDF ", "Encrypted PDFs ", "No stored CV ", "The document ",
+        "An identical CV ", "A CV page is image-only ", "Only PDF ", "The PDF ", "Encrypted PDFs ", "No stored CV ", "The document ",
         "The selected ", "The saved ", "The batch ", "Ollama embedding ", "GEMINI_API_KEY is not configured")
     return message[:500] if message.startswith(prefixes) else "CV screening could not finish. Retry screening; no candidate score was assigned."
 
@@ -122,6 +122,8 @@ class ScreeningService:
             raise LookupError(
                 "One or more selected applications do not belong to this job posting"
             )
+        from app.services.application_identity import canonical_applications
+        applications = canonical_applications(db, applications)
         if not applications:
             raise ValueError("This job posting has no applications to screen")
         if len(applications) > self.settings.screening_batch_max_applications:
@@ -188,6 +190,8 @@ class ScreeningService:
                     )
                 )
             )
+            from app.services.application_identity import canonical_applications
+            applications = canonical_applications(db, applications)
             try:
                 profile = db.get(RequirementProfile, job.requirement_profile_id)
                 _, snapshot_hash = (
@@ -237,6 +241,8 @@ class ScreeningService:
                 .order_by(CandidateApplication.submitted_at.desc())
             )
         )
+        from app.services.application_identity import canonical_applications
+        applications = canonical_applications(db, applications)
         application_items: list[dict[str, Any]] = []
         for application in applications:
             candidate = db.get(Candidate, application.candidate_id)
@@ -513,7 +519,7 @@ class ScreeningService:
             try: parsed = self.parser.parse(document)
             except Exception as exc: parse_error = safe_screening_error(exc)
         original_blocks = [b.as_dict() for b in parsed.blocks] if parsed else []
-        content_hash = digest(original_blocks) if parsed else None
+        content_hash = digest({"blocks": original_blocks, "ocr": parsed.ocr}) if parsed and parsed.ocr else digest(original_blocks) if parsed else None
         fingerprint = digest([content_hash or (document.sha256 if document else ""), snapshot_hash, engine, PROMPT_VERSION, CALCULATION_VERSION])
         # The lock covers the short cache-claim transaction, never provider calls.
         db.scalar(select(JobPosting.id).where(JobPosting.id == batch.job_posting_id).with_for_update())
@@ -1136,7 +1142,20 @@ class ScreeningService:
             .order_by(ScreeningRun.created_at.desc(), ScreeningRun.id.desc())
         )
         expected = self._engine()
-        return next((r for r in rows if all((r.processing_metadata or {}).get("engine", {}).get(k) == v for k,v in expected.items())), None)
+        for row in rows:
+            if not all((row.processing_metadata or {}).get("engine", {}).get(k) == v for k,v in expected.items()):
+                continue
+            ocr_pages = (row.processing_metadata or {}).get("evidence", {}).get("ocr", {}).get("pages", [])
+            if ocr_pages:
+                from app.screening.ocr import OCRReadError
+                try:
+                    identity = self.parser.ocr.identity()
+                except OCRReadError:
+                    continue
+                if any(page.get("identity") != identity for page in ocr_pages):
+                    continue
+            return row
+        return None
 
     @staticmethod
     def _latest_cv_sha(db: Session, application_id: int) -> str:

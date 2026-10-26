@@ -7,6 +7,8 @@ import { MeetingTabs } from "../../src/components/interviews/MeetingTabs";
 import { readFileSync } from "node:fs";
 import { SupervisorChatPanel } from "../../src/components/jobs/SupervisorChatPanel";
 const api = vi.hoisted(() => vi.fn());
+vi.mock("../../src/components/interviews/IdentityOverview", () => ({ IdentityOverview: () => null }));
+vi.mock("../../src/components/interviews/CandidatePhoto", () => ({ CandidatePhoto: ({ interviewId, name }: { interviewId: number; name: string }) => <span data-testid="candidate-photo" data-interview={interviewId}>{name}'s photo</span> }));
 vi.mock("../../src/api/apiClient", () => ({ apiRequest: api }));
 const context: CopilotContext = {
   candidate: { name: "Test Candidate", email: "test@example.test", phone: "01234", location: null,
@@ -51,6 +53,13 @@ test("shows saved candidate details and requests cited questions for this interv
     sources: [{ chunk_id: 7, document_title: "Synthetic React questions", excerpt: "State management question" }] }] });
   const user = userEvent.setup(); render(<InterviewCopilotPanel interviewId={12} />);
   await screen.findByText("Test Candidate");
+  expect(screen.getByTestId("candidate-photo").getAttribute("data-interview")).toBe("12");
+  const profile = screen.getByRole("group", { name: "Candidate profile" });
+  expect(profile.className).toContain("flex-col");
+  expect(profile.className).toContain("items-center");
+  expect(profile.className).toContain("text-center");
+  expect(within(profile).getByRole("heading", { name: "Test Candidate" })).toBeTruthy();
+  expect(profile.firstElementChild).toBe(screen.getByTestId("candidate-photo"));
   expect(screen.getByLabelText("Private interview assistance")).toBeTruthy();
   expect(screen.getByText("test@example.test")).toBeTruthy();
   expect(screen.getByText("Experience: 3 years")).toBeTruthy();

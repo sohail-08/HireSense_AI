@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     transcription_interim_results: bool = True
     transcription_retention_days: int = Field(default=30, ge=1, le=3650)
     work_sample_retention_days: int = Field(default=30, ge=1, le=3650)
+    identity_enabled: bool = True
+    identity_models_dir: str = "storage/identity-models"
+    identity_encryption_key: SecretStr | None = None
+    identity_retention_days: int = Field(default=30, ge=1, le=90)
+    identity_post_interview_days: int = Field(default=7, ge=1, le=30)
+    identity_similarity_threshold: float = Field(default=0.5, ge=0.3, le=0.95)
     transcription_start_timeout_seconds: int = Field(default=45, ge=10, le=180)
     transcription_lease_seconds: int = Field(default=20, ge=10, le=120)
     deepgram_model: Literal["nova-3"] = "nova-3"
@@ -63,6 +69,13 @@ class Settings(BaseSettings):
     cv_max_pages: int = Field(default=40, ge=1, le=500)
     cv_max_characters: int = Field(default=150_000, ge=1_000, le=2_000_000)
     cv_min_extract_characters: int = Field(default=80, ge=1, le=10_000)
+    cv_ocr_enabled: bool = True
+    cv_ocr_language: str = Field(default="eng", pattern=r"^[a-zA-Z0-9_]+(?:\+[a-zA-Z0-9_]+)*$")
+    cv_ocr_min_confidence: float = Field(default=80, ge=50, le=100)
+    cv_ocr_max_uncertain_ratio: float = Field(default=0.15, ge=0, le=0.5)
+    cv_ocr_max_pages: int = Field(default=8, ge=1, le=40)
+    cv_ocr_timeout_seconds: int = Field(default=120, ge=10, le=300)
+    cv_ocr_max_image_side: int = Field(default=3500, ge=1500, le=4500)
     screening_batch_max_applications: int = Field(default=50, ge=1, le=500)
     screening_evidence_top_k: int = Field(default=6, ge=2, le=12)
     screening_engine_revision: str = "semantic-evidence-v1"
@@ -82,6 +95,7 @@ class Settings(BaseSettings):
     google_forms_portfolio_column: str = "Portfolio"
     google_forms_location_column: str = "Location"
     google_forms_cv_column: str = "Upload CV"
+    google_forms_photo_column: str = "Candidate photo"
     google_forms_job_column: str = "Job Posting"
 
     ollama_base_url: str = "http://localhost:11434"

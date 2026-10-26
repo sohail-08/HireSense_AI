@@ -17,7 +17,7 @@ from caption_protocol import validate_public_key
 NOTICE_VERSION = "transcription-v1"
 NOTICE = ("With your consent, microphone audio is sent to Deepgram for live English transcription. "
           "HireSense stores final text, speaker labels and timestamps, not audio or video. "
-          "Both participants see live captions; only the assigned interviewer can retrieve saved history.")
+          "Only the assigned interviewer can see live captions and retrieve saved history.")
 OPEN = {"starting", "active", "stopping"}
 
 
@@ -95,6 +95,9 @@ class TranscriptionService:
                 and self.settings.transcription_enabled and (not session or session.status not in OPEN)}
         if role == "INTERVIEWER":
             result["metrics"] = session.metrics if session else {}
+        else:
+            # Consent/lifecycle only; candidates never receive caption transport details.
+            result["caption_public_key"] = result["worker_identity"] = None
         db.commit()
         return result
 

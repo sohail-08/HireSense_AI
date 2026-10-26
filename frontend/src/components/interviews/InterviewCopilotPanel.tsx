@@ -3,7 +3,9 @@ import { apiRequest } from "../../api/apiClient";
 import { TranscriptCitation } from "./TranscriptCitation";
 import type { Citation } from "./analysisApi";
 import { MeetingTabs } from "./MeetingTabs";
-import { MeetingIcon } from "./MeetingIcon";
+import { IdentityOverview } from "./IdentityOverview";
+import { CandidatePhoto } from "./CandidatePhoto";
+import { displayPercent } from "../candidates/scoringDisplay";
 import { AssistantBubble, AssistantComposer, AssistantIdentity, AssistantWorking, assistantChatStyles } from "../assistant/AssistantChatUI";
 
 type Question = { question: string; requirement: string; source_ids: number[] };
@@ -13,7 +15,8 @@ type Message = { role: "user" | "assistant"; content: string; questions: Questio
 export type CopilotContext = {
   open_practical_exercise?: boolean;
   candidate: { name: string; email: string | null; phone: string | null; location: string | null;
-    skills: string[]; qualifications: string[]; experience_years: number | null; recent_roles: string[] };
+    skills: string[]; qualifications: string[]; experience_years: number | null; recent_roles: string[];
+    cv_score?: string | null; probe_areas?: { name: string; reason: string; source: string; screening_run_id: number }[] };
   job_title: string; required_skills: string[]; preferred_skills: string[]; qualifications: string[];
   minimum_experience: number | null; selection_criteria: string[]; messages: Message[]; version: number;
 };
@@ -54,9 +57,12 @@ export function InterviewCopilotPanel({ interviewId, fill = false, pageScroll = 
   const candidate = context.candidate;
   const candidateInfo = <section className="min-w-0 break-words p-5">
       <h2 className="text-sm font-semibold text-slate-500">Candidate information</h2>
-      <div className="mt-4 flex items-center gap-3"><span className="rounded-2xl bg-blue-50 p-3 text-blue-600"><MeetingIcon name="person" className="h-7 w-7"/></span><div className="min-w-0"><h3 className="break-words text-lg font-bold">{candidate.name}</h3>
-      <p className="text-sm text-slate-600">{context.job_title}</p>
+      <div role="group" aria-label="Candidate profile" className="mt-5 flex flex-col items-center gap-4 pb-5 text-center"><CandidatePhoto interviewId={interviewId} name={candidate.name} /><div className="min-w-0 max-w-full"><h3 className="break-words text-xl font-bold text-slate-900">{candidate.name}</h3>
+      <p className="mt-1 text-sm text-slate-600">{context.job_title}</p>
       </div></div>
+      <IdentityOverview interviewId={interviewId} />
+      {candidate.cv_score != null ? <p className="mt-4 rounded-xl bg-teal-50 p-3 text-sm text-teal-900">Saved CV score <strong className="float-right">{displayPercent(candidate.cv_score)}</strong></p> : null}
+      {candidate.probe_areas?.length ? <section aria-label="Areas to explore" className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Areas to explore</h3><ul className="mt-2 space-y-2">{candidate.probe_areas.map((item, index) => <li key={index} className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-sm"><p className="font-medium text-slate-700">{item.name}</p><details className="mt-1 text-xs text-slate-500"><summary className="cursor-pointer">Why explore this?</summary><p className="mt-1 leading-5">{item.reason}</p><p className="mt-1">{item.source}</p></details></li>)}</ul></section> : null}
       <dl className="mt-5 space-y-3 break-words text-sm">
         <div><dt className="text-xs text-slate-400">Email</dt><dd className="mt-1 font-medium">{candidate.email || "Not provided"}</dd></div>
         <div><dt className="text-xs text-slate-400">Phone</dt><dd className="mt-1 font-medium">{candidate.phone || "Not provided"}</dd></div>

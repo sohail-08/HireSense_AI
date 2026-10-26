@@ -85,6 +85,7 @@ class ScreeningWorkflow:
                 "page_count": parsed.page_count,
                 "warnings": parsed.warnings,
                 "semantic_retrieval": retrieval,
+                **({"ocr": parsed.ocr} if parsed.ocr else {}),
             },
         }
 

@@ -203,6 +203,35 @@ def test_evidence_presentation_enriches_existing_results_without_rescoring(recor
     assert db.scalar(select(func.count(ScoringRun.id))) == count
 
 
+def test_contacts_are_only_added_for_explicit_interviewer_presentation(records):
+    db, owner, other, posting, application, _, _ = records
+    from app.models.candidate import Candidate
+    candidate = db.get(Candidate, application.candidate_id)
+    candidate.email = "candidate@example.com"
+    db.commit()
+    service = ScoringService()
+    configuration = service.approve(db, user_id=owner.id, job_id=posting.id, data=approval(db, owner, posting))
+    saved = service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"]))
+    assert "candidate_email" not in saved["results"][0]
+    shown = service.detail(db, user_id=owner.id, run_id=saved["id"], include_contacts=True)
+    assert shown["results"][0]["candidate_email"] == "candidate@example.com"
+    with pytest.raises(LookupError):
+        service.detail(db, user_id=other.id, run_id=saved["id"], include_contacts=True)
+
+
+def test_ocr_origin_is_exposed_from_saved_screening_trace_without_rescoring(records):
+    db, owner, _, posting, _, _, _ = records
+    service = ScoringService()
+    configuration = service.approve(db, user_id=owner.id, job_id=posting.id, data=approval(db, owner, posting))
+    saved = service.run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=configuration["id"]))
+    screening = db.get(ScreeningRun, saved["results"][0]["screening_run_id"])
+    screening.processing_metadata = {**screening.processing_metadata, "evidence": {"ocr": {"pages": [{"page": 1}, {"page": 2, "blank": True}]}}}
+    db.commit()
+    shown = service.detail(db, user_id=owner.id, run_id=saved["id"])
+    assert shown["results"][0]["source_extraction"] == {"method": "ocr", "pages": [1]}
+    assert shown["results"][0]["final_score"] == saved["results"][0]["final_score"]
+
+
 def test_legacy_ambiguous_match_is_persisted_as_unmet_without_changing_history(records):
     db, owner, _, posting, _, _, _ = records
     service = ScoringService()

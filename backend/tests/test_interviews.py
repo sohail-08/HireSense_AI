@@ -344,6 +344,53 @@ def test_job_ownership_document_failure_and_ranking_freshness(setup):
         select_preview(setup, mode="top_n", top_n=1)
 
 
+def successful_ocr_document(db, app):
+    from app.models.candidate import CVDocument
+    from app.screening.ocr import ocr_page_notice
+    document = db.scalar(select(CVDocument).where(CVDocument.application_id == app.id))
+    data = deepcopy(document.extraction_data)
+    data["parser"] = {**data["parser"], "parser": "pypdf+tesseract", "ocr": {"pages": [{"page": 1,
+        "mean_confidence": 94, "uncertain_character_ratio": 0.02, "word_count": 50,
+        "identity": {"policy": {"min_confidence": 80, "max_uncertain_ratio": 0.15, "min_words": 5}}}]}}
+    document.extraction_data = data
+    document.extraction_warnings = [ocr_page_notice(1)]
+    return document
+
+
+def test_successful_ocr_candidate_can_be_selected_and_invitation_prepared(setup):
+    db, owner, _, posting, apps, run, service, sender = setup
+    document = successful_ocr_document(db, apps[0]); db.commit()
+    # Recalculate against this new evidence state; scheduling still validates
+    # the exact saved ranking and does not bypass evidence freshness.
+    ScoringService().run(db, user_id=owner.id, job_id=posting.id, data=ScoreRunRequest(configuration_id=run["configuration_id"]))
+    selection = service.preview_selection(db, owner.id, SelectionRequest(job_posting_id=posting.id, mode="manual", application_ids=[apps[0].id]))
+    assert selection["recipient_count"] == 1 and selection["excluded"] == []
+    invitation = service.prepare(db, owner.id, schedule_data(selection["selection_token"]))
+    assert invitation["recipient_count"] == 1
+    assert document.extraction_warnings  # Keep the OCR provenance visible.
+    assert sender.calls == [] and db.scalar(select(func.count(InterviewSchedule.id))) == 0
+
+
+@pytest.mark.parametrize("problem", ["unknown_warning", "missing_trace", "low_confidence", "failed_status", "active_error", "unverified_page"])
+def test_ocr_notice_does_not_bypass_real_cv_problems(setup, problem):
+    db, _, _, _, apps, _, service, sender = setup
+    document = successful_ocr_document(db, apps[0])
+    if problem == "unknown_warning": document.extraction_warnings += ["An image-only page was not read"]
+    elif problem == "missing_trace": document.extraction_data = {"parser": {}}
+    elif problem == "low_confidence":
+        data = deepcopy(document.extraction_data)
+        data["parser"]["ocr"]["pages"][0]["mean_confidence"] = 30
+        document.extraction_data = data
+    elif problem == "failed_status": document.status = "failed"
+    elif problem == "active_error": document.error_message = "CV OCR could not finish"
+    elif problem == "unverified_page":
+        from app.screening.ocr import ocr_page_notice
+        document.extraction_warnings = [ocr_page_notice(2)]
+    db.commit()
+    _, reasons = service.eligibility(db, apps[0], "technical")
+    assert any("CV processing" in reason for reason in reasons) and sender.calls == []
+
+
 def test_expired_preview_is_rejected_before_schedules_exist(setup):
     db, owner, _, _, _, _, service, _ = setup
     preview = prepared(setup, count=1)

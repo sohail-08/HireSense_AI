@@ -348,7 +348,7 @@ def test_publisher_sends_signed_interim_before_stopping_and_counts_failures():
         async def send_text(text, **options):
             sent.append((json.loads(text), options))
         metrics = {}
-        publisher = Publisher(SimpleNamespace(local_participant=SimpleNamespace(send_text=send_text)), "session", CaptionSigner(), metrics)
+        publisher = Publisher(SimpleNamespace(local_participant=SimpleNamespace(send_text=send_text)), "session", CaptionSigner(), metrics, destinations=["opaque-interviewer"])
         task = asyncio.create_task(publisher.run())
         publisher.put({"kind": "interim", "speaker": "CANDIDATE", "text": "During speech", "stream_id": "stream"})
         for _ in range(100):
@@ -359,6 +359,7 @@ def test_publisher_sends_signed_interim_before_stopping_and_counts_failures():
         payload = json.loads(base64.urlsafe_b64decode(envelope["payload"] + "=" * (-len(envelope["payload"]) % 4)))
         assert payload["kind"] == "interim" and payload["event_index"] == 1
         assert options["compress"] is False
+        assert options["destination_identities"] == ["opaque-interviewer"]
         assert metrics["caption_messages_sent"] == 1
         async def failure(*args, **kwargs): raise RuntimeError("private diagnostics")
         publisher.room.local_participant.send_text = failure
@@ -368,3 +369,21 @@ def test_publisher_sends_signed_interim_before_stopping_and_counts_failures():
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
     asyncio.run(scenario())
+
+
+def test_caption_publisher_never_broadcasts_when_no_interviewer_is_configured():
+    async def scenario():
+        sent = []
+        async def send_text(*args, **kwargs): sent.append(kwargs)
+        publisher = Publisher(SimpleNamespace(local_participant=SimpleNamespace(send_text=send_text)), "session")
+        await publisher.send({"kind": "interim", "text": "private transcript"}, 1)
+        assert not sent and not publisher.delivery_healthy
+    asyncio.run(scenario())
+
+
+def test_runner_targets_only_the_server_assigned_interviewer():
+    from transcription_worker.runner import Runner
+    runner = Runner(None, None, {"session_id": "session", "participants": {
+        "assigned-interviewer": "INTERVIEWER", "candidate": "CANDIDATE", "unexpected": "OBSERVER"}},
+        None, SimpleNamespace(transcription_queue_size=4))
+    assert runner.publisher.destinations == ["assigned-interviewer"]

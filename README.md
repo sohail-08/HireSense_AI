@@ -11,6 +11,12 @@ and interviewer correction/version history are documented in [Feature 5](docs/in
 
 ## Current milestone
 
+Optional [candidate photo verification and profile overview](docs/candidate-identification.md)
+uses local models with explicit consent inside the app before the interview.
+It is separate from assessment scores and supports manual verification.
+An opt-in [local recruitment example loader](docs/recruitment-examples.md) fills
+the existing screens with complete, privately traceable recruitment scenarios.
+
 ### Innovation Feature — Live Work-Sample Studio
 
 The interview console includes a practical-exercise workspace for technical and

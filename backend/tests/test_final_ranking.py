@@ -48,6 +48,30 @@ def test_fixed_30_60_10_weights_and_question_average_are_exact():
     assert Fraction(summary["final_score"]) == 55
 
 
+def test_repaired_identity_gets_a_new_report_without_reanalysing_answers(consolidated):
+    from app.models.candidate import Candidate, CandidateApplication
+    from app.schemas.assessment import GenerateAssessment
+    from scripts.repair_application_profiles import refresh_saved_reports
+    t = consolidated
+    old = t.assessments.enqueue(t.db, t.owner.id, t.row.application_id, GenerateAssessment())
+    t.assessments.process(old.id); t.db.expire_all()
+    previous_result = copy.deepcopy(t.db.get(AssessmentRun, old.id).result)
+    app = t.db.get(CandidateApplication, t.row.application_id)
+    t.db.get(Candidate, app.candidate_id).name = "Correct application name"
+    app.response_data = {**app.response_data, "_identity_repair": {"version": "application-profile-v1"}}
+    t.db.commit()
+    calls = len(t.analysis.model.calls)
+    new_ids = refresh_saved_reports(t.db, t.owner.id, [app.id], session_factory=t.assessments.factory)
+    t.db.expire_all()
+    assert len(new_ids) == 1 and new_ids[0] != old.id
+    new = t.assessments.read(t.db, t.owner.id, new_ids[0])
+    assert new["result"]["identification"]["candidate_name"] == "Correct application name"
+    assert not new["stale"] and new["status"] == "completed"
+    assert t.assessments.read(t.db, t.owner.id, old.id)["stale"]
+    assert t.db.get(AssessmentRun, old.id).result == previous_result
+    assert len(t.analysis.model.calls) == calls
+
+
 @pytest.mark.parametrize("cv,expected", [("80", Fraction(79)), ("0", Fraction(55)), ("100", Fraction(85)), ("2.675", Fraction(22321, 400))])
 def test_asymmetric_scores_use_exact_30_cv_60_interview_10_practical_arithmetic(cv, expected):
     source = synthetic_source()
