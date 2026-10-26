@@ -24,7 +24,7 @@ from app.config import get_settings
 from app.database import Base, get_db
 from app.models.user import User, UserRole
 from app.routes.auth import router
-from app.security import hash_password, require_interviewer
+from app.security import create_access_token, hash_password, require_interviewer
 from app.seed_interviewer import seed_interviewer
 
 
@@ -66,22 +66,18 @@ def client():
     engine.dispose()
 
 
-def register_candidate(api, **overrides):
-    return api.post(
-        "/api/auth/register",
-        json={
-            "name": "Candidate One",
-            "email": "candidate@example.com",
-            "password": "CandidatePassword123!",
-            **overrides,
-        },
-    )
+def legacy_candidate(sessions):
+    with sessions() as db:
+        user = User(name="Legacy candidate", email="candidate@example.com",
+                    password_hash=hash_password("CandidatePassword123!"), role=UserRole.CANDIDATE)
+        db.add(user); db.commit()
+        return user.id
 
 
 def login(
     api,
-    email="candidate@example.com",
-    password="CandidatePassword123!",
+    email="interviewer@hiresense.com",
+    password="TestInterviewerPassword123!",
 ):
     return api.post(
         "/api/auth/login",
@@ -89,62 +85,25 @@ def login(
     )
 
 
-def test_registration_creates_candidate_and_hashes_password(
-    client,
-):
+@pytest.mark.parametrize("extra", [{}, {"role": "interviewer"}, {"email": "interviewer@hiresense.com"}])
+def test_public_registration_is_removed_without_creating_or_altering_accounts(client, extra):
     api, sessions = client
-
-    response = register_candidate(api)
-
-    assert response.status_code == 201
-    assert response.json()["role"] == "candidate"
-    assert "password_hash" not in response.json()
-
+    response = api.post("/api/auth/register", json={"name": "Candidate One", "email": "candidate@example.com", "password": "CandidatePassword123!", **extra})
+    assert response.status_code == 404
+    assert "/api/auth/register" not in api.get("/openapi.json").json()["paths"]
     with sessions() as db:
-        user = db.scalar(
-            select(User).where(
-                User.email == "candidate@example.com"
-            )
-        )
-        assert user.password_hash != "CandidatePassword123!"
+        users = list(db.scalars(select(User)))
+        assert len(users) == 1 and users[0].role == UserRole.INTERVIEWER
 
 
-def test_duplicate_email_is_case_insensitive(client):
+def test_login_client_cannot_choose_role(client):
     api, _ = client
-
-    register_candidate(api)
-
-    response = register_candidate(
-        api,
-        email="CANDIDATE@example.com",
-    )
-
-    assert response.status_code == 409
-
-
-def test_client_cannot_choose_role(client):
-    api, _ = client
-
-    response = register_candidate(api, role="interviewer")
-
+    response = api.post("/api/auth/login", json={"email": "interviewer@hiresense.com", "password": "TestInterviewerPassword123!", "role": "interviewer"})
     assert response.status_code == 422
-
-
-def test_seed_email_cannot_be_registered(client):
-    api, _ = client
-
-    response = register_candidate(
-        api,
-        email="interviewer@hiresense.com",
-    )
-
-    assert response.status_code == 409
 
 
 def test_login_and_me(client):
     api, _ = client
-
-    register_candidate(api)
 
     response = login(api)
 
@@ -158,17 +117,30 @@ def test_login_and_me(client):
     )
 
     assert me.status_code == 200
-    assert me.json()["role"] == "candidate"
+    assert me.json()["role"] == "interviewer"
+    assert "password_hash" not in me.json()
+    assert response.headers["cache-control"] == me.headers["cache-control"] == "no-store"
 
 
 def test_wrong_password(client):
     api, _ = client
 
-    register_candidate(api)
-
     response = login(api, password="WrongPassword123!")
 
     assert response.status_code == 401
+
+
+def test_existing_candidate_accounts_cannot_login_or_restore_but_are_not_deleted(client):
+    api, sessions = client
+    candidate_id = legacy_candidate(sessions)
+    response = login(api, email="candidate@example.com", password="CandidatePassword123!")
+    assert response.status_code == 403 and "access_token" not in response.json()
+    assert "private link" in response.json()["detail"]
+    assert response.headers["cache-control"] == "no-store"
+    old_token = create_access_token(candidate_id)
+    assert api.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"}).status_code == 403
+    with sessions() as db:
+        assert db.get(User, candidate_id).is_active
 
 
 @pytest.mark.parametrize("token", [None, "invalid-token"])
@@ -213,11 +185,8 @@ def test_me_rejects_expired_token(client):
 
 
 def test_backend_role_guard(client):
-    api, _ = client
-
-    register_candidate(api)
-
-    token = login(api).json()["access_token"]
+    api, sessions = client
+    token = create_access_token(legacy_candidate(sessions))
 
     response = api.get(
         "/interviewer-only",
@@ -243,14 +212,12 @@ def test_backend_role_guard(client):
 def test_inactive_user_cannot_reuse_token(client):
     api, sessions = client
 
-    register_candidate(api)
-
     token = login(api).json()["access_token"]
 
     with sessions() as db:
         user = db.scalar(
             select(User).where(
-                User.email == "candidate@example.com"
+                User.email == "interviewer@hiresense.com"
             )
         )
 

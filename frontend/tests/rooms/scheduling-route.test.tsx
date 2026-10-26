@@ -59,7 +59,7 @@ it("provides the new page's job and candidate selection to the central assistant
 it("does not expose scheduling to candidate accounts", async () => {
   auth.role = "candidate";
   render(<MemoryRouter initialEntries={["/interviewer/schedule-interviews"]}><App /></MemoryRouter>);
-  expect(await screen.findByRole("heading", { name: "Candidate dashboard" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Interviewer sign in" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: "Schedule Interviews" })).toBeNull();
   expect(apiRequest).not.toHaveBeenCalled();
 });

@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from "react";
 import {
-  Link,
   Navigate,
-  useLocation,
   useNavigate,
 } from "react-router-dom";
 
@@ -17,7 +15,6 @@ export function LoginPage() {
   const { user, loading, login } = useAuth();
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +25,7 @@ export function LoginPage() {
     return <LoadingSpinner />;
   }
 
-  if (user) {
+  if (user?.role === "interviewer") {
     return <Navigate to={dashboardPath(user)} replace />;
   }
 
@@ -64,21 +61,12 @@ export function LoginPage() {
         </p>
 
         <h1 className="mt-6 text-3xl font-bold tracking-tight text-slate-900">
-          Welcome back
+          Interviewer sign in
         </h1>
 
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Sign in to your interviewer or candidate account.
+          Sign in to manage hiring and conduct interviews.
         </p>
-
-        {location.state?.registered && (
-          <p
-            className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-            role="status"
-          >
-            Account created. Please sign in.
-          </p>
-        )}
 
         <ErrorMessage message={error} />
 
@@ -140,14 +128,9 @@ export function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-600">
-          New candidate?{" "}
-          <Link
-            to="/register"
-            className="font-semibold text-blue-600 underline-offset-4 hover:underline"
-          >
-            Create an account
-          </Link>
+        <p className="mt-6 border-t border-slate-100 pt-5 text-center text-xs leading-5 text-slate-500">
+          <span className="block font-semibold text-slate-700">Joining as a candidate?</span>
+          Open the private interview link from your invitation. No account or sign-in is needed.
         </p>
       </section>
     </main>

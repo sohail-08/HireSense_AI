@@ -1,3 +1,4 @@
+// Candidate is retained only to safely reject historical web-account sessions.
 export type UserRole = "interviewer" | "candidate";
 
 export interface User {
@@ -12,10 +13,6 @@ export interface User {
 export interface LoginRequest {
   email: string;
   password: string;
-}
-
-export interface RegisterRequest extends LoginRequest {
-  name: string;
 }
 
 export interface TokenResponse {

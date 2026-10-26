@@ -46,11 +46,11 @@ Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
 No external calendar API or recording is connected. Consented Deepgram transcription
 and LiveKit captions are documented in [live transcription](docs/live-transcription.md).
 
-- Candidate-only registration
-- Email/password sign-in
+- Link-only candidate interview access; no candidate account or signup
+- Interviewer-only email/password sign-in
 - JWT authentication
 - One seeded Interviewer account
-- Role-based dashboards and navigation
+- Protected interviewer dashboard and navigation
 - Persistent PostgreSQL storage
 - Alembic-managed database migrations
 - Private named-volume foundation for candidate documents

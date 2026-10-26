@@ -16,7 +16,6 @@ import {
 
 import type {
   LoginRequest,
-  RegisterRequest,
   TokenResponse,
   User,
 } from "../types";
@@ -25,7 +24,6 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (data: LoginRequest) => Promise<User>;
-  register: (data: RegisterRequest) => Promise<User>;
   logout: () => void;
 }
 
@@ -34,7 +32,7 @@ const AuthContext = createContext<
 >(undefined);
 
 export function dashboardPath(user: User): string {
-  return `/${user.role}/dashboard`;
+  return user.role === "interviewer" ? "/interviewer/dashboard" : "/login";
 }
 
 export function AuthProvider({
@@ -62,7 +60,8 @@ export function AuthProvider({
           );
 
           if (active) {
-            setUser(currentUser);
+            if (currentUser.role === "interviewer") setUser(currentUser);
+            else logout();
           }
         } catch {
           if (active) {
@@ -145,6 +144,7 @@ export function AuthProvider({
         "/auth/me",
       );
 
+      if (currentUser.role !== "interviewer") throw new Error("Candidates join using their private interview link. No account or sign-in is needed.");
       setUser(currentUser);
       return currentUser;
     } catch (error) {
@@ -153,26 +153,12 @@ export function AuthProvider({
     }
   }
 
-  function register(
-    data: RegisterRequest,
-  ): Promise<User> {
-    return apiRequest<User>(
-      "/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-      },
-      false,
-    );
-  }
-
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
         login,
-        register,
         logout,
       }}
     >

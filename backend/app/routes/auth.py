@@ -3,10 +3,8 @@ from fastapi import (
     Depends,
     HTTPException,
     Response,
-    status,
 )
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -14,15 +12,13 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.auth import (
     LoginRequest,
-    RegisterRequest,
     TokenResponse,
 )
 from app.schemas.user import UserResponse
 from app.security import (
     DUMMY_HASH,
     create_access_token,
-    get_current_user,
-    hash_password,
+    require_interviewer,
     verify_password,
 )
 
@@ -31,53 +27,6 @@ router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"],
 )
-
-
-@router.post(
-    "/register",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def register(
-    data: RegisterRequest,
-    db: Session = Depends(get_db),
-):
-    email = str(data.email).lower()
-
-    # Reserve the configured interviewer email.
-    if email == str(get_settings().interviewer_email).lower():
-        raise HTTPException(
-            status_code=409,
-            detail="This email is unavailable",
-        )
-
-    if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(
-            status_code=409,
-            detail="This email is already registered",
-        )
-
-    user = User(
-        name=data.name,
-        email=email,
-        password_hash=hash_password(data.password),
-        role=UserRole.CANDIDATE,
-    )
-
-    db.add(user)
-
-    try:
-        db.commit()
-
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="This email is unavailable",
-        ) from None
-
-    db.refresh(user)
-    return user
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -103,6 +52,13 @@ def login(
             detail="Invalid email or password",
         )
 
+    if user.role != UserRole.INTERVIEWER:
+        raise HTTPException(
+            status_code=403,
+            detail="Candidates join using the private link in their interview invitation. No account or sign-in is needed.",
+            headers={"Cache-Control": "no-store"},
+        )
+
     response.headers["Cache-Control"] = "no-store"
 
     return TokenResponse(
@@ -116,7 +72,7 @@ def login(
 @router.get("/me", response_model=UserResponse)
 def me(
     response: Response,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_interviewer),
 ):
     response.headers["Cache-Control"] = "no-store"
     return user
