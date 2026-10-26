@@ -25,13 +25,16 @@ export function InterviewerConsolePage() {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [workspaceTab, setWorkspaceTab] = useState("workspace-transcript");
+  const [workspaceTab, setWorkspaceTab] = useState("workspace-private");
   const [privateTab, setPrivateTab] = useState("candidate");
   const [transcriptTab, setTranscriptTab] = useState("transcript");
   const [exerciseRefresh, setExerciseRefresh] = useState(0);
   const openPractical = () => { setWorkspaceTab("workspace-practical"); setExerciseRefresh(value => value + 1); reveal("practical-exercise"); };
   const openAnalysis = () => { setWorkspaceTab("workspace-transcript"); setTranscriptTab("analysis"); reveal("interview-analysis"); };
   const [confirmLink, setConfirmLink] = useState<"rotate" | "revoke">();
+  useEffect(() => {
+    setWorkspaceTab("workspace-private"); setPrivateTab("candidate"); setTranscriptTab("transcript");
+  }, [id]);
   useEffect(() => {
     let active = true;
     let polling = false;
@@ -113,13 +116,13 @@ export function InterviewerConsolePage() {
           </div> : null}
           <aside className="hiresense-console-tools" aria-label="Interviewer workspace">
           <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} activeId={workspaceTab} onActiveChange={setWorkspaceTab} variant="segmented" label="Workspace panel" tabs={[
+            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel activeTab={privateTab} onTabChange={setPrivateTab} onOpenPractical={openPractical} onOpenAnalysis={openAnalysis} fill={!closed} pageScroll={Boolean(closed)} key={id} interviewId={id} /></div> },
             { id: "workspace-transcript", label: "Transcript & analysis", content: <div className="hiresense-console-transcript">
               <MeetingTabs fill={!closed} pageScroll={Boolean(closed)} activeId={transcriptTab} onActiveChange={setTranscriptTab} label="Interview workspace" tabs={[
             { id: "transcript", label: "Live transcript", content: <TranscriptionPanel closed={Boolean(closed)} panelScroll={!closed} pageScroll={Boolean(closed)} /> },
             { id: "analysis", label: "Answer analysis", content: <InterviewAnalysisPanel key={id} interviewId={id} /> },
               ]} />
             </div> },
-            { id: "workspace-private", label: "Candidate & assistant", content: <div className="hiresense-console-side"><InterviewCopilotPanel activeTab={privateTab} onTabChange={setPrivateTab} onOpenPractical={openPractical} onOpenAnalysis={openAnalysis} fill={!closed} pageScroll={Boolean(closed)} key={id} interviewId={id} /></div> },
             { id: "workspace-practical", label: "Practical exercise", content: <WorkSamplePanel key={id} interviewId={id} closed={Boolean(closed)} refreshKey={exerciseRefresh} onAskAssistant={() => { setWorkspaceTab("workspace-private"); setPrivateTab("assistant"); reveal("interview-assistant-message"); }} /> },
           ]} />
           </aside>

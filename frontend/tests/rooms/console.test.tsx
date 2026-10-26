@@ -1,8 +1,8 @@
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { InterviewerConsolePage } from "../../src/pages/InterviewerConsolePage";
 import { ApiError } from "../../src/api/apiClient";
 import { getSdk } from "./setup";
@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 
 const api = vi.hoisted(() => ({ status: vi.fn(), admit: vi.fn(), end: vi.fn(), interviewerMedia: vi.fn(), interviewerConnected: vi.fn(), interviewerLeave: vi.fn(), link: vi.fn(), revoke: vi.fn() }));
 vi.mock("../../src/components/interviews/roomApi", async (original) => ({ ...await original<any>(), roomApi: api }));
-vi.mock("../../src/components/interviews/InterviewCopilotPanel", () => ({ InterviewCopilotPanel: () => <aside>Private interview assistance</aside> }));
+vi.mock("../../src/components/interviews/InterviewCopilotPanel", () => ({ InterviewCopilotPanel: ({ activeTab }: { activeTab: string }) => <aside data-active-tab={activeTab}>Private interview assistance</aside> }));
 const info = { interview_id: 1, candidate_name: "Test Candidate", job_title: "Frontend Engineer", scheduled_start: "2030-10-14T02:00:00Z", scheduled_end: "2030-10-14T02:30:00Z", timezone: "Asia/Dhaka", room_status: "waiting", waiting: true, admitted: false, has_join_link: true, link_revoked: false, room_version: 1 };
 function open() { render(<MemoryRouter initialEntries={["/interviews/1/console"]}><Routes><Route path="/interviews/:interviewId/console" element={<InterviewerConsolePage />} /></Routes></MemoryRouter>); }
 beforeEach(() => {
@@ -24,6 +24,27 @@ test("console authorization failure does not expose candidate or room controls",
   expect((await screen.findByRole("alert")).textContent).toContain("not authorized");
   expect(screen.queryByText("Test Candidate")).toBeNull(); expect(screen.queryByRole("button", { name: "Admit candidate" })).toBeNull();
   expect(screen.queryByText("Private interview assistance")).toBeNull();
+});
+
+test("opens candidate information first and places it before transcript and practical tools", async () => {
+  open();
+  const tabs = await screen.findByRole("tablist", { name: "Workspace panel" });
+  expect(within(tabs).getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Candidate & assistant", "Transcript & analysis", "Practical exercise"]);
+  expect(within(tabs).getByRole("tab", { name: "Candidate & assistant" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByText("Private interview assistance").getAttribute("data-active-tab")).toBe("candidate");
+  expect(screen.queryByRole("tab", { name: "Live transcript" })).toBeNull();
+  expect(api.interviewerMedia).not.toHaveBeenCalled();
+});
+
+test("returns to candidate information when opening another interview in the same route", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/interviews/1/console"]}><Link to="/interviews/2/console">Next interview</Link><Routes><Route path="/interviews/:interviewId/console" element={<InterviewerConsolePage />} /></Routes></MemoryRouter>);
+  await user.click(await screen.findByRole("tab", { name: "Transcript & analysis" }));
+  expect(screen.getByRole("tab", { name: "Live transcript" })).toBeTruthy();
+  await user.click(screen.getByRole("link", { name: "Next interview" }));
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Candidate & assistant" }).getAttribute("aria-selected")).toBe("true"));
+  expect(screen.getByText("Private interview assistance").getAttribute("data-active-tab")).toBe("candidate");
+  expect(screen.queryByRole("tab", { name: "Live transcript" })).toBeNull();
 });
 test("shows a waiting candidate and admits them without joining media automatically", async () => {
   const user = userEvent.setup(); open();
@@ -101,6 +122,7 @@ test("ending requires a confirmation dialog and renders ended state", async () =
   expect(screen.queryByRole("button", { name: "Join interview room" })).toBeNull();
   expect(document.querySelector("main")?.classList.contains("hiresense-console-review")).toBe(true);
   const groupTabs = screen.getByRole("tablist", { name: "Workspace panel" }).parentElement!;
+  await user.click(screen.getByRole("tab", { name: "Transcript & analysis" }));
   const innerTabs = screen.getByRole("tablist", { name: "Interview workspace" }).parentElement!;
   for (const tabs of [groupTabs, innerTabs]) {
     expect(tabs.classList.contains("hiresense-meeting-tabs-page")).toBe(true);

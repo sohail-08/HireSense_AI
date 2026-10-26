@@ -31,8 +31,10 @@ The interviewer console occupies one `100dvh` viewport. Candidate admission and
 invitation actions share the compact page header instead of taking a separate
 full-width row; **Candidate link** groups Copy/Generate/Update, Replace and Revoke.
 Video and meeting controls fill the left column. All other tools share the right
-column, using a **Transcript & analysis / Candidate & assistant** segmented tab
-switch. Each group retains its own inner tabs and scrollable content. Camera
+column, using a **Candidate & assistant / Transcript & analysis / Practical exercise**
+segmented tab switch. The console opens **Candidate info** first, and opening a
+different interview restores that starting view. Each group retains its own inner
+tabs and scrollable content. Camera
 height comes from the available grid space, not an additional viewport-sized card.
 Device preview and the Join button fit the same area. Closed interviews switch to
 normal document scrolling: transcript, analysis, candidate information and assistant
