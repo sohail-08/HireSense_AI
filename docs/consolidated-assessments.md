@@ -3,9 +3,11 @@
 ## Interviewer workflow
 
 1. In **CV Screening**, select a job, choose the CV scoring weights, and rank CVs.
-2. Conduct the interviews and save the transcripts.
+2. Conduct the interviews and save the transcripts. Select **Analyze answers** in
+   each interview console to save its question scores and interview percentage.
 3. Let the AI verify/score the live practical response, then approve its result.
-4. In **Assessment**, select the job and click **Calculate final ranking**.
+4. In **Assessment**, select the job and click **Calculate final ranking**. This
+   combines saved scores only; it never starts or retries AI answer analysis.
    Read rank, candidate, CV score, interview score, practical score and final score.
 5. Search candidates by name and use the pagination controls for larger lists.
    Filtering and paging never renumber the saved ranks or recalculate scores.
@@ -58,11 +60,17 @@ a new combined rank. Screen and export formula captions use each report's saved 
 
 The interview score is the average score of all included interview questions.
 Each question uses the saved answer rubric: relevance, correctness, completeness,
-and reasoning/examples, equally weighted at 25% each. Each dimension earns 1,
-0.5, or 0 based on validated evidence. Unanswered questions score zero; explicitly
-excluded/procedural questions do not enter the average. A missing transcript,
+and reasoning appropriate to the question, equally weighted at 25% each. In the new
+rubric the LLM assigns each dimension 0–100, independently checked against its exact
+evidence; the application averages those marks, not label-derived 0/50/100 values.
+Verified off-topic answers and unanswered questions score zero; explicitly
+excluded/procedural questions do not enter the average. Greetings, device checks
+and unrelated small talk do not enter either question counts
+or the denominator. Role-related HR/sales questions remain eligible. A missing transcript,
 expired source, or failed analysis is not an unanswered question and is not made
 into a zero. It gets a short explanation and no final rank until scoring succeeds.
+Historical discrete-rubric reports retain their original grades. Explicitly analyze
+older interviews under the new rubric before comparing them with newly scored ones.
 
 Positive credit requires a validated candidate quote. Correctness also needs an
 answer guide or technical reference; completeness needs an answer guide. These
@@ -83,12 +91,13 @@ opening the page never starts model work. The central assistant can call the
 native `candidate_assessments` tool with `operation="rank"` on explicit request.
 
 `FinalRankingService` freezes the application cohort, saved CV scoring run, and
-latest completed interview (by scheduled start, then ID). It reuses fresh saved
-answer analysis; missing, failed or stale analysis is queued through the existing
-Feature 5 service. Then it creates versioned consolidated reports and persists
-their final ordering. The existing background worker resumes this workflow after
-a restart. CVs are not re-screened by this action. Repeated requests reuse work;
-an explicit retry can retry failed processing.
+latest completed interview (by scheduled start, then ID). It reads fresh saved
+answer scores only. Missing, failed, pending or stale analysis leaves a candidate
+unranked with an instruction to use **Analyze answers** in the interview console;
+ranking never creates or retries an AI job. Deterministic reports and final ordering
+are calculated inline, without one worker interval per candidate. The existing
+worker can recover an interrupted aggregation after restart. CVs are not re-screened
+by this action, and repeated unchanged requests reuse the saved ranking.
 
 The coordinator stores its state in the existing `assessment_comparisons` JSON
 snapshot and linked assessment IDs. No schema migration, separate database, or

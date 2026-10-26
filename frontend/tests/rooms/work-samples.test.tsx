@@ -179,6 +179,16 @@ test("an approved zero is displayed as a score, not missing work", () => {
   expect(screen.queryByRole("button", { name: "Approve score" })).toBeNull();
 });
 
+test("shows an actionable failure instead of confusing a failed review with a verification decision", () => {
+  const assessment = scored("failed", null);
+  assessment.error = "The AI service quota is exhausted or rate-limited. Wait for the quota to recover before retrying.";
+  render(<WorkSampleReview assessment={assessment} busy={false} onApprove={vi.fn()} onScore={vi.fn()} />);
+  expect(screen.getByText("AI review failed")).toBeTruthy();
+  expect(screen.getByText(assessment.error)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Approve score" })).toBeNull();
+  expect(screen.queryByLabelText("Practical correctness score")).toBeNull();
+});
+
 test("the panel approves the exact saved result without sending a score", async () => {
   const initial = state("submitted", "200 BDT", 1);
   initial.exercise!.attempt!.submission_hash = "submission-hash";

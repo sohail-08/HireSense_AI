@@ -79,7 +79,7 @@ export function ConsolidatedAssessmentsPage() {
   const calculating = busy || ranking?.status === "processing";
   const detailsOpen = Boolean(Number(params.get("run")) || Number(params.get("comparison")));
   return <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-6">
-    <header className="mb-6"><h1 className="text-3xl font-bold tracking-tight text-slate-900">Candidate ranking</h1><p className="mt-2 text-sm text-slate-500">Compare interview, CV and practical-task scores in one place.</p></header>
+    <header className="mb-6"><h1 className="text-3xl font-bold tracking-tight text-slate-900">Candidate ranking</h1><p className="mt-2 text-sm text-slate-500">Compare saved interview, CV and practical-task scores. Use Analyze answers in the interview console before calculating the final ranking.</p></header>
     {error ? <p role="alert" className="my-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">{error}</p> : null}
     <section aria-label="Ranking settings" className="mb-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-end gap-4 p-5">

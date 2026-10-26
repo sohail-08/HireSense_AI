@@ -29,6 +29,65 @@ def result(source):
     return ConsolidatedAssessmentGraph().graph.invoke({"snapshot": source})["result"]
 
 
+def granular_source(marks=(87, 91, 84, 89), off_topic=False):
+    from app.agents.interview_analysis import score_pair, RUBRIC_VERSION
+    source = synthetic_source()
+    analysis = source["interviews"][0]["analysis"]
+    pair = analysis["result"]["pairs"][0]
+    pair.pop("score")
+    for name, mark in zip(("relevance", "accuracy", "completeness", "quality"), marks):
+        pair["assessment"][name]["score"] = mark
+    pair["assessment"]["interpretation"] = {"status": "faithful", "support_status": "supported_by_check", "citations": pair["assessment"]["relevance"]["citations"], "notes": []}
+    if off_topic:
+        pair["assessment"]["relevance"]["label"] = "tangent"
+        for name in ("accuracy", "completeness", "quality"):
+            pair["assessment"][name].update(support_status="insufficient_evidence", references=[], citations=[])
+    analysis["rubric_version"] = RUBRIC_VERSION
+    score_pair(pair)
+    return source
+
+
+def test_granular_marks_flow_exactly_to_interview_and_final_scores():
+    source = granular_source()
+    summary = result(source)["score_summary"]
+    assert summary["ready"] and Fraction(summary["interview_score"]) == Fraction(351, 4)
+    assert Fraction(summary["final_score"]) == Fraction(1703, 20)
+
+
+def test_verified_off_topic_zero_survives_reporting_and_final_ranking():
+    source = granular_source(off_topic=True)
+    report = result(source)
+    assert report["interviews"][0]["pairs"][0]["off_topic_zero_validated"]
+    assert report["score_summary"]["ready"] and Fraction(report["score_summary"]["interview_score"]) == 0
+    assert Fraction(report["score_summary"]["final_score"]) == Fraction(65, 2)
+
+
+def test_off_topic_zero_cannot_bypass_relevance_evidence_provenance():
+    source = granular_source(off_topic=True)
+    source["interviews"][0]["analysis"]["result"]["pairs"][0]["assessment"]["relevance"]["citations"][0]["quote"] = "Fabricated words"
+    assert not result(source)["score_summary"]["ready"]
+
+
+def test_housekeeping_is_excluded_from_final_question_count_and_denominator():
+    source = granular_source()
+    interview = source["interviews"][0]
+    analysis = interview["analysis"]
+    q = {**copy.deepcopy(analysis["snapshot"]["segments"][0]), "id": "greeting-q", "text": "Hello Ashok. Can you hear me clearly?"}
+    a = {**copy.deepcopy(analysis["snapshot"]["segments"][1]), "id": "greeting-a", "text": "Yes. I can hear you."}
+    from app.agents.interview_analysis import digest
+    for item in (q, a):
+        item["hash"] = digest({k:v for k,v in item.items() if k != "hash"})
+        interview["segments"][item["id"]] = item
+        analysis["snapshot"]["segments"].append(item)
+        analysis["snapshot"]["watermark"][item["id"]] = item["hash"]
+    analysis["result"]["pairs"].insert(0, {"id": "greeting", "question_ids": [q["id"]], "answer_ids": [a["id"]], "context_ids": [], "state": "analysis_failed", "excluded": False, "analysis_error": "Old greeting analysis failed"})
+    before = copy.deepcopy(source)
+    report = result(source)
+    assert report["score_summary"]["ready"] and report["score_summary"]["question_count"] == 1
+    assert Fraction(report["score_summary"]["interview_score"]) == Fraction(351, 4)
+    assert len(report["interviews"][0]["pairs"]) == 1 and source == before
+
+
 def test_fixed_30_60_10_weights_and_question_average_are_exact():
     source = synthetic_source()
     summary = result(source)["score_summary"]
@@ -197,14 +256,6 @@ def test_exact_ties_and_final_score_order_not_cv_order():
 def finish(t, service, row_id):
     service.advance(row_id)
     t.db.expire_all()
-    for analysis in list(t.db.scalars(select(InterviewAnalysisRun).where(InterviewAnalysisRun.status == "queued"))):
-        t.analysis.process(analysis.id)
-    service.advance(row_id)
-    t.db.expire_all()
-    for report in list(t.db.scalars(select(AssessmentRun).where(AssessmentRun.status == "queued"))):
-        t.assessments.process(report.id)
-    service.advance(row_id)
-    t.db.expire_all()
 
 
 def test_durable_job_ranking_reuses_sources_and_detects_new_transcript(consolidated, monkeypatch):
@@ -213,7 +264,7 @@ def test_durable_job_ranking_reuses_sources_and_detects_new_transcript(consolida
     before = len(t.analysis.model.calls)
     monkeypatch.setattr(InterviewAnalysisService, "enqueue", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("Fresh analysis must be reused")))
     ranking = service.start(t.db, t.owner.id, t.row.job_posting_id)
-    assert ranking["status"] == "processing"
+    assert ranking["status"] == "completed"
     assert service.start(t.db, t.owner.id, t.row.job_posting_id)["id"] == ranking["id"]
     finish(t, service, ranking["id"])
     current = service.read(t.db, t.owner.id, t.row.job_posting_id)
@@ -247,26 +298,33 @@ def test_old_final_weighting_is_stale_and_recalculation_reuses_answer_analysis(c
     assert len(t.analysis.model.calls) == before
 
 
-def test_missing_analysis_is_queued_once_then_joins_final_ranking(consolidated):
+def test_missing_analysis_does_not_start_ai_or_block_final_ranking(consolidated, monkeypatch):
     t = consolidated
     # Expire the old source without removing immutable existing reports.
     analysis = t.analysis.latest(t.db, t.row.id)
     analysis.status = "failed"
     t.db.commit()
     service = FinalRankingService(session_factory=t.assessments.factory)
+    before = len(t.analysis.model.calls)
+    saved_score = t.analysis.latest(t.db, t.row.id).result["score_summary"]
+    assert saved_score["ready"] and saved_score["percentage"] is not None
+    monkeypatch.setattr(InterviewAnalysisService, "enqueue", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("Ranking must never start AI analysis")))
     ranking = service.start(t.db, t.owner.id, t.row.job_posting_id)
     service.advance(ranking["id"]); t.db.expire_all()
-    assert t.analysis.latest(t.db, t.row.id).status == "queued"
+    assert t.analysis.latest(t.db, t.row.id).status == "failed"
     count = len(list(t.db.scalars(select(InterviewAnalysisRun))))
     service.advance(ranking["id"]); t.db.expire_all()
     assert len(list(t.db.scalars(select(InterviewAnalysisRun)))) == count
     finish(t, service, ranking["id"])
     value = service.read(t.db, t.owner.id, t.row.job_posting_id)
     assert value["status"] == "completed"
-    assert next(c for c in value["candidates"] if c["application_id"] == t.row.application_id)["final_rank"] is not None
+    candidate = next(c for c in value["candidates"] if c["application_id"] == t.row.application_id)
+    assert candidate["final_rank"] is None and candidate["interview_score"] is None and candidate["final_score"] is None
+    assert "Analyze answers" in candidate["reason"]
+    assert len(t.analysis.model.calls) == before
 
 
-def test_legacy_display_only_scores_do_not_prevent_persisted_rescoring(consolidated):
+def test_legacy_display_only_scores_require_explicit_analyze_answers(consolidated):
     t = consolidated
     analysis = t.analysis.latest(t.db, t.row.id)
     original = copy.deepcopy(analysis.result)
@@ -276,8 +334,50 @@ def test_legacy_display_only_scores_do_not_prevent_persisted_rescoring(consolida
     service = FinalRankingService(session_factory=t.assessments.factory)
     value = service.start(t.db, t.owner.id, t.row.job_posting_id)
     service.advance(value["id"]); t.db.expire_all()
-    assert t.analysis.latest(t.db, t.row.id).id != analysis.id
-    assert t.analysis.latest(t.db, t.row.id).status == "queued"
+    assert t.analysis.latest(t.db, t.row.id).id == analysis.id
+    assert t.analysis.latest(t.db, t.row.id).status == "completed"
+    candidate = next(c for c in value["candidates"] if c["application_id"] == t.row.application_id)
+    assert candidate["final_score"] is None and "Analyze answers" in candidate["reason"]
+    # Explicit Analyze answers can persist deterministic scores from validated,
+    # unchanged judgments without asking the model to grade them again.
+    from app.schemas.interview_analysis import StartAnalysis
+    calls = len(t.analysis.model.calls)
+    run = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(automatic=False))
+    if run.status == "queued": t.analysis.process(run.id)
+    t.db.expire_all()
+    saved = t.analysis.latest(t.db, t.row.id)
+    assert saved.result["score_summary"]["ready"]
+    assert len(t.analysis.model.calls) == calls
+    current = service.start(t.db, t.owner.id, t.row.job_posting_id)
+    assert next(c for c in current["candidates"] if c["application_id"] == t.row.application_id)["final_rank"] is not None
+
+
+def test_stale_transcript_is_not_rescored_by_final_ranking(consolidated, monkeypatch):
+    t = consolidated
+    t.db.get(TranscriptSegment, t.answer["id"]).text = "Changed saved answer"
+    t.db.commit()
+    count = len(list(t.db.scalars(select(InterviewAnalysisRun))))
+    monkeypatch.setattr(InterviewAnalysisService, "enqueue", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("No AI work during ranking")))
+    value = FinalRankingService(session_factory=t.assessments.factory).start(t.db, t.owner.id, t.row.job_posting_id)
+    assert value["status"] == "completed"
+    candidate = next(c for c in value["candidates"] if c["application_id"] == t.row.application_id)
+    assert candidate["interview_score"] is None and candidate["final_score"] is None
+    assert "Analyze answers" in candidate["reason"]
+    assert len(list(t.db.scalars(select(InterviewAnalysisRun)))) == count
+
+
+def test_interview_summary_uses_saved_scores_and_never_counts_failures_as_zero(consolidated):
+    from app.agents.interview_analysis import interview_score_summary, score_pair
+    pair = copy.deepcopy(consolidated.analysis.latest(consolidated.db, consolidated.row.id).result["pairs"][0])
+    unanswered = {"id": "unanswered", "state": "unanswered"}
+    score_pair(unanswered)
+    result = {"pairs": [pair, unanswered, {"id": "excluded", "state": "excluded"}], "reconciled": True}
+    summary = interview_score_summary(result)
+    assert summary["ready"] and summary["question_count"] == 2 and summary["unanswered_count"] == 1
+    assert summary["percentage"] == pair["score"]["percentage"] / 2
+    result["pairs"].append({"id": "failed", "state": "analysis_failed"})
+    summary = interview_score_summary(result)
+    assert not summary["ready"] and summary["percentage"] is None and summary["scored_count"] == 2
 
 
 def test_central_assistant_can_start_fixed_weight_job_ranking(consolidated):
@@ -300,7 +400,7 @@ def test_pending_rankings_are_private_and_deleted_with_sources(consolidated):
     with pytest.raises(LookupError): service.read(t.db, t.other.id, t.row.job_posting_id)
     with pytest.raises(LookupError): t.assessments.read_comparison(t.db, t.other.id, value["id"])
     from app.schemas.assessment import ExportReport
-    with pytest.raises(ValueError): t.reports.request(t.db, t.owner.id, ExportReport(format="html"), comparison_id=value["id"])
+    with pytest.raises(LookupError): t.reports.request(t.db, t.other.id, ExportReport(format="html"), comparison_id=value["id"])
     AssessmentService.delete_sources(t.db, interview_ids=[t.row.id]); t.db.commit()
     assert t.db.get(AssessmentComparison, value["id"]) is None
 

@@ -20,7 +20,7 @@ export type ReportData = { identification: { application_id: number; job_posting
   interviews: { id: number; date: string; analysis_id: number | null; analysis_version: number | null; rubric_version: string | null;
     limitations: string[]; pairs: { id: string; question: string; answer: string; state: string; evidence_ids: string[]; score?: { percentage: number };
     score_unavailable_reason?: string; interpretation?: { status: string; meaning: string; notes: { interpreted_as: string; reason: string; original: { quote: string } }[] };
-    dimensions: Record<string, { label: string; finding: string; simple_reason?: string; evidence_ids: string[]; gaps: string[] }> }[] }[] };
+    dimensions: Record<string, { label: string; percentage?: number; finding: string; simple_reason?: string; evidence_ids: string[]; gaps: string[] }> }[] }[] };
 export type Assessment = { id: number; version: number; application_id: number; job_posting_id: number; status: string; stage: string;
   completeness: string; review_status: string; stale: boolean; missing: string[]; error?: string; created_at: string; completed_at?: string;
   selection_policy: string; result: ReportData; comparison_cv_rank?: number; final_rank?: number;

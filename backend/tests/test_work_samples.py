@@ -26,6 +26,43 @@ TASK = {"title": "Customer quotation", "instructions": "Calculate a quote for tw
     "tools_policy": "Use the supplied catalogue only. No external AI or assistance.", "response_type": "text"}
 ANSWER = "Two Basic units cost 200 BDT.\nNo discount applies."
 
+
+def test_long_code_evidence_uses_unique_exact_quote_to_repair_wrong_line_numbers():
+    from app.agents.practical_scoring import validate_evaluation
+    content = "\n" * 100 + "const total = 2 + 3;\nreturn total;"
+    raw = {"score": 100, "summary": "The response correctly calculates the required total.",
+        "evidence": [{"line_start": 1, "line_end": 2, "quote": "const total = 2 + 3;\nreturn total;"}]}
+    result = validate_evaluation({"content": content}, raw)
+    assert result["evidence"] == [{"line_start": 101, "line_end": 102, "quote": raw["evidence"][0]["quote"]}]
+    assert raw["evidence"][0]["line_start"] == 1
+
+
+@pytest.mark.parametrize("content,quote", [("return 5;\n\nreturn 5;", "return 5;"), ("return 4;", "return 5;")])
+def test_wrong_line_evidence_cannot_use_an_ambiguous_or_fabricated_quote(content, quote):
+    from app.agents.practical_scoring import validate_evaluation
+    with pytest.raises(ValueError, match="Evidence does not match"):
+        validate_evaluation({"content": content}, {"score": 100, "summary": "The response calculates the total correctly.",
+            "evidence": [{"line_start": 20, "line_end": 21, "quote": quote}]})
+
+
+def test_practical_retry_supplies_line_numbers_and_repairs_only_invalid_output():
+    import json
+    from app.agents.practical_scoring import PracticalScorer
+    class Retry:
+        calls = 0
+        def generate_json(self, **kwargs):
+            self.calls += 1
+            assert json.loads(kwargs["prompt"])["submission_lines"] == [{"line": 1, "text": "return 5;"}]
+            if self.calls == 3:
+                return {"supported": True, "reason": "The exact submitted calculation meets the task."}
+            if self.calls == 2:
+                assert "evidence_mismatch" in kwargs["system_instruction"]
+            return {"score": 100, "summary": "The submitted calculation meets the requested task.",
+                "evidence": [{"line_start": 1, "line_end": 1, "quote": "return 4;" if self.calls == 1 else "return 5;"}]}
+    model = Retry()
+    result = PracticalScorer(model).evaluate({"model": "mock", "task": {"instructions": "Return five."}, "content": "return 5;", "status": "submitted"})
+    assert model.calls == 3 and result["score"] == 100 and result["verified"]
+
 class Model:
     def __init__(self, score=75, mode="valid"):
         self.calls, self.score, self.mode, self.hook = [], score, mode, None

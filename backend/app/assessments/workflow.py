@@ -3,7 +3,8 @@ import copy
 import json
 from typing import TypedDict
 from langgraph.graph import START, END, StateGraph
-from app.agents.interview_analysis import canonical_quote, digest, provider_schema
+from app.agents.interview_analysis import canonical_quote, digest, provider_schema, off_topic_zero, RUBRIC_VERSION
+from app.agents.interview_scope import apply_scoring_scope
 from app.schemas.assessment import SummarySelection, ReportData
 
 PROMPT_VERSION = "consolidation-evidence-summary-v6-approved-llm-practical-score"
@@ -81,6 +82,8 @@ def build_report(snapshot):
                     source_version=source["hash"], interview_id=interview["id"], analysis_id=analysis["id"], citation=valid))
             return ids
         for pair in analysis["result"].get("pairs", []):
+            if pair.get("excluded") or pair.get("state") == "excluded":
+                continue
             all_ids = pair["question_ids"] + pair["answer_ids"] + pair["context_ids"]
             if any(i not in allowed or i not in saved_sources or allowed[i]["hash"] != saved_sources[i]["hash"] for i in all_ids):
                 flags.append(f"Interview #{interview['id']}: a question-answer pair has unavailable or changed transcript sources")
@@ -139,10 +142,20 @@ def build_report(snapshot):
                     "completeness": {1: "The answer covered the expected points.", .5: "The answer covered some expected points, but missed others.", 0: "The recorded answer did not cover the expected points."},
                     "quality": {1: "The answer gave clear reasoning or useful examples.", .5: "The answer gave some reasoning, but needed more detail.", 0: "The recorded answer did not explain the reasoning clearly."}}
                 p["dimensions"][name]["simple_reason"] = reasons[name].get(saved_value, "This answer has not been scored yet.")
+                marks = ((pair.get("score") or {}).get("breakdown", {}).get(name) or {}).get("percentage")
+                if marks is not None:
+                    p["dimensions"][name]["percentage"] = marks
+                    p["dimensions"][name]["simple_reason"] = f"{marks}% — {dim['justification']}" if validated else "No independently supported finding for this dimension."
                 if dim["label"] == "unable_to_verify":
                     fact("limitations", f"Unable to verify: {name} for question '{p['question'][:140]}' remains unverified in the saved interview analysis.", refs + [source_id])
             item["pairs"].append(p)
-            if pair["state"] != "unanswered" and any(not d["support_validated"] for d in p["dimensions"].values()):
+            p["off_topic_zero_validated"] = bool((pair.get("score") or {}).get("rubric_version") == RUBRIC_VERSION
+                and (pair.get("score") or {}).get("basis") == "off_topic" and off_topic_zero(pair)
+                and meaning_verified and p["dimensions"].get("relevance", {}).get("support_validated"))
+            if p["off_topic_zero_validated"]:
+                for dimension in p["dimensions"].values():
+                    dimension["simple_reason"] = "0% — The answer does not address this question; the whole exchange scores zero."
+            if pair["state"] != "unanswered" and not p["off_topic_zero_validated"] and any(not d["support_validated"] for d in p["dimensions"].values()):
                 p["score"] = None
             if pair["state"] == "unanswered":
                 fact("limitations", f"No answer was recorded for the selected interview question: {p['question'][:180]}", p["evidence_ids"] + [source_id])
@@ -289,7 +302,12 @@ class ConsolidatedAssessmentGraph:
         self.graph = graph.compile()
 
     def resolve_source_versions(self, state):
-        return {"snapshot": copy.deepcopy(state["snapshot"])}
+        snapshot = copy.deepcopy(state["snapshot"])
+        for interview in snapshot.get("interviews", []):
+            analysis = interview.get("analysis")
+            if analysis:
+                analysis["result"] = apply_scoring_scope(analysis["result"], analysis["snapshot"])
+        return {"snapshot": snapshot}
 
     def validate_readiness(self, state):
         if not state["snapshot"].get("identification", {}).get("application_id"):

@@ -240,8 +240,8 @@ class SupervisorService:
             if not job_id:
                 return {"outcome": "info", "assistant_message": "Select a job posting in Reports first.", "refresh_required": False}
             ranking = FinalRankingService().start(db, user_id, job_id)
-            return {"outcome": "success", "assistant_message": "Final ranking is ready." if ranking["status"] == "completed" else
-                "I am scoring the saved interview answers and calculating the final ranking: interview 60% + CV 30% + practical task 10%. Open Reports for progress.",
+            return {"outcome": "success", "assistant_message": "Final ranking is ready: interview 60% + CV 30% + practical task 10%." if ranking["status"] == "completed" else
+                "I am combining saved scores: interview 60% + CV 30% + practical task 10%. No new AI analysis is started. Open Reports for progress.",
                 "assessment_links": [{"label": "Open final ranking", "path": f"/interviewer/reports?job={job_id}"}], "refresh_required": True}
         ids = request.application_ids or state.get("selected_application_ids", [])
         if not ids or len(ids) > 4 or len(ids) != len(set(ids)):

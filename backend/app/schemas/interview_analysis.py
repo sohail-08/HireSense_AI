@@ -28,6 +28,7 @@ class ReferenceUpdate(Strict):
 
 class Turn(Strict):
     segment_id: str
+    scoring_scope: Literal["job_related", "non_assessment", "uncertain"]
     kind: Literal["question", "question_continuation", "answer", "acknowledgement", "clarification", "procedural", "other"]
     subparts: list[str] = Field(default_factory=list, max_length=12)
     reason: str = Field(max_length=500)
@@ -74,6 +75,7 @@ class ReferenceQuote(Strict):
 
 
 class Dimension(Strict):
+    score: int = Field(strict=True, ge=0, le=100)
     label: Literal["direct", "partial", "tangent", "ambiguous", "supported", "contradicted",
                    "partially_supported", "unable_to_verify", "complete", "incomplete", "clear",
                    "mixed", "limited", "unanswered", "unreadable", "not_assessed"]

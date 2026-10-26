@@ -9,6 +9,7 @@ from app.agents.interview_analysis import digest
 from app.agents.work_sample import WorkSampleGraph
 from app.agents.practical_scoring import POLICY as GRADING_POLICY, PROMPT_VERSION, PracticalScorer, result_hash
 from app.config import get_settings
+from app.llm.errors import failure_detail
 from app.database import SessionLocal
 from app.models.interview import InterviewSchedule
 from app.models.job import JobDescription, JobPosting
@@ -403,9 +404,10 @@ class WorkSampleService:
         try:
             result = PracticalScorer(self.model).evaluate(snapshot)
             status, error = ("scored" if result["verified"] and result["score"] is not None else "needs_verification"), None
-        except Exception:
+        except Exception as exc:
             # Do not leak provider messages, private submissions or credentials to logs/UI.
-            result, status, error = {}, "failed", "The AI review could not be completed. Your saved work is unchanged; retry scoring."
+            failure = failure_detail(exc)
+            result, status, error = {"failure": failure}, "failed", failure["message"]
         with self.factory() as db:
             job = self.job(db, assessment_id)
             if not job:

@@ -2,6 +2,7 @@ import copy
 from datetime import datetime, timezone
 from sqlalchemy import select, or_
 from app.agents.interview_analysis import digest
+from app.agents.interview_scope import apply_scoring_scope
 from app.models.candidate import Candidate, CandidateApplication, CVDocument
 from app.models.job import JobPosting, JobDescription, RequirementProfile
 from app.models.scoring import CandidateScore, ScoringRun, ScoringConfiguration
@@ -184,7 +185,7 @@ def resolve_sources(db, user_id, application_id, request):
             "finalized": finalized, "segments": sources,
             "analysis": {"id": analysis.id, "version": analysis.version, "status": analysis.status,
                 "requirement_version": analysis.snapshot.get("requirement_version"), "rubric_version": analysis.snapshot.get("rubric_version"),
-                "snapshot": copy.deepcopy(analysis.snapshot), "result": copy.deepcopy(analysis.result)} if valid_analysis else None,
+                "snapshot": copy.deepcopy(analysis.snapshot), "result": apply_scoring_scope(analysis.result, analysis.snapshot)} if valid_analysis else None,
             "reviews": [{"id": r.id, "run_id": r.run_id, "kind": r.kind, "target_id": r.target_id,
                 "payload": copy.deepcopy(r.payload), "created_by": r.created_by, "created_at": utc(r.created_at).isoformat()}
                 for r in reviews if analysis and r.run_id == analysis.id]})
