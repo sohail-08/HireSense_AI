@@ -31,6 +31,12 @@ It does not infer honesty, personality, protected traits, AI use, or future succ
    integer score from 0–100 and a concise explanation with exact response quotes.
    A separate model call checks whether the proposed score follows from the task
    and saved work. Unsupported or unavailable results stay unscored, not zero.
+   Requests include explicit 1-based source lines, including blank lines. If the
+   model miscounts a range, the server can re-anchor a uniquely occurring exact
+   quote to its actual lines; it never rewrites code, accepts paraphrases, or picks
+   between repeated passages. Invalid output/evidence gets at most one bounded
+   retry with safe feedback. A negative verification does not trigger score rerolls.
+   Quota, authentication and other provider failures surface actionable safe errors.
 7. Review the proposed result, discuss the work if needed, and **Approve score**.
    The interviewer does not assign or edit marks. Confirm review before approval;
    approval is final and tied to the exact task, submission and result hashes.

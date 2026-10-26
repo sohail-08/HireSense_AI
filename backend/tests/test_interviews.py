@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models import Candidate, CandidateApplication, CandidateScore, ScoringRun, ScreeningRun, UserRole
 from app.models.candidate import ApplicationStatus
 from app.models.interview import InterviewBatch, InterviewSchedule, InterviewDelivery
+from app.models.job import JobPosting
 from app.schemas.interview import SelectionRequest, PrepareInvites, ConfirmInvites, RescheduleRequest
 from app.services.interview_service import InterviewService, InterviewConflict
 from app.services.interview_content import allocate_slots, SMTPInvitationSender
@@ -323,6 +324,33 @@ def test_api_authorization_confirmation_and_mocked_background_delivery(setup, mo
         assert response.status_code == 200, response.text
         assert len(sender.calls) == 1
         assert client.get(f"/api/interviews/batches/{preview['id']}", headers=headers).json()["sent"] == 1
+
+
+def test_schedule_status_query_filters_by_owned_job_without_mutating_records(setup, monkeypatch):
+    db, owner, other, posting, _, _, service, sender = setup
+    preview = prepared(setup, count=1)
+    service.confirm(db, owner.id, preview["id"], confirm_data(preview))
+    empty_posting = JobPosting(job_description_id=posting.job_description_id, platform="manual")
+    db.add(empty_posting)
+    db.commit()
+    api = FastAPI()
+    api.include_router(api_routes.router)
+    api.dependency_overrides[get_db] = lambda: db
+    monkeypatch.setattr(api_routes, "InterviewService", lambda: service)
+    with TestClient(api) as client:
+        headers = {"Authorization": "Bearer " + create_access_token(owner.id)}
+        result = client.get(f"/api/interviews/schedules?job_posting_id={posting.id}", headers=headers)
+        assert result.status_code == 200
+        assert len(result.json()) == 1 and result.json()[0]["status"] == "scheduled"
+        assert result.json()[0]["application_id"] == preview["recipients"][0]["application_id"]
+        assert client.get(f"/api/interviews/schedules?job_posting_id={empty_posting.id}", headers=headers).json() == []
+        assert len(client.get("/api/interviews/schedules", headers=headers).json()) == 1
+        assert client.get("/api/interviews/schedules?job_posting_id=0", headers=headers).status_code == 422
+        assert client.get("/api/interviews/schedules?job_posting_id=999999", headers=headers).status_code == 404
+        denied = {"Authorization": "Bearer " + create_access_token(other.id)}
+        assert client.get(f"/api/interviews/schedules?job_posting_id={posting.id}", headers=denied).status_code == 403
+    assert sender.calls == []
+    assert db.scalar(select(func.count(InterviewSchedule.id))) == 1
 
 
 def test_job_ownership_document_failure_and_ranking_freshness(setup):

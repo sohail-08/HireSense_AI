@@ -31,6 +31,32 @@ function fixture(): AnalysisState {
 beforeEach(() => { vi.mocked(analysisApi.read).mockReset().mockResolvedValue(fixture()); vi.mocked(analysisApi.start).mockReset().mockResolvedValue({}); });
 
 describe("simplified interviewer answer analysis", () => {
+  it("excludes greetings from scored cards, numbering and the displayed question count", async () => {
+    const data = fixture(), technical = structuredClone(data.run!.result.pairs![0]);
+    technical.id = "technical";
+    data.run!.result.pairs![0].excluded = true;
+    data.run!.result.pairs![0].state = "excluded";
+    data.run!.result.pairs!.push(technical);
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByText("1 question")).toBeTruthy();
+    expect(screen.getByLabelText("Question 1")).toBeTruthy();
+    expect(screen.queryByLabelText("Question 2")).toBeNull();
+    expect(screen.getAllByLabelText("Answer score 75%")).toHaveLength(1);
+  });
+
+  it("does not present greeting-only transcripts as failed scoring or a zero assessment", async () => {
+    const data = fixture();
+    data.run!.result.pairs![0].excluded = true;
+    data.run!.result.pairs![0].state = "excluded";
+    data.run!.result.score_summary = { percentage: null, scored_count: 0, question_count: 0, unanswered_count: 0, ready: false, rubric_version: "v4" };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByText("No assessment questions")).toBeTruthy();
+    expect(screen.queryByText("Scoring incomplete")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Saved interview score" })).toBeNull();
+    expect(screen.getByText("No job-related interview questions were found in the saved transcript yet.")).toBeTruthy();
+  });
   it("shows four evidence categories with immutable source links without generating on read", async () => {
     const data = fixture();
     data.run!.result.evidence_summary = {
@@ -267,7 +293,7 @@ describe("simplified interviewer answer analysis", () => {
     await screen.findByText("Analysis failed");
     expect(screen.getByRole("alert").textContent).toContain("unavailable");
     expect(screen.getAllByText("Some speech may be missing.")).toHaveLength(1);
-    expect(screen.getByText(/The transcript or reference material has changed/)).toBeTruthy();
+    expect(screen.getByText(/The transcript, reference material or scoring policy has changed/)).toBeTruthy();
   });
 
   it("opens exact sources and rejects a changed source revision", async () => {
@@ -290,5 +316,70 @@ describe("simplified interviewer answer analysis", () => {
     render(<TranscriptCitation citation={{ ...citation, char_start: 2, char_end: 16 }} interviewId={1} runId={10} />);
     fireEvent.click(screen.getByRole("button")); await screen.findByRole("dialog");
     expect(document.querySelector("mark")?.textContent).toBe("commit changes");
+  });
+
+  it("shows the saved interview percentage used by final ranking without requesting AI on read", async () => {
+    const data = fixture();
+    data.run!.result.score_summary = { percentage: 75, question_count: 2, scored_count: 2, unanswered_count: 0, ready: true, rubric_version: "v3" };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    const summary = await screen.findByRole("region", { name: "Saved interview score" });
+    expect(within(summary).getByText("75.00%")).toBeTruthy();
+    expect(within(summary).getByText("Saved for final ranking")).toBeTruthy();
+    expect(analysisApi.start).not.toHaveBeenCalled();
+  });
+
+  it("shows precise numeric marks independently of identical descriptive badges", async () => {
+    const data = fixture(), pair = data.run!.result.pairs![0];
+    pair.score!.percentage = 87.75;
+    for (const [name, mark] of [["relevance", 87], ["accuracy", 91], ["completeness", 84], ["quality", 89]] as const) {
+      pair.score!.breakdown[name] = { value: mark / 100, percentage: mark, weight: 25, status: "met", reason: "Evidence supports this answer-specific mark." };
+    }
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByLabelText("Answer score 87.75%")).toBeTruthy();
+    expect(screen.getByLabelText("relevance mark").textContent).toBe("87/100");
+    expect(screen.getByLabelText("accuracy mark").textContent).toBe("91/100");
+    expect(screen.getAllByText("Met")).toHaveLength(4);
+  });
+
+  it("displays verified off-topic answers as zero rather than not scored", async () => {
+    const data = fixture(), pair = data.run!.result.pairs![0];
+    pair.score!.basis = "off_topic";
+    pair.score!.percentage = 0;
+    for (const item of Object.values(pair.score!.breakdown)) Object.assign(item, { value: 0, percentage: 0, status: "unmet", reason: "The answer does not address this question." });
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByLabelText("Answer score 0%")).toBeTruthy();
+    expect(screen.getByLabelText("accuracy mark").textContent).toBe("0/100");
+    expect(screen.queryByText("Not scored")).toBeNull();
+  });
+
+  it("does not display a fabricated zero when interview answers remain unscored", async () => {
+    const data = fixture();
+    data.run!.result.score_summary = { percentage: null, question_count: 2, scored_count: 1, unanswered_count: 0, ready: false, rubric_version: "v3" };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    const summary = await screen.findByRole("region", { name: "Saved interview score" });
+    expect(within(summary).getByText("Incomplete")).toBeTruthy();
+    expect(within(summary).queryByText("0.00%")).toBeNull();
+    expect(within(summary).queryByText("Saved for final ranking")).toBeNull();
+    expect(screen.getByText("Scoring incomplete")).toBeTruthy();
+    expect(screen.queryByText("Ready")).toBeNull();
+  });
+
+  it("surfaces scoring failures and removes the requested notice after an incomplete run finishes", async () => {
+    const data = fixture(), pair = data.run!.result.pairs![0];
+    pair.state = "analysis_failed";
+    delete pair.score;
+    pair.analysis_failure = { code: "incomplete_checks", stage: "citation_support_validation", message: "The AI did not return all required evidence checks. No score was assigned; retry analysis." };
+    vi.mocked(analysisApi.read).mockResolvedValue(data);
+    render(<InterviewAnalysisPanel interviewId={1} />);
+    expect(await screen.findByText("Scoring incomplete")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(pair.analysis_failure.message);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze answers" }));
+    await waitFor(() => expect(analysisApi.start).toHaveBeenCalled());
+    expect(screen.queryByText("Analysis requested. Results will update here.")).toBeNull();
+    expect(screen.queryByText("Ready")).toBeNull();
   });
 });

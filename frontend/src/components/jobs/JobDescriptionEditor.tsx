@@ -18,7 +18,7 @@ export function JobDescriptionEditor({ job, title, content, editing, busy, appro
     wasEditing.current = editing;
   }, [editing]);
 
-  return <div className="space-y-5">
+  return <div id="job-description-review" className="workflow-section space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${jobStatusStyle(job.status)}`}>{jobStatusLabel(job.status)}</span>

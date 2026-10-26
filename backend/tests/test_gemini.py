@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from app.llm.gemini import GeminiStructuredClient
+from app.llm.errors import ProviderError, failure_detail
 
 
 def test_gemini_client_requests_json_schema_output():
@@ -95,3 +96,15 @@ def test_gemini_client_reports_free_tier_quota_error():
             prompt="Prompt",
             schema={"type": "object"},
         )
+
+
+@pytest.mark.parametrize("status,code", [(401, "authentication"), (403, "authentication"), (429, "quota"), (400, "request_rejected"), (503, "unavailable")])
+def test_provider_failure_category_never_exposes_remote_error_payload(status, code):
+    def rejected(url, **_kwargs):
+        return httpx.Response(status, request=httpx.Request("POST", url), json={"error": {"message": "PRIVATE source content and credential"}})
+    client = GeminiStructuredClient(api_key="test-api-key", post=rejected)
+    with pytest.raises(ProviderError) as caught:
+        client.generate_json(model="test-model", system_instruction="Test", prompt="Synthetic", schema={"type": "object"})
+    assert caught.value.code == code
+    assert failure_detail(caught.value)["code"] == code
+    assert "PRIVATE" not in str(caught.value) and "PRIVATE" not in failure_detail(caught.value)["message"]

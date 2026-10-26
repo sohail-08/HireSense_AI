@@ -13,7 +13,7 @@ export function WorkSampleReview({ assessment, busy, onApprove, onScore }: {
   const available = ["scored", "approved"].includes(assessment?.status ?? "") && result?.verified === true && typeof result.score === "number";
   const processing = ["queued", "processing"].includes(assessment?.status ?? "");
   return <section aria-label="Practical task score" className={`rounded-2xl border p-4 ${approved ? "border-emerald-100 bg-emerald-50/40" : "border-indigo-100 bg-indigo-50/30"}`}>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">AI correctness review</p><h3 className="mt-1 font-semibold text-slate-900">{approved ? "Score approved" : available ? "Review the proposed score" : processing ? "Verifying the response…" : "Verification needed"}</h3></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">AI correctness review</p><h3 className="mt-1 font-semibold text-slate-900">{approved ? "Score approved" : available ? "Review the proposed score" : processing ? "Verifying the response…" : assessment?.status === "failed" ? "AI review failed" : "Verification needed"}</h3></div>
       {available ? <span aria-label="Practical correctness score" className="rounded-xl bg-white px-3 py-2 text-xl font-bold tabular-nums text-indigo-800">{result.score}/100</span> : null}
     </div>
     {processing ? <p role="status" className="mt-2 text-sm leading-6 text-slate-600">The AI is checking the saved work against the task. You can leave this panel and return later.</p> : available ? <>

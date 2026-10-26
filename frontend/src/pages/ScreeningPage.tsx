@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { ApiError, apiRequest } from "../api/apiClient";
 import { ErrorMessage } from "../components/common/ErrorMessage";
@@ -12,6 +13,9 @@ function messageFor(error: unknown): string {
 }
 
 export function ScreeningPage() {
+  const [params] = useSearchParams();
+  const requestedJob = Number(params.get("job"));
+  const appliedJob = useRef(0);
   const { setSelectedJobPostingId, setSelectedApplicationIds, refreshVersion, batch: assistantBatch } = useSupervisor();
   const [jobs, setJobs] = useState<ScreeningJobOption[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<number>();
@@ -52,6 +56,12 @@ export function ScreeningPage() {
       if (selectedJobRef.current === selectedJobId) setError(messageFor(failure));
     });
   }, [selectedJobId]);
+
+  useEffect(() => {
+    if (appliedJob.current !== requestedJob && jobs.some(job => job.id === requestedJob)) {
+      appliedJob.current = requestedJob; setSelectedJobId(requestedJob);
+    }
+  }, [requestedJob, jobs]);
 
   useEffect(() => {
     setSelectedJobPostingId(selectedJobId);
@@ -120,7 +130,7 @@ export function ScreeningPage() {
   const jobSelector = <JobPostingSelect jobs={jobs} value={selectedJobId} loading={loading} onChange={setSelectedJobId} />;
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <section data-workflow-ready={!loading && Boolean(activeDashboard || error || !jobs.length)} className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-bold tracking-tight text-slate-900">CV Screening</h1>
       <p className="mt-2 text-sm text-slate-600">Choose a job, adjust the weights, and compare candidates.</p>
       <ErrorMessage message={error} />

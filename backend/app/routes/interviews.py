@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import get_db
@@ -50,8 +50,8 @@ def batch(batch_id: int, db: Session = Depends(get_db), user: User = Depends(req
 
 
 @router.get("/schedules", response_model=list[InterviewScheduleResult])
-def schedules(db: Session = Depends(get_db), user: User = Depends(require_interviewer)):
-    return execute(lambda: InterviewService().schedules(db, user.id))
+def schedules(job_posting_id: int | None = Query(default=None, gt=0), db: Session = Depends(get_db), user: User = Depends(require_interviewer)):
+    return execute(lambda: InterviewService().schedules(db, user.id, job_posting_id=job_posting_id))
 
 
 @router.post("/reschedule/preview", response_model=InvitationPreview, response_model_exclude_unset=True)

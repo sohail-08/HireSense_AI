@@ -61,7 +61,7 @@ class Model:
             for s in data["targets"]:
                 text = s["text"].lower()
                 kind = "answer" if s["speaker"] == "CANDIDATE" else "question" if text.startswith(("explain", "how", "what", "describe")) else "acknowledgement"
-                turns.append({"segment_id": s["id"], "kind": kind, "reason": "Synthetic classification", "uncertain": False, "subparts": []})
+                turns.append({"segment_id": s["id"], "kind": kind, "scoring_scope": "job_related" if kind in {"question", "answer"} else "non_assessment", "reason": "Synthetic classification", "uncertain": False, "subparts": []})
             return {"turns": turns}
         if title == "SupportCheck":
             return {"findings": [{"target": key, "supported": self.supported, "reason": "Synthetic logical support check"} for key in data["targets"]]}
@@ -69,7 +69,7 @@ class Model:
         quote = {"segment_id": candidate["id"], "quote": "fabricated quotation" if self.bad_quote else candidate["text"]} if candidate else None
         if title == "Assessment":
             def dimension(label):
-                return {"label": label, "justification": "The candidate describes transactions.", "citations": [quote] if quote else [], "references": [], "flags": [], "evidence_gaps": []}
+                return {"label": label, "score": 100, "justification": "The candidate describes transactions.", "citations": [quote] if quote else [], "references": [], "flags": [], "evidence_gaps": []}
             result = {"relevance": dimension("direct"), "accuracy": dimension("supported"), "completeness": dimension("complete"), "quality": dimension("clear"),
                     "interpretation": {"status": "faithful", "meaning": "The candidate describes transactions.", "citations": [quote] if quote else [], "notes": []},
                     "expected_elements": ["Explain transaction atomicity"], "expected_elements_basis": "approved_guide"}
@@ -90,6 +90,120 @@ class Model:
 
 def execute(source, model=None):
     return InterviewAnalysisGraph(model or Model()).graph.invoke({"snapshot": source})["result"]
+
+
+def test_support_response_schema_requires_each_dimension_interpretation_and_mapping():
+    class KeyedChecks(Model):
+        def generate_json(self, **kwargs):
+            result = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "SupportCheck":
+                targets = json.loads(kwargs["prompt"])["targets"]
+                wire = kwargs["schema"]["properties"]["findings"]
+                assert wire["type"] == "object" and set(wire["required"]) == set(targets)
+                assert wire["additionalProperties"] is False
+                return {"findings": {item["target"]: {k: v for k, v in item.items() if k != "target"} for item in result["findings"]}}
+            return result
+    result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]), KeyedChecks())
+    assert result["pairs"][0]["score"]["percentage"] == 100
+    assert len(result["pairs"][0]["validation"]) == 6
+
+
+@pytest.mark.parametrize("recovers", [False, True])
+def test_mapping_only_validation_is_retried_but_never_accepted_as_a_full_check(recovers):
+    class IncompleteChecks(Model):
+        checks = 0
+        def generate_json(self, **kwargs):
+            result = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "SupportCheck":
+                self.checks += 1
+                if self.checks == 1 or not recovers:
+                    return {"findings": [item for item in result["findings"] if item["target"].startswith("mapping:")]}
+                assert "incomplete_checks" in kwargs["system_instruction"]
+            return result
+    model = IncompleteChecks()
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]), model)["pairs"][0]
+    assert model.checks == 2
+    if recovers:
+        assert pair["score"]["percentage"] == 100
+    else:
+        assert pair["state"] == "analysis_failed" and "score" not in pair
+        assert pair["analysis_failure"]["code"] == "incomplete_checks"
+
+
+def test_provider_quota_failure_is_actionable_without_exposing_provider_payloads():
+    from app.llm.errors import ProviderError
+    class Quota(Model):
+        def generate_json(self, **kwargs):
+            if kwargs["schema"]["title"] == "SupportCheck":
+                raise ProviderError("quota", "PRIVATE provider response and credential")
+            return super().generate_json(**kwargs)
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]), Quota())["pairs"][0]
+    assert pair["analysis_failure"]["code"] == "quota"
+    assert "quota" in pair["analysis_error"] and "PRIVATE" not in json.dumps(pair)
+    assert "score" not in pair
+
+
+def test_verified_off_topic_answer_is_zero_even_when_accuracy_cannot_be_verified():
+    from app.agents.interview_analysis import score_pair
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]))["pairs"][0]
+    pair["assessment"]["relevance"]["label"] = "tangent"
+    pair["assessment"]["accuracy"]["label"] = "unable_to_verify"
+    score_pair(pair)
+    assert pair["score"]["percentage"] == 0 and pair["score"]["basis"] == "off_topic"
+    assert pair["state"] == "analyzed" and "score_unavailable_reason" not in pair
+
+
+def test_identical_descriptive_labels_can_have_different_validated_numeric_scores():
+    class Numeric(Model):
+        def __init__(self, marks):
+            super().__init__()
+            self.marks = marks
+        def generate_json(self, **kwargs):
+            value = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "Assessment":
+                for name, mark in zip(("relevance", "accuracy", "completeness", "quality"), self.marks):
+                    value[name]["score"] = mark
+            return value
+    data = snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")])
+    first = execute(data, Numeric((87, 91, 84, 89)))["pairs"][0]
+    second = execute(data, Numeric((94, 96, 92, 95)))["pairs"][0]
+    assert first["score"]["percentage"] == 87.75 and second["score"]["percentage"] == 94.25
+    assert all(first["assessment"][k]["label"] == second["assessment"][k]["label"] for k in ("relevance", "accuracy", "completeness", "quality"))
+
+
+@pytest.mark.parametrize("mark", [-1, 101, True, 87.5, None])
+def test_invalid_or_missing_numeric_marks_never_fall_back_to_label_values(mark):
+    class Invalid(Model):
+        def generate_json(self, **kwargs):
+            value = super().generate_json(**kwargs)
+            if kwargs["schema"]["title"] == "Assessment":
+                value["accuracy"]["score"] = mark
+            return value
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]), Invalid())["pairs"][0]
+    assert pair["state"] == "analysis_failed" and "score" not in pair
+
+
+def test_unverified_mismatch_or_unclear_meaning_is_not_a_candidate_zero():
+    from app.agents.interview_analysis import score_pair
+    pair = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")]))["pairs"][0]
+    pair["assessment"]["relevance"].update(label="tangent", support_status="insufficient_evidence")
+    score_pair(pair)
+    assert "score" not in pair
+    pair["state"] = "analyzed"
+    pair["assessment"]["relevance"]["support_status"] = "supported_by_check"
+    pair["assessment"]["interpretation"]["status"] = "uncertain"
+    score_pair(pair)
+    assert "score" not in pair and pair["state"] == "needs_clarification"
+
+
+def test_opt_in_provider_benchmark_understands_the_keyed_checklist(monkeypatch):
+    from app.benchmark_interview_analysis import ProbeClient
+    from app.llm.gemini import GeminiStructuredClient
+    value = {"findings": {"accuracy": {"supported": False, "reason": "No reference supports this conclusion."}}}
+    monkeypatch.setattr(GeminiStructuredClient, "generate_json", lambda *_args, **_kwargs: value)
+    probe = ProbeClient()
+    assert probe.generate_json(schema={"title": "SupportCheck"}, prompt=json.dumps({"targets": {"accuracy": {}}})) == value
+    assert probe.failure is None
 
 
 def test_multisegment_multipart_acknowledgement_and_conservative_completion():
@@ -209,12 +323,14 @@ def test_prompt_injection_remains_source_data_no_tools_or_rankings():
     assert not hasattr(InterviewAnalysisGraph, "tools")
 
 
-@pytest.mark.parametrize("partial,expected", [(False, 100), (True, 50)])
-def test_deterministic_answer_scores_use_validated_labels_and_guide_evidence(partial, expected):
+@pytest.mark.parametrize("partial,expected", [(False, 97), (True, 63)])
+def test_answer_scores_use_validated_numeric_marks_not_fixed_label_values(partial, expected):
     class GuidedModel(Model):
         def generate_json(self, **kwargs):
             result = super().generate_json(**kwargs)
             if kwargs["schema"]["title"] == "Assessment":
+                for name in ("relevance", "accuracy", "completeness", "quality"):
+                    result[name]["score"] = expected
                 if partial:
                     for name, value in zip(("relevance", "accuracy", "completeness", "quality"),
                                            ("partial", "partially_supported", "partial", "mixed")):
@@ -227,7 +343,7 @@ def test_deterministic_answer_scores_use_validated_labels_and_guide_evidence(par
     pair = execute(data, GuidedModel())["pairs"][0]
     assert pair["score"]["percentage"] == expected
     assert sum(item["value"] * item["weight"] for item in pair["score"]["breakdown"].values()) == expected
-    assert {item["value"] for item in pair["score"]["breakdown"].values()} == ({.5} if partial else {1})
+    assert {item["percentage"] for item in pair["score"]["breakdown"].values()} == {expected}
     assert pair["state"] == "analyzed" and "needs_review" not in json.dumps(pair)
 
 
@@ -522,7 +638,7 @@ def test_automatic_reconciliation_and_no_model_calls_on_refresh(saved):
     assert t.analysis.latest(t.db, t.row.id).result["reconciled"] is True
 
 
-@pytest.mark.parametrize("field", ["prompt_version", "pairing_version", "rubric_version", "model"])
+@pytest.mark.parametrize("field", ["prompt_version", "pairing_version", "rubric_version", "model", "scoping_version"])
 def test_deployment_does_not_automatically_regrade_saved_interviews(saved, field):
     t = saved
     run = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis())
@@ -542,6 +658,36 @@ def test_deployment_does_not_automatically_regrade_saved_interviews(saved, field
     assert t.db.get(InterviewAnalysisControl, t.row.id).automatic
     explicit = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(reanalyze=True))
     assert explicit.id != run.id and explicit.status == "queued"
+
+
+def test_scope_policy_refresh_reclassifies_turns_without_rerolling_accepted_marks(saved):
+    t = saved
+    t.analysis.references(t.db, t.owner.id, t.row.id, ReferenceUpdate(revision=0, approved=True, references=[
+        {"id": "guide", "title": "Transactions", "kind": "answer_guide", "content": "Transactions commit changes atomically.", "requirement_ids": []}]))
+    old = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(automatic=False))
+    t.analysis.process(old.id)
+    t.db.expire_all()
+    old = t.db.get(InterviewAnalysisRun, old.id)
+    original_scores = [copy.deepcopy(p["score"]) for p in old.result["pairs"]]
+    old_snapshot = copy.deepcopy(old.snapshot)
+    old_snapshot.pop("scoping_version", None)
+    old_snapshot["input_key"] = t.analysis.input_key(old_snapshot)
+    old.snapshot = old_snapshot
+    old.fingerprint = digest({"unscoped_input": old_snapshot["input_key"]})
+    old_result = copy.deepcopy(old.result)
+    for turn in old_result["turns"]:
+        turn.pop("scoping_version", None)
+        turn.pop("scoring_scope", None)
+    old.result = old_result
+    t.db.commit()
+    before = len(t.analysis.model.calls)
+    new = t.analysis.enqueue(t.db, t.owner.id, t.row.id, StartAnalysis(automatic=False))
+    assert new.id != old.id
+    t.analysis.process(new.id)
+    t.db.expire_all()
+    current = t.db.get(InterviewAnalysisRun, new.id)
+    assert [p["score"] for p in current.result["pairs"]] == original_scores
+    assert [title for title, _, _ in t.analysis.model.calls[before:]] == ["Detection"]
 
 
 def test_chatbot_reads_saved_analysis_and_queues_only_when_stale(saved):

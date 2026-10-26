@@ -47,6 +47,17 @@ delivery receipt. Configure domain authentication and privacy policies separatel
 ## Manual interviewer flow
 
 1. On **Schedule Interviews**, select a job with a current saved CV ranking.
+   The candidate list shows persisted **Interview status**, date/time and a link
+   to the existing interview. Filter by **Not scheduled**, **Already scheduled**
+   or **Completed**. Active bookings disable duplicate manual selection even if
+   their email delivery failed; use **View scheduled interviews** to reschedule
+   or retry notification. Cancelled bookings can be scheduled again. Statuses are
+   keyed by application and the form's default stage, not candidate name or CV
+   rank. Past timestamps alone never imply completion. Statuses refresh after
+   confirmation, assistant updates, window focus and every 30 seconds while the
+   page is visible/idle; failed status loading disables manual selection instead
+   of incorrectly claiming a candidate is unscheduled. The existing authenticated
+   schedules endpoint accepts optional `job_posting_id` for a job-scoped read.
 2. Use row checkboxes, or choose **Highest-ranked
    candidates** or **Candidates above a score**. `Above` uses `>`; `At least` uses `>=`. Comparisons use saved,
    unrounded decimal scores. Selection previews filter candidates and list exclusions.
@@ -76,6 +87,11 @@ delivery receipt. Configure domain authentication and privacy policies separatel
    Nothing is sent during selection or preview.
 7. Select **Confirm & send**. Schedules and delivery snapshots are committed first;
    background workers then send each email. The UI polls sent/failed/uncertain status.
+   The delivery card shows summary counts, processed progress and per-candidate
+   badges. In-flight attempts display **Sending** even while the SMTP safety
+   claim is internally `uncertain`; only finished uncertain attempts display
+   **Unconfirmed**. Progress counts completed attempts, not inbox delivery.
+   Only eligible failed attempts offer Retry; no email is automatically resent.
 8. **Interviews** lists candidates, readable dates/times, status badges and a dedicated
    **Actions** column. Button-styled links open the interview console, completed
    interview details and assessment reports. There is no Delivery column. Each row

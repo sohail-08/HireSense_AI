@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../../src/App";
 import { apiRequest } from "../../src/api/apiClient";
@@ -21,6 +21,7 @@ beforeEach(() => {
   vi.clearAllMocks(); sessionStorage.clear();
   Object.defineProperty(window, "matchMedia", { configurable: true, value: vi.fn(() => ({ matches: false })) });
   Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.mocked(apiRequest).mockImplementation(async (path, options) => {
     if (path === "/job-descriptions") return [draft];
@@ -85,10 +86,12 @@ it("approves the specifically selected saved draft without requiring a chatbot r
 });
 
 it("shows the generated JD after one hiring request without requirements confirmation or a generate button", async () => {
+  let loads = 0;
+  let finishLayout!: (value: JobDescriptionResponse[]) => void;
   vi.mocked(apiRequest).mockImplementation(async (path, options) => {
-    if (path === "/job-descriptions") return [draft];
+    if (path === "/job-descriptions") return ++loads === 1 ? [draft] : new Promise(resolve => { finishLayout = resolve as typeof finishLayout; });
     if (path === "/supervisor/chat" && options?.method === "POST") return { ...result,
-      phase: "job_description_draft", route: "generate_job_description", job_description: draft,
+      phase: "job_description_draft", route: "generate_job_description", job_description: draft, refresh_required: true,
       messages: [{ role: "user", content: "I want to hire a frontend engineer", outcome: "info" },
         { role: "assistant", content: "I drafted your job description. Review it when you are ready.", outcome: "success" }] };
     throw new Error(`Unexpected synthetic request: ${path}`);
@@ -106,7 +109,12 @@ it("shows the generated JD after one hiring request without requirements confirm
   expect(within(workspace).getByRole("button", { name: "Edit", exact: true })).toBeTruthy();
   expect(within(workspace).getByRole("button", { name: "Approve job description" })).toBeTruthy();
   expect(within(workspace).queryByRole("button", { name: /Open assistant|Continue with assistant/ })).toBeNull();
-  expect(screen.getByRole("dialog", { name: "HireSense supervisor" })).toBeTruthy();
+  expect(chat.getAttribute("aria-hidden")).toBe("true");
+  expect(workspace.getAttribute("data-workflow-ready")).toBe("false");
+  expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+  await act(async () => finishLayout([draft]));
+  await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled());
+  expect((vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts.at(-1) as HTMLElement).id).toBe("job-description-review");
   expect(screen.queryByRole("button", { name: /Confirm requirements|Generate job description/ })).toBeNull();
   expect(vi.mocked(apiRequest).mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1);
 });

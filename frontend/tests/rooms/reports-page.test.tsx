@@ -55,13 +55,13 @@ it("loads the Assessment route through the navbar with the real supervisor provi
 it("calculates only on request and shows background progress in plain words", async () => {
   vi.mocked(apiRequest).mockImplementation(async (path, options) => {
     if (path === "/screening/jobs") return [{ id: 1, title: "Synthetic Engineer" }];
-    if (path === "/assessments/jobs/1/ranking") return options?.method === "POST" ? { ...ranking, status: "processing", stage: "scoring_answers" } : ranking;
+    if (path === "/assessments/jobs/1/ranking") return options?.method === "POST" ? { ...ranking, status: "processing", stage: "calculating_scores" } : ranking;
     throw new Error(`Unexpected test API request: ${path}`);
   });
   render(<MemoryRouter initialEntries={["/interviewer/reports"]}><App /></MemoryRouter>);
   await screen.findByText("Synthetic Candidate");
   fireEvent.click(await screen.findByRole("button", { name: "Calculate final ranking" }));
-  expect(await screen.findByText(/Scoring interview answers/)).toBeTruthy();
+  expect(await screen.findByText(/Combining saved scores/)).toBeTruthy();
   expect((screen.getByRole("button", { name: "Calculating…" }) as HTMLButtonElement).disabled).toBe(true);
   expect(apiRequest).toHaveBeenCalledWith("/assessments/jobs/1/ranking", { method: "POST", body: JSON.stringify({ confirmed: true }) });
 });

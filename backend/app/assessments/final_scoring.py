@@ -3,7 +3,7 @@ from decimal import Decimal, localcontext
 from fractions import Fraction
 import json
 import copy
-from app.agents.interview_analysis import score_pair
+from app.agents.interview_analysis import score_pair, RUBRIC_VERSION
 from app.agents.practical_scoring import POLICY as PRACTICAL_POLICY, result_hash
 
 FORMULA_VERSION = "cv30-interview60-practical10-llm-v4"
@@ -95,15 +95,21 @@ def score_summary(report, source):
                 recomputed = copy.deepcopy(pair)
                 score_pair(recomputed)
                 expected = recomputed["score"]["breakdown"]
+                granular = saved.get("rubric_version") == RUBRIC_VERSION
+                off_topic = granular and saved.get("basis") == "off_topic"
+                if off_topic and not verified.get("off_topic_zero_validated"): raise ValueError()
+                if granular and saved.get("basis") != recomputed["score"].get("basis"): raise ValueError()
                 earned = Fraction(0)
                 for name in DIMENSIONS:
                     item = breakdown[name]
                     value, weight = Fraction(str(item["value"])), Fraction(str(item["weight"]))
-                    if value not in {Fraction(0), Fraction(1, 2), Fraction(1)} or weight != 25: raise ValueError()
+                    if not 0 <= value <= 1 or weight != 25: raise ValueError()
+                    if not granular and value not in {Fraction(0), Fraction(1, 2), Fraction(1)}: raise ValueError()
                     if value != Fraction(str(expected[name]["value"])): raise ValueError()
+                    if granular and (type(item.get("percentage")) is not int or item["percentage"] != expected[name]["percentage"]): raise ValueError()
                     dimension = verified["dimensions"].get(name, {})
-                    if pair["state"] != "unanswered" and not dimension.get("support_validated"): raise ValueError()
-                    if pair["state"] != "unanswered" and name in {"accuracy", "completeness"} and not any(
+                    if pair["state"] != "unanswered" and not off_topic and not dimension.get("support_validated"): raise ValueError()
+                    if pair["state"] != "unanswered" and not off_topic and name in {"accuracy", "completeness"} and not any(
                         report["evidence"][eid]["kind"] in ({"answer_guide", "technical_reference"} if name == "accuracy" else {"answer_guide"}) for eid in dimension.get("evidence_ids", [])):
                         raise ValueError()
                     earned += value

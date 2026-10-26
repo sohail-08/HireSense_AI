@@ -5,10 +5,12 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import selectinload
-from app.agents.interview_analysis import InterviewAnalysisGraph, digest, present_result, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
+from app.agents.interview_analysis import InterviewAnalysisGraph, digest, present_result, score_pair, interview_score_summary, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
 from app.config import get_settings
 from app.database import SessionLocal
 from app.llm.gemini import GeminiStructuredClient
+from app.llm.errors import failure_detail
+from app.agents.interview_scope import SCOPING_VERSION, apply_scoring_scope
 from app.models.interview import InterviewSchedule, InterviewBatch
 from app.models.interview_analysis import InterviewAnalysisControl, InterviewAnalysisRun, InterviewAnalysisReview
 from app.models.scoring import ScoringRun, ScoringConfiguration
@@ -116,13 +118,13 @@ class InterviewAnalysisService:
                 "complete": complete, "gaps": gaps, "watermark": hashes,
                 "expires_at": min((utc(s.expires_at) for s in sessions), default=now()).isoformat(),
                 "provider": "gemini", "model": get_settings().gemini_chat_model, "prompt_version": PROMPT_VERSION,
-                "pairing_version": PAIRING_VERSION, "rubric_version": RUBRIC_VERSION,
+                "pairing_version": PAIRING_VERSION, "rubric_version": RUBRIC_VERSION, "scoping_version": SCOPING_VERSION,
                 "configuration": {"provider_timeout_seconds": 45, "model_attempts": 2, "automatic_interval_seconds": 20}}
 
     @staticmethod
     def input_key(snapshot):
-        return digest({k: snapshot[k] for k in ("watermark", "requirements", "requirement_version", "references", "reference_revision",
-                    "complete", "gaps", "provider", "model", "prompt_version", "pairing_version", "rubric_version", "configuration")})
+        return digest({k: snapshot.get(k) for k in ("watermark", "requirements", "requirement_version", "references", "reference_revision",
+                    "complete", "gaps", "provider", "model", "prompt_version", "pairing_version", "rubric_version", "configuration", "scoping_version")})
 
     def enqueue(self, db, user_id, interview_id, request, *, override=None, correction_reason=None):
         row = InterviewRooms().owned(db, user_id, interview_id, lock=True)
@@ -143,6 +145,11 @@ class InterviewAnalysisService:
         existing = db.scalar(select(InterviewAnalysisRun).where(InterviewAnalysisRun.interview_id == interview_id,
                                                                InterviewAnalysisRun.fingerprint == key))
         if existing:
+            if existing.status == "completed":
+                result = apply_scoring_scope(existing.result, existing.snapshot)
+                for pair in result.get("pairs", []):
+                    score_pair(pair)
+                existing.result = {**result, "score_summary": interview_score_summary(result)}
             db.commit()
             return existing
         old_watermark = previous.snapshot.get("watermark", {}) if previous else {}
@@ -279,6 +286,7 @@ class InterviewAnalysisService:
                 if current["references"] != snapshot["references"] or current["requirement_version"] != snapshot["requirement_version"] or any(current["watermark"].get(i) != h for i, h in snapshot["watermark"].items()):
                     run.status, run.stage = "cancelled", "inputs_changed"
                 else:
+                    result = {**result, "score_summary": interview_score_summary(result)}
                     run.result, run.status, run.stage, run.completed_at = result, "completed", "completed", now()
                 db.commit()
         try:
@@ -290,11 +298,11 @@ class InterviewAnalysisService:
                 db.execute(update(InterviewAnalysisRun).where(InterviewAnalysisRun.id == run_id, InterviewAnalysisRun.status == "processing")
                            .values(status="cancelled", stage="obsolete"))
                 db.commit()
-        except Exception:
+        except Exception as error:
             # Never log exception repr: it may embed transcript text or provider output.
             with self.factory() as db:
                 db.execute(update(InterviewAnalysisRun).where(InterviewAnalysisRun.id == run_id, InterviewAnalysisRun.status == "processing")
-                    .values(status="failed", stage="failed", error="Analysis could not finish. Review the transcript and retry.", completed_at=now()))
+                    .values(status="failed", stage="failed", error=failure_detail(error)["message"], completed_at=now()))
                 db.commit()
 
     def tick(self):
@@ -314,6 +322,7 @@ class InterviewAnalysisService:
                 if latest and any(latest.snapshot.get(key) != value for key, value in {
                     "prompt_version": PROMPT_VERSION, "pairing_version": PAIRING_VERSION,
                     "rubric_version": RUBRIC_VERSION, "model": get_settings().gemini_chat_model,
+                    "scoping_version": SCOPING_VERSION,
                 }.items()):
                     continue
                 try:

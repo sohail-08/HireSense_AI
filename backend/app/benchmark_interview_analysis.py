@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from app.config import get_settings
 from app.llm.gemini import GeminiStructuredClient
-from app.agents.interview_analysis import InterviewAnalysisGraph, digest, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
+from app.agents.interview_analysis import InterviewAnalysisGraph, digest, normalize_support_checks, PROMPT_VERSION, PAIRING_VERSION, RUBRIC_VERSION
 from app.schemas.interview_analysis import Detection, Assessment, Mappings, SupportCheck, FollowUps
 
 
@@ -37,7 +37,8 @@ class ProbeClient(GeminiStructuredClient):
             raise
         schema = {s.__name__: s for s in (Detection, Assessment, Mappings, SupportCheck, FollowUps)}[kwargs["schema"]["title"]]
         try:
-            schema.model_validate(value)
+            schema.model_validate(normalize_support_checks(value, json.loads(kwargs["prompt"])["targets"])
+                                  if schema is SupportCheck else value)
         except Exception:
             self.failure = "Structured output failed schema validation"
             raise

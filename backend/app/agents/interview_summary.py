@@ -63,7 +63,8 @@ def evidence_summary(result, snapshot):
             if name == "completeness": valid = valid and any(r["kind"] == "answer_guide" for r in refs)
             label = item.get("label")
             if valid and label not in {"unreadable", "unanswered", "ambiguous", "not_assessed", "unable_to_verify"}:
-                category = "strengths" if LABEL_VALUES.get(label, 0) == 1 else "weaknesses"
+                marks = (pair.get("score") or {}).get("breakdown", {}).get(name, {}).get("percentage")
+                category = ("strengths" if marks >= 80 else "weaknesses") if marks is not None else "strengths" if LABEL_VALUES.get(label, 0) == 1 else "weaknesses"
                 grouped[category].append((name, item, citations, refs))
         for category, findings in grouped.items():
             if not findings: continue

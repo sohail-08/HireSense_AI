@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.llm.errors import ProviderError
 
 
 PostFunction = Callable[..., httpx.Response]
@@ -46,7 +47,7 @@ class GeminiStructuredClient:
         schema: dict[str, Any],
     ) -> dict[str, Any]:
         if not self.api_key.strip():
-            raise RuntimeError(
+            raise ProviderError("authentication",
                 "GEMINI_API_KEY is not configured in the backend environment"
             )
 
@@ -87,20 +88,23 @@ class GeminiStructuredClient:
                 raise ValueError("Gemini JSON response must be an object")
             return parsed
         except httpx.TimeoutException as exc:
-            raise RuntimeError("Gemini API request timed out") from exc
+            raise ProviderError("timeout", "Gemini API request timed out") from exc
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
             if status_code in {401, 403}:
+                code = "authentication"
                 message = "Gemini API authentication failed; check GEMINI_API_KEY"
             elif status_code == 429:
+                code = "quota"
                 message = "Gemini API quota was exceeded; retry after the quota resets"
             else:
+                code = "unavailable" if status_code >= 500 else "request_rejected"
                 message = f"Gemini API request failed with status {status_code}"
-            raise RuntimeError(message) from exc
+            raise ProviderError(code, message) from exc
         except httpx.HTTPError as exc:
-            raise RuntimeError("Gemini API is unavailable") from exc
+            raise ProviderError("unavailable", "Gemini API is unavailable") from exc
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise RuntimeError(
+            raise ProviderError("invalid_output",
                 "Gemini returned an invalid structured response"
             ) from exc
 

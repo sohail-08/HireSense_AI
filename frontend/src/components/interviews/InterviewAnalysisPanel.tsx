@@ -3,6 +3,7 @@ import { analysisApi, type AnalysisState } from "./analysisApi";
 import { transcriptTime } from "./transcriptionApi";
 import { TranscriptCitation } from "./TranscriptCitation";
 import { EvidenceSummary } from "../assessments/EvidenceSummary";
+import { useSectionReveal } from "../common/useSectionReveal";
 
 const dimensions = ["relevance", "accuracy", "completeness", "quality"] as const;
 const label = (text: string) => text.replaceAll("_", " ");
@@ -22,6 +23,7 @@ function shortReason(reason: string) {
 }
 
 export function InterviewAnalysisPanel({ interviewId }: { interviewId: number }) {
+  const reveal = useSectionReveal();
   const [state, setState] = useState<AnalysisState>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -44,7 +46,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   async function action(work: () => Promise<unknown>, message: string) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
-    try { await work(); setNotice(message); await refresh(); }
+    try { await work(); setNotice(message); await refresh(); if (message.startsWith("Analysis requested") || message === "The latest answer will be scored.") reveal("interview-analysis-results"); }
     catch (e) { setError(e instanceof Error ? e.message : "Analysis action failed."); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -52,9 +54,14 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
   const segments = run?.snapshot.segments || [];
   const source = (ids: string[]) => ids.map(id => segments.find(s => s.id === id)?.text || "Source unavailable").join("\n");
   const gaps = [...new Set(run?.result.gaps || [])];
+  const summary = run?.result.score_summary;
+  const eligible = run?.result.pairs?.filter(pair => !pair.excluded && pair.state !== "excluded") || [];
+  const scoreReady = run?.status === "completed" && !run.stale && (summary ? summary.ready : eligible.length > 0 && eligible.every(pair => !!pair.score) && run.result.reconciled !== false);
+  const incomplete = run?.status === "completed" && eligible.length > 0 && !scoreReady;
+  const issues = [...new Set(eligible.filter(pair => !pair.score).map(pair => pair.analysis_failure?.message || pair.analysis_error || pair.score_unavailable_reason).filter((message): message is string => !!message))];
   return <section id="interview-analysis" aria-label="Private interview analysis" className="hiresense-answer-analysis mt-5 min-w-0 rounded-2xl bg-white p-5 shadow-sm">
     <header className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold tracking-tight text-slate-800">Answer analysis</h2>
-      {run ? <span role="status" className={`rounded-full border px-2.5 py-1 text-xs font-medium ${run.status === "completed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{runLabel(run.status)}</span> : null}</header>
+      {run ? <span role="status" className={`rounded-full border px-2.5 py-1 text-xs font-medium ${scoreReady ? "border-emerald-200 bg-emerald-50 text-emerald-800" : incomplete ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{run.stale && run.status === "completed" ? "Out of date" : run.status === "completed" && !eligible.length ? "No assessment questions" : incomplete ? "Scoring incomplete" : runLabel(run.status)}</span> : null}</header>
     <p className="mt-1 text-sm text-slate-500">Questions, answers and scores from the interview.</p>
     <div className="mt-4 flex flex-wrap items-center gap-3">
       <button className="min-h-10 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy || ["queued", "processing"].includes(run?.status || "")} onClick={() => void action(() => analysisApi.start(interviewId, automatic, false, run?.status === "failed" || !!run?.result.pairs?.some(pair => pair.state === "analysis_failed")), "Analysis requested. Results will update here.")}>Analyze answers</button>
@@ -62,13 +69,19 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
     </div>
     <details className="hiresense-analysis-options mt-3"><summary className="w-fit cursor-pointer text-xs font-semibold text-slate-500">Scoring options</summary><div className="mt-3 space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
       <div className="flex flex-wrap items-center gap-2">{run ? <button className={button} disabled={busy || ["queued", "processing"].includes(run.status)} onClick={() => void action(() => analysisApi.start(interviewId, automatic, false, true), "Analysis requested. Validated scores are kept when their inputs are unchanged.")}>Analyze again</button> : null}{state?.automatic ? <button className={button} disabled={busy} onClick={() => void action(async () => { await analysisApi.start(interviewId, false); setAutomatic(false); }, "Live updates stopped.")}>Stop live updates</button> : null}</div>
-      <p className="text-xs leading-5 text-slate-500">Relevance, accuracy, completeness and quality each count for 25%. Met = 1, partially met = 0.5, unmet = 0.</p>
-      <p className="text-xs leading-5 text-slate-500">Unclear wording or incomplete evidence checks stay unscored. An approved reference is needed for correctness; a failed check is not a zero.</p>
+      <p className="text-xs leading-5 text-slate-500">The AI assigns 0–100 for relevance, accuracy, completeness and quality, using the answer and supporting evidence. Each contributes 25% of the answer score. Badges describe the result; they do not set the marks.</p>
+      <p className="text-xs leading-5 text-slate-500">A verified off-topic answer or no answer earns 0. Partial answers receive proportionate credit. Unclear transcripts and service failures require a retry or verification, not an invented zero. Older saved results retain their original scoring policy until reanalyzed.</p>
     </div></details>
+    <div id="interview-analysis-results" className="workflow-section">
     {error || run?.error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error || run?.error}</p> : null}
-    {notice ? <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p> : null}
-    {run?.stale ? <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">The transcript or reference material has changed. Update the analysis to include it.</p> : null}
+    {notice && (!notice.startsWith("Analysis requested") || !run || ["queued", "processing"].includes(run.status)) ? <p role="status" className="mt-3 text-sm text-emerald-800">{notice}</p> : null}
+    {incomplete && issues.length ? <div role="alert" className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Some answers could not be scored</p>{issues.slice(0, 3).map(message => <p className="mt-1" key={message}>{message}</p>)}</div> : null}
+    {run?.stale ? <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">The transcript, reference material or scoring policy has changed. Analyze answers to update the results.</p> : null}
     {gaps.length ? <div className="mt-3 space-y-1 rounded-xl border border-amber-100 bg-amber-50/70 p-3 text-xs leading-5 text-amber-900">{gaps.map(gap => <p key={gap}>{gap}</p>)}</div> : null}
+    {summary && summary.question_count > 0 && run?.status === "completed" ? <section aria-label="Saved interview score" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50/50 px-4 py-3">
+      <div><h3 className="text-sm font-semibold text-slate-800">Interview score</h3><p className="mt-1 text-xs text-slate-500">{summary.scored_count} of {summary.question_count} questions scored · 60% of the final score</p></div>
+      <div className="text-right"><p className="text-2xl font-bold tabular-nums text-violet-700">{summary.percentage === null ? summary.scored_count > 0 ? "Incomplete" : "Not scored" : `${summary.percentage.toFixed(2)}%`}</p><p className="mt-1 text-xs text-slate-500">{run.stale ? "Out of date — analyze answers again" : summary.ready ? "Saved for final ranking" : "Resolve the unscored answers below, then analyze again"}</p></div>
+    </section> : null}
     {!run ? <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Analyze the saved transcript to see answer scores.</p> : null}
     {run?.result.pairs ? <>
       {run.result.evidence_summary ? <EvidenceSummary value={run.result.evidence_summary} evidence={finding => <>
@@ -76,11 +89,11 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
         {finding.references.map((ref, i) => <figure className="mt-2" key={i}><blockquote className="border-l-2 border-blue-300 pl-2">{ref.quote}</blockquote><figcaption className="mt-1 text-slate-500">{ref.title} · version {ref.version.slice(0, 12)}</figcaption></figure>)}
         <p className="mt-2 text-slate-500">{label(finding.rule)}{finding.source.requirement_id ? ` · Approved requirement ${finding.source.requirement_id} · ${finding.source.version}` : finding.source.state ? ` · ${label(finding.source.state)}` : ""}</p>
       </>} /> : null}
-      <div className="mt-6 mb-3 flex items-center justify-between gap-3"><h3 className="font-semibold text-slate-800">Questions & answers</h3><span className="text-xs text-slate-500">{run.result.pairs.length} {run.result.pairs.length === 1 ? "question" : "questions"}</span></div>
-      {!run.result.pairs.length ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No interview questions were found in the saved transcript yet.</p> : null}
-      <div className="space-y-3">{run.result.pairs.map((pair, index) => {
+      <div className="mt-6 mb-3 flex items-center justify-between gap-3"><h3 className="font-semibold text-slate-800">Questions & answers</h3><span className="text-xs text-slate-500">{eligible.length} {eligible.length === 1 ? "question" : "questions"}</span></div>
+      {!eligible.length ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No job-related interview questions were found in the saved transcript yet.</p> : null}
+      <div className="space-y-3">{eligible.map((pair, index) => {
         const first = segments.find(segment => pair.question_ids.includes(segment.id));
-        return <details key={pair.id} aria-label={`Question ${index + 1}`} className="hiresense-analysis-question overflow-hidden rounded-2xl border border-slate-200 bg-white" open={index === run.result.pairs!.length - 1}>
+        return <details key={pair.id} aria-label={`Question ${index + 1}`} className="hiresense-analysis-question overflow-hidden rounded-2xl border border-slate-200 bg-white" open={index === eligible.length - 1}>
           <summary className="hiresense-analysis-question-summary cursor-pointer"><span aria-hidden="true" className="hiresense-analysis-number">{index + 1}</span><span className="min-w-0 flex-1"><span className="block whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-slate-800">{source(pair.question_ids) || "Question unavailable"}</span><span className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">{first ? <span>{transcriptTime(first.start_offset_ms)}</span> : null}{pairLabel(pair.state) ? <span>{pairLabel(pair.state)}</span> : null}</span></span>
             {pair.score ? <span aria-label={`Answer score ${pair.score.percentage}%`} className="shrink-0 rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-sm font-bold text-blue-700">{pair.score.percentage}%</span> : null}<svg aria-hidden="true" className="hiresense-analysis-chevron h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <div className="border-t border-slate-100 p-4">
@@ -94,7 +107,7 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
               const points = pair.score?.breakdown[dimension];
               const uncertainMeaning = pair.assessment?.interpretation && (pair.assessment.interpretation.status === "uncertain" || pair.assessment.interpretation.support_status !== "supported_by_check");
               const reason = uncertainMeaning ? "Verify the answer’s wording before drawing a conclusion." : points?.reason || item?.justification || "No score explanation is available yet.";
-              return <section aria-label={`${dimension} score`} key={dimension} className="min-w-0 rounded-xl border border-slate-100 bg-white p-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold capitalize text-slate-700">{dimension}</h4><span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${scoreStyle(points?.status || "")}`}>{scoreLabel(points?.status || "")}</span></div><p className="mt-2 text-xs leading-6 text-slate-600">{shortReason(reason)}</p></section>;
+              return <section aria-label={`${dimension} score`} key={dimension} className="min-w-0 rounded-xl border border-slate-100 bg-white p-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold capitalize text-slate-700">{dimension}</h4><span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${scoreStyle(points?.status || "")}`}>{!points && pair.state === "analysis_failed" ? "Scoring error" : scoreLabel(points?.status || "")}</span></div>{points ? <p aria-label={`${dimension} mark`} className="mt-3 text-2xl font-bold tabular-nums text-slate-800">{points.percentage ?? Math.round(points.value * 100)}<span className="text-sm font-medium text-slate-400">/100</span></p> : null}<p className="mt-2 text-xs leading-6 text-slate-600">{shortReason(reason)}</p></section>;
             })}</div> : null}
           </div>
         </details>;
@@ -116,6 +129,6 @@ export function InterviewAnalysisPanel({ interviewId }: { interviewId: number })
           </li>;
         })}</ol></div>
       </details> : null}
-    </> : null}
+    </> : null}</div>
   </section>;
 }

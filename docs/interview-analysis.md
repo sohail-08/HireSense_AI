@@ -25,16 +25,43 @@ candidate captions. Interim text never enters the analysis workflow.
    STT event does not. Use **Score this answer now** for an explicit boundary.
    Transcript gaps and analysis failures remain visible. Unanswered questions receive 0;
    procedural/excluded conversation and unfinished answers are not scored.
+   Greetings, name introductions, audio/video checks, small talk and interview
+   logistics are excluded from cards, counts and the score denominator. A conservative
+   local guard catches known housekeeping phrases (including split ASR segments)
+   before model assessment; obvious housekeeping-only transcripts need no AI calls.
+   The existing turn detector additionally labels job relevance, keeping role-related
+   HR, sales and behavioral competencies while excluding unrelated conversation.
+   Mixed greeting-plus-job questions retain their substantive part. Off-topic candidate
+   replies to real job questions remain answers and can earn zero, not an exclusion.
+   Excluded speech stays in the live transcript and **Other transcript passages**.
+   Older obvious housekeeping pairs are filtered on read without rewriting sources
+   or calling the provider. Scoping policy `job-related-interview-scope-v1` requests
+   explicit reanalysis for persisted updated results; unchanged accepted marks are
+   reused. A deployment does not start paid reanalysis by itself.
 5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
-   accuracy, completeness and quality each weigh 25%. Met earns 1, partially met 0.5,
-   and unmet 0. The percentage is `25 × (relevance + accuracy + completeness + quality)`.
-   Python calculates scores after quote and logical-support validation. Every scored
+   accuracy, completeness and quality each weigh 25%. The LLM assigns an integer
+   0–100 to each dimension using the actual answer, requested scope and cited guides.
+   Python averages the four validated marks. Labels/badges do not choose the marks;
+   two answers with the same labels may legitimately receive different scores.
+   Anchors: 0=no demonstrated credit, 1–39=major gaps/errors, 40–59=limited understanding,
+   60–79=useful but meaningfully incomplete, 80–94=strong with minor gaps, 95–100=fully
+   correct and sufficient for what was asked. Equivalent-quality answers may still tie.
+   Python calculates totals after quote and logical-support validation. Every scored
    criterion needs supported evidence; accuracy and completeness additionally require
    a cited reference (an answer guide for completeness). A failed check, ambiguous
    meaning or missing correctness reference leaves the answer **unscored**, not zero.
-   A supported negative finding or genuinely unanswered question can still earn zero.
+   A supported, unambiguous off-topic finding awards zero to the entire exchange,
+   even if unrelated accuracy/completeness cannot be verified. This policy needs
+   verified relevance and meaning citations, not missing evidence or a provider error.
+   A genuinely unanswered question also scores zero.
    Missing support does not prove a personal claim false. Provider failures remain
    retryable errors; unclear speech is labelled **Wording needs verification**.
+   Evidence validation requests a keyed checklist requiring every dimension,
+   interpretation and requirement-mapping check. Missing or duplicate checks are
+   rejected and retried once with safe validation feedback, never counted as passes.
+   Completed jobs with unscored answers display **Scoring incomplete**, not **Ready**.
+   Provider quota, authentication, timeout and invalid-output failures have safe,
+   actionable messages; raw provider responses and candidate text are not logged.
 6. Question cards show the question, candidate answer, percentage and brief category
    explanations. The per-answer **Evidence & details** expander, cited passages,
    reference quotes and full explanations are no longer rendered here. Saved evidence,
@@ -65,7 +92,9 @@ analysis and question tools are also unchanged.
 
 Known missing-evidence boilerplate is shortened for display without changing scores
 or claiming that missing support proves an answer wrong. Original wording remains
-in saved records. Met earns 1, partially met 0.5, unmet 0, with equal weights.
+in saved records. New dimension cards show precise marks out of 100. Badges describe
+marks (80–100 met, 1–79 partially met, 0 unmet); they never calculate them. Historical
+discrete-rubric scores keep their original 0/0.5/1 calculation until explicit reanalysis.
 
 ## Actual graph and background execution
 
@@ -183,12 +212,26 @@ and source-owned citations, with no extra generative summary call. They distingu
 weaknesses from missing/uncertain evidence. No system can perfectly recover missing or
 misrecognized speech from text alone; human clarification remains necessary in such cases.
 
-Prompt `interview-analysis-v3-context-grounded` and rubric
-`answer-coverage-equal-dimensions-v3-validated` require an explicit new analysis for old
+Prompt `interview-analysis-v4-granular-answer-scores` and rubric
+`answer-quality-continuous-dimensions-v4` require an explicit new analysis for old
 inputs. Historical runs are not rewritten. Recalculate the final ranking afterwards to
 include the new validated scores and summary. The four equal answer-dimension weights
-are unchanged. Final ranking uses CV40/interview60; see the consolidated assessment
+are unchanged. Final ranking uses CV30/interview60/practical10; see the consolidated assessment
 documentation for the versioned formula. No database migration or new dependency is needed.
+
+## Score once, rank from saved results
+
+**Analyze answers** persists both the validated per-question scores and an exact
+interview-score aggregate. The console shows that percentage and how many questions
+were scored. Missing/failed evidence is never converted to zero, and provisional or
+stale analyses are labelled rather than presented as final.
+
+**Calculate final ranking** never queues or retries interview analysis. It combines
+the saved interview/CV/practical scores locally, completing deterministic report
+aggregation inline instead of waiting for worker ticks per candidate. Candidates
+without current completed analysis remain unranked with an instruction to use
+**Analyze answers** first. Repeated unchanged calculations reuse the saved ranking.
+Reference, transcript and scoring-policy changes invalidate ranking readiness.
 
 Follow-ups cite their triggering question/answer passages, name requirements and explain
 their purpose and priority. History is passed to generation and a normalized similarity

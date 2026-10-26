@@ -44,7 +44,7 @@ export function WorkSamplePanel({ interviewId, closed = false, refreshKey = 0, o
   const editing = !exercise || exercise.status === "draft";
   const change = (value: ExerciseTask) => { dirty.current = true; setTask(value); };
   const action = (name: string) => exercise && perform(async () => { accept(await workSampleApi.action(interviewId, exercise.version, name, reason)); setReason(""); });
-  return <section aria-label="Live work-sample studio" className="min-w-0 space-y-5 p-4 sm:p-5">
+  return <section id="practical-exercise" aria-label="Live work-sample studio" className="workflow-section min-w-0 space-y-5 p-4 sm:p-5">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-700">Live practical task</p><h2 className="mt-1 text-lg font-bold text-slate-900">Practical exercise</h2><p className="mt-1 text-sm text-slate-500">One submission · up to 15 minutes · AI scores, interviewer approves</p></div><div className="flex flex-wrap gap-2">{exercise ? <span className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-800">{exerciseLabel(exercise.status)}</span> : null}{state ? <ExerciseClock state={state} /> : null}</div></header>
     {error ? <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
     {notice ? <p role="status" className="rounded-xl bg-teal-50 p-3 text-sm text-teal-800">{notice}</p> : null}

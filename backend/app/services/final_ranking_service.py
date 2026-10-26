@@ -3,8 +3,10 @@ import copy
 from datetime import datetime
 from uuid import uuid4
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.agents.interview_analysis import digest, PROMPT_VERSION, RUBRIC_VERSION, PAIRING_VERSION
+from app.agents.interview_scope import SCOPING_VERSION, apply_scoring_scope
 from app.assessments.sources import resolve_sources
 from app.assessments.final_scoring import FORMULA_VERSION, POLICY, rank_reports
 from app.models.assessment import AssessmentComparison, AssessmentRun
@@ -12,7 +14,6 @@ from app.models.candidate import CandidateApplication
 from app.models.job import JobPosting, JobDescription
 from app.models.interview_analysis import InterviewAnalysisRun
 from app.schemas.assessment import GenerateAssessment
-from app.schemas.interview_analysis import StartAnalysis
 from app.services.assessment_service import AssessmentService, unexpired
 from app.services.interview_analysis import InterviewAnalysisService
 from app.services.application_identity import current_application_ids
@@ -33,6 +34,7 @@ def needs_answer_scoring(result, rubric):
 class FinalRankingService:
     def __init__(self, session_factory=None):
         self.factory = session_factory or SessionLocal
+        self.request_bound_factory = session_factory is None
 
     @staticmethod
     def owned_job(db, user_id, job_id, lock=False):
@@ -48,24 +50,44 @@ class FinalRankingService:
             .order_by(AssessmentComparison.id.desc()))
         return next((r for r in rows if r.snapshot.get("kind") == "final_ranking" and unexpired(r)), None)
 
+    def answer_readiness(self, db, user_id, sources):
+        """Read saved analysis readiness only. Ranking never requests model work."""
+        analyses = InterviewAnalysisService(session_factory=self.factory)
+        result = []
+        for source in sources:
+            for interview in source["interviews"]:
+                response = analyses.read(db, user_id, interview["id"])
+                item = response["run"]
+                raw = db.get(InterviewAnalysisRun, item["id"]) if item else None
+                result.append({"application_id": source["identification"]["application_id"], "interview_id": interview["id"],
+                    "run_id": item["id"] if item else None, "status": item["status"] if item else "missing",
+                    "stale": bool(item and item["stale"]), "scored": bool(raw and not needs_answer_scoring(apply_scoring_scope(raw.result, raw.snapshot), raw.snapshot.get("rubric_version")))})
+        return result
+
     def start(self, db, user_id, job_id):
+        if self.request_bound_factory:
+            # Honor the caller's database binding for inline aggregation, including
+            # injected request sessions and isolated tests.
+            bind = db.get_bind()
+            self.factory = lambda: Session(bind, expire_on_commit=False)
         self.owned_job(db, user_id, job_id, lock=True)
         previous = self.latest(db, job_id)
         if previous and previous.snapshot["status"] == "processing":
+            db.commit()
+            self.advance(previous.id)
+            db.expire_all()
             return self.read(db, user_id, job_id)
         ids = current_application_ids(db, job_id)
         if not ids: raise ValueError("No candidates have applied for this job yet.")
         sources = [resolve_sources(db, user_id, app_id, GenerateAssessment()) for app_id in ids]
-        fingerprint = digest([FORMULA_VERSION, self.scoring_policy(), [source_identity(s) for s in sources]])
+        readiness = self.answer_readiness(db, user_id, sources)
+        fingerprint = digest([FORMULA_VERSION, self.scoring_policy(), [source_identity(s) for s in sources], readiness])
         existing = db.scalar(select(AssessmentComparison).where(AssessmentComparison.job_posting_id == job_id,
             AssessmentComparison.fingerprint == fingerprint))
         if existing and unexpired(existing):
             # An explicit retry after failed processing gets a new durable attempt.
-            retry_sources = any(i["finalized"] and i["segments"] and (not i["analysis"] or
-                needs_answer_scoring(i["analysis"]["result"], i["analysis"]["rubric_version"]))
-                for s in sources for i in s["interviews"])
             failed_report = any(r.get("status") == "failed" for r in existing.snapshot.get("assessments", []))
-            if existing.snapshot.get("status") != "failed" and not retry_sources and not failed_report:
+            if existing.snapshot.get("status") != "failed" and not failed_report:
                 return self.present(db, user_id, existing)
         if existing:
             fingerprint = digest([fingerprint, uuid4().hex])
@@ -73,7 +95,8 @@ class FinalRankingService:
         plans = [{"application_id": s["identification"]["application_id"], "interview_ids": [i["id"] for i in s["interviews"]],
             "scoring_run_id": (s.get("cv") or {}).get("scoring_run_id"), "analysis_ids": [], "analysis_requested": False,
             "assessment_id": None} for s in sources]
-        snapshot = {"kind": "final_ranking", "status": "processing", "stage": "scoring_answers", "policy": POLICY,
+        snapshot = {"kind": "final_ranking", "status": "processing", "stage": "calculating_scores", "policy": POLICY,
+            "analysis_readiness": readiness,
             "scoring_policy": self.scoring_policy(),
             "basis": "Final candidate ranking", "formula_version": FORMULA_VERSION, "plans": plans,
             "selected_cohort_application_ids": ids, "source_interview_ids": [i for p in plans for i in p["interview_ids"]],
@@ -83,7 +106,9 @@ class FinalRankingService:
             created_by=user_id, expires_at=min(expiry) if expiry else None)
         db.add(row)
         db.commit()
-        return self.present(db, user_id, row)
+        self.advance(row.id)
+        db.expire_all()
+        return self.present(db, user_id, db.get(AssessmentComparison, row.id))
 
     def read(self, db, user_id, job_id):
         self.owned_job(db, user_id, job_id)
@@ -95,7 +120,7 @@ class FinalRankingService:
             source = resolve_sources(db, user_id, app_id, GenerateAssessment())
             candidates.append({"application_id": app_id, "candidate_name": source["identification"]["candidate_name"],
                 "cv_score": (source.get("cv") or {}).get("final_score"), "interview_score": None, "practical_score": None, "final_score": None,
-                "final_rank": None, "assessment_id": None, "reason": "Calculate the final ranking to score interview answers."})
+                "final_rank": None, "assessment_id": None, "reason": "Use Analyze answers in the interview console, then calculate the final ranking from saved scores."})
         return {"id": None, "status": "not_started", "stage": "not_started", "policy": POLICY, "candidates": candidates,
             "stale": False, "incompatibilities": []}
 
@@ -107,9 +132,11 @@ class FinalRankingService:
         candidates = []
         saved = {r["application_id"]: r for r in snapshot.get("assessments", [])}
         service = AssessmentService(session_factory=self.factory)
+        current_sources = []
         for plan in snapshot["plans"]:
             app_id = plan["application_id"]
             current = resolve_sources(db, user_id, app_id, GenerateAssessment())
+            current_sources.append(current)
             item = saved.get(app_id)
             if item and plan.get("assessment_id"):
                 run = service.owned_run(db, user_id, plan["assessment_id"])
@@ -121,13 +148,14 @@ class FinalRankingService:
                 "final_rank": (item or {}).get("final_rank"), "assessment_id": plan.get("assessment_id"),
                 "reason": summary.get("reason", plan.get("error", "Interview not scored yet"))})
         candidates.sort(key=lambda c: (c["final_rank"] is None, c["final_rank"] or 0, c["application_id"]))
+        stale = stale or self.answer_readiness(db, user_id, current_sources) != snapshot.get("analysis_readiness")
         return {"id": row.id, "status": snapshot["status"], "stage": snapshot["stage"], "policy": snapshot.get("policy", POLICY),
             "candidates": candidates, "stale": stale, "incompatibilities": snapshot.get("incompatibilities", []),
             "error": snapshot.get("error")}
 
     @staticmethod
     def scoring_policy():
-        return {"prompt": PROMPT_VERSION, "rubric": RUBRIC_VERSION, "pairing": PAIRING_VERSION}
+        return {"prompt": PROMPT_VERSION, "rubric": RUBRIC_VERSION, "pairing": PAIRING_VERSION, "scoping": SCOPING_VERSION, "ranking_flow": "saved-scores-only-v1"}
 
     def tick(self):
         with self.factory() as db:
@@ -143,36 +171,28 @@ class FinalRankingService:
             if not row or not unexpired(row) or row.snapshot.get("status") != "processing": return
             snapshot = copy.deepcopy(row.snapshot)
             try:
-                analyses = InterviewAnalysisService(session_factory=self.factory)
                 assessments = AssessmentService(session_factory=self.factory)
                 waiting = False
                 for plan in snapshot["plans"]:
-                    if not plan["analysis_requested"]:
-                        source = resolve_sources(db, row.created_by, plan["application_id"], GenerateAssessment(
-                            scoring_run_id=plan["scoring_run_id"], interview_ids=plan["interview_ids"]))
-                        for interview in source["interviews"]:
-                            if not interview["finalized"] or not interview["segments"]: continue
-                            response = analyses.read(db, row.created_by, interview["id"])
-                            previous = response["run"]
-                            raw = db.get(InterviewAnalysisRun, previous["id"]) if previous else None
-                            retry = bool(previous and (previous["status"] in {"failed", "cancelled"} or
-                                (previous["status"] == "completed" and needs_answer_scoring(raw.result, raw.snapshot.get("rubric_version")))))
-                            if not previous or previous["stale"] or retry:
-                                run = analyses.enqueue(db, row.created_by, interview["id"], StartAnalysis(automatic=False, reanalyze=retry))
-                                plan["analysis_ids"].append(run.id)
-                            else:
-                                plan["analysis_ids"].append(previous["id"])
-                        plan["analysis_requested"] = True
-                        row.snapshot = copy.deepcopy(snapshot)
-                        db.commit()
-                    if any(db.get(InterviewAnalysisRun, i) is None for i in plan["analysis_ids"]):
-                        raise LookupError("The selected analysis was deleted")
-                    if any(db.get(InterviewAnalysisRun, i).status in {"queued", "processing"} for i in plan["analysis_ids"]):
-                        waiting = True
-                        continue
+                    source = resolve_sources(db, row.created_by, plan["application_id"], GenerateAssessment(
+                        scoring_run_id=plan["scoring_run_id"], interview_ids=plan["interview_ids"]))
+                    ready = self.answer_readiness(db, row.created_by, [source])
+                    plan["analysis_ids"], plan["error"] = [], None
+                    if not source["interviews"]:
+                        plan["error"] = "Complete the interview and use Analyze answers in its console first."
+                    for interview, status in zip(source["interviews"], ready):
+                        if not interview["finalized"] or not interview["segments"]:
+                            plan["error"] = "Finalize the transcript and use Analyze answers in the interview console first."
+                        elif status["status"] in {"queued", "processing"}:
+                            plan["error"] = "Answer analysis is still running. Wait for it to finish, then calculate the ranking again."
+                        elif status["status"] != "completed" or status["stale"] or not status["scored"]:
+                            plan["error"] = "Use Analyze answers in the interview console to save a current interview score first."
+                        else:
+                            plan["analysis_ids"].append(status["run_id"])
+                    plan["analysis_requested"] = True  # Legacy durable plan field; no analysis is enqueued.
                     if not plan["assessment_id"]:
                         request = GenerateAssessment(scoring_run_id=plan["scoring_run_id"], interview_ids=plan["interview_ids"],
-                            analysis_run_ids=plan["analysis_ids"] or None)
+                            analysis_run_ids=plan["analysis_ids"] if plan["analysis_ids"] and not plan["error"] else None)
                         report = assessments.enqueue(db, row.created_by, plan["application_id"], request)
                         if report.status == "failed":
                             report = assessments.enqueue(db, row.created_by, plan["application_id"], request.model_copy(update={"new_version": True}))
@@ -182,12 +202,23 @@ class FinalRankingService:
                         db.commit()
                     report = db.get(AssessmentRun, plan["assessment_id"])
                     if report is None: raise LookupError("The selected report was deleted")
+                    if report.status == "queued":
+                        # Report aggregation is deterministic and model-free. Complete
+                        # it here instead of waiting for one worker tick per candidate.
+                        db.commit()
+                        assessments.process(report.id)
+                        db.expire_all()
+                        row = db.get(AssessmentComparison, row_id)
+                        report = db.get(AssessmentRun, plan["assessment_id"])
                     if report.status in {"queued", "processing"}: waiting = True
-                snapshot["stage"] = "scoring_answers" if any(
-                    db.get(InterviewAnalysisRun, i).status in {"queued", "processing"} for p in snapshot["plans"] for i in p["analysis_ids"]
-                ) else "calculating_scores"
+                snapshot["stage"] = "calculating_scores"
                 if not waiting:
                     reports = [assessments.read(db, row.created_by, p["assessment_id"]) for p in snapshot["plans"]]
+                    for plan, report in zip(snapshot["plans"], reports):
+                        if report["status"] == "failed" and not plan.get("error"):
+                            plan["error"] = "Saved scores could not be combined. Check the sources and calculate the ranking again."
+                        if plan.get("error"):
+                            report["result"].setdefault("score_summary", {}).update(ready=False, interview_score=None, final_score=None, reason=plan["error"])
                     ordered, issue = rank_reports(reports)
                     snapshot.update(status="completed", stage="completed", assessments=ordered,
                         assessment_ids=[r["id"] for r in ordered], incompatibilities=[issue] if issue else [],

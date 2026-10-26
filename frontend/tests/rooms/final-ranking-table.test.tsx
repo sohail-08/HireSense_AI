@@ -59,7 +59,8 @@ it("opens the correct assessment and disables details when scoring is unfinished
   expect(open).toHaveBeenCalledWith(1, 100);
   view.rerender(<FinalRankingTable ranking={{ ...ranking, status: "processing", stage: "scoring_answers" }} onDetails={open} />);
   expect((screen.getByRole("button", { name: "View details for Candidate 1" }) as HTMLButtonElement).disabled).toBe(true);
-  expect(screen.getByText(/Scoring interview answers/)).toBeTruthy();
+  expect(screen.getByText(/Combining saved scores/)).toBeTruthy();
+  expect(screen.queryByText(/Scoring interview answers/)).toBeNull();
 });
 
 it("keeps stale-result warnings and incompatible evidence visible", () => {

@@ -384,10 +384,14 @@ class InterviewService:
         db.commit()
         return self.batch(db, user_id, item.batch_id)
 
-    def schedules(self, db, user_id):
+    def schedules(self, db, user_id, *, job_posting_id=None):
         self.actor(db, user_id)
+        query = select(InterviewSchedule).where(InterviewSchedule.created_by_user_id == user_id)
+        if job_posting_id is not None:
+            self.job(db, user_id, job_posting_id)
+            query = query.where(InterviewSchedule.job_posting_id == job_posting_id)
         items = []
-        for schedule in db.scalars(select(InterviewSchedule).where(InterviewSchedule.created_by_user_id == user_id).order_by(InterviewSchedule.start_utc, InterviewSchedule.id)):
+        for schedule in db.scalars(query.order_by(InterviewSchedule.start_utc, InterviewSchedule.id)):
             application = db.get(CandidateApplication, schedule.application_id)
             candidate = db.get(Candidate, application.candidate_id) if application and application.candidate_id else None
             job = self.job(db, user_id, schedule.job_posting_id)

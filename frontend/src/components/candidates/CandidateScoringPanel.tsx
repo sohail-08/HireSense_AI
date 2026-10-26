@@ -7,6 +7,7 @@ import { RankingPagination } from "./RankingPagination";
 import { displayPercent, scoredEvidenceRequirements, weightUnits } from "./scoringDisplay";
 import { RequirementEvidence, type EvidenceRequirement } from "./RequirementEvidence";
 import { formatDateTime } from "../../utils/dateTime";
+import { useSectionReveal } from "../common/useSectionReveal";
 
 type Category = "technical" | "experience" | "qualification";
 type Weights = Record<Category, string>;
@@ -90,6 +91,7 @@ type Props = {
 };
 
 export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, pendingCount, processing, ready, progress, processingError, failedCount = 0, onScreenPending, jobSelector }: Props) {
+  const reveal = useSectionReveal();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [proposal, setProposal] = useState<Proposal>();
@@ -186,6 +188,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         setRun(saved);
         setNotice("Ranking updated.");
       }
+      reveal("cv-ranking-results");
     } catch (failure) {
       waitingForConfiguration.current = undefined;
       setNotice(undefined);
@@ -206,7 +209,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
   useEffect(() => { setPage(value => Math.min(value, pages)); }, [pages]);
 
   return <>
-    <section aria-labelledby="ranking-title" className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section id="cv-screening" aria-labelledby="ranking-title" className="workflow-section mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-4 py-4 sm:px-5">
         <div><h2 id="ranking-title" className="text-lg font-semibold text-slate-900">Candidate ranking</h2>
           <p className="mt-1 text-sm text-slate-500">See how closely each CV matches the job.</p></div>
@@ -233,6 +236,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
         {missingCategories.length ? <p className="mt-2 text-sm text-amber-800">{missingCategories.map((category) => categoryLabels[category]).join(", ") + ": no matching job requirements. Set this weight to 0% and add the difference to the other categories."}</p> : null}
         {!applicationCount ? <p className="mt-3 text-sm text-slate-500">No candidates have applied for this job yet.</p> : null}
       </> : null}
+      <div id="cv-ranking-results" className="workflow-section">
       {processing ? <p role="status" className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{progress ?? "Preparing candidate CVs and ranking…"}</p>
         : notice && !processingError ? <p role="status" className={"mt-4 rounded-xl p-3 text-sm " + (failedCount ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
           {failedCount ? `Ranking incomplete: ${run?.results.length ?? 0} candidate${run?.results.length === 1 ? "" : "s"} ranked. ${failedCount} CV${failedCount === 1 ? " could" : "s could"} not be processed and ${failedCount === 1 ? "has" : "have"} not been scored.` : notice}</p> : null}
@@ -254,6 +258,7 @@ export function CandidateScoringPanel({ jobId, refreshToken, applicationCount, p
       </p>}
       <RankingPagination count={ranked.length} page={currentPage} pageSize={pageSize} loading={loading} onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1); }} />
       {run ? <p className="mt-3 text-xs text-slate-400">Last updated {formatDateTime(run.created_at)} · Scores reflect the CV, not a final hiring decision.</p> : null}
+      </div>
       </div>
     </section>
     {evidence ? <EvidenceModal key={evidence.id} result={evidence} restoreFocus={evidenceTrigger.current} onClose={closeEvidence} /> : null}

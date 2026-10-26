@@ -47,6 +47,17 @@ test("a failed task creation does not navigate or consume the suggestion", async
   expect(open).not.toHaveBeenCalled();
   expect((screen.getByRole("button", { name: "Use this task" }) as HTMLButtonElement).disabled).toBe(false);
 });
+
+test("opens answer analysis only for a newly requested analysis, not restored history", async () => {
+  const saved = { role: "assistant" as const, content: "Saved analysis", questions: [], sources: [], analysis_run_id: 4 };
+  api.mockResolvedValueOnce({ ...context, messages: [saved] }).mockResolvedValueOnce({ ...context, version: 1, messages: [saved, { ...saved, analysis_run_id: 5, content: "Analysis requested" }] });
+  const open = vi.fn();
+  render(<InterviewCopilotPanel interviewId={12} activeTab="assistant" onOpenAnalysis={open} />);
+  await screen.findByText("Saved analysis"); expect(open).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Ask the interview assistant"), { target: { value: "Analyze the answers" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  await waitFor(() => expect(open).toHaveBeenCalledOnce());
+});
 test("shows saved candidate details and requests cited questions for this interview", async () => {
   api.mockResolvedValueOnce(context).mockResolvedValueOnce({ ...context, version: 1, messages: [{ role: "assistant", content: "Try this question.",
     questions: [{ question: "How do you manage React state?", requirement: "React", source_ids: [7] }],
