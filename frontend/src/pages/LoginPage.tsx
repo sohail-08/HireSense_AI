@@ -128,10 +128,6 @@ export function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 border-t border-slate-100 pt-5 text-center text-xs leading-5 text-slate-500">
-          <span className="block font-semibold text-slate-700">Joining as a candidate?</span>
-          Open the private interview link from your invitation. No account or sign-in is needed.
-        </p>
       </section>
     </main>
   );

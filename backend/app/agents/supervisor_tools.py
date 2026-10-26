@@ -183,8 +183,9 @@ def build_supervisor_tools(
         """Select ranked candidates, collect interview times, preview invitations, explicitly confirm sending, or reschedule through MCP tools.
 
         Use at every page/phase for scheduling and invitation requests, or follow-ups
-        while an interview selection/schedule/confirmation is pending. Pass the real
-        interviewer message. Do not invent candidates, recipients or confirmation.
+        while an interview selection/schedule/confirmation is pending.
+        Named candidates are supported; do not require a ranking cutoff for a name.
+        Pass the complete interviewer message. Do not invent candidates, recipients or confirmation.
         """
         if not callbacks.interviews:
             raise ValueError("Interview scheduling is unavailable")

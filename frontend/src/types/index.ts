@@ -211,6 +211,7 @@ export interface SupervisorChatResponse {
   sync_result: GoogleFormsSyncResult | null;
   screening_batch: ScreeningBatch | null;
   interview_batch_id?: number | null;
+  interview_selection?: { job_posting_id: number; application_ids: number[] } | null;
   assessment_links?: { label: string; path: string }[];
 }
 

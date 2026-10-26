@@ -29,6 +29,7 @@ it("maps structured job, screening, scheduling and report outcomes to explicit d
   expect(workflowDestination(reply({ route: "job_posting", job_description: { ...draft!, status: "approved" } }))).toEqual({ path: "/interviewer/jobs", section: "job-publication" });
   expect(workflowDestination(reply({ route: "screen_candidates", screening_batch: { job_posting_id: 22 } as any }), 11)).toEqual({ path: "/interviewer/assessments?job=22", section: "cv-screening" });
   expect(workflowDestination(reply({ route: "interviews", phase: "interview_schedule" }))).toEqual({ path: "/interviewer/schedule-interviews", section: "interview-candidates" });
+  expect(workflowDestination(reply({ route: "interviews", phase: "interview_schedule", interview_selection: { job_posting_id: 22, application_ids: [7] } }), 11)).toEqual({ path: "/interviewer/schedule-interviews?job=22", section: "interview-candidates" });
   expect(workflowDestination(reply({ route: "interviews", phase: "interview_sent" }))).toEqual({ path: "/interviewer/interviews", section: "interview-list" });
   expect(workflowDestination(reply({ route: "sync_responses", sync_result: {} as any }))).toEqual({ path: "/interviewer/candidates", section: "candidate-list" });
   expect(workflowDestination(reply({ route: "candidate_assessments", assessment_links: [{ label: "Report", path: "/interviewer/reports?run=5&application=7&ignored=1" }] }))).toEqual({ path: "/interviewer/reports?application=7&run=5", section: "assessment-details" });

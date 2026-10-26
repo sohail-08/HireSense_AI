@@ -42,6 +42,14 @@ it("loads only the latest ranking and never sends invitations on entry", async (
   expect(vi.mocked(apiRequest).mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
+it("reveals a named candidate on another list page after the assistant's navigation", async () => {
+  render(<MemoryRouter initialEntries={[{ pathname: "/interviewer/schedule-interviews", search: "?job=1",
+    state: { interviewSelection: { job_posting_id: 1, application_ids: [12] } } }]}><ScheduleInterviewsPage /></MemoryRouter>);
+  await waitFor(() => expect((screen.getByRole("checkbox", { name: "Select Candidate 12 for interview" }) as HTMLInputElement).checked).toBe(true));
+  expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+  expect(supervisor.setSelectedApplicationIds).toHaveBeenLastCalledWith([12]);
+});
+
 it("keeps candidate selections across pages and passes them to scheduling and the chatbot", async () => {
   open();
   fireEvent.click(await screen.findByRole("checkbox", { name: "Select Candidate 1 for interview" }));

@@ -21,7 +21,7 @@ export function workflowDestination(value: SupervisorChatResponse, selectedJob?:
     case "interviews":
       return ["interview_sent", "interview_reschedule"].includes(value.phase)
         ? { path: "/interviewer/interviews", section: "interview-list" }
-        : { path: `/interviewer/schedule-interviews${jobQuery}`, section: "interview-candidates" };
+        : { path: `/interviewer/schedule-interviews${value.interview_selection ? `?job=${value.interview_selection.job_posting_id}` : jobQuery}`, section: "interview-candidates" };
     case "candidate_assessments": {
       const links = value.assessment_links ?? [];
       if (!links.length) return;

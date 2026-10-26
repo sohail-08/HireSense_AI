@@ -23,7 +23,8 @@ beforeEach(() => {
 it.each(["/login", "/register", "/candidate", "/candidate/dashboard", "/candidate/interviews"])("shows interviewer sign-in instead of signup/account pages at %s", async path => {
   open(path);
   await screen.findByRole("heading", { name: "Interviewer sign in" });
-  expect(screen.getByText(/No account or sign-in is needed/)).toBeTruthy();
+  expect(screen.queryByText("Joining as a candidate?")).toBeNull();
+  expect(screen.queryByText(/Open the private interview link from your invitation/)).toBeNull();
   expect(screen.queryByRole("link", { name: /Create an account|Sign up/ })).toBeNull();
   expect(screen.queryByRole("heading", { name: "Candidate dashboard" })).toBeNull();
   expect(apiRequest).not.toHaveBeenCalled();

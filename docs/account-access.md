@@ -15,8 +15,8 @@ origin checks, rate limits, candidate privacy and room authorization are unchang
 
 The frontend no longer includes a signup page, candidate account dashboard or
 candidate account navigation. Old `/register` and `/candidate/*` bookmarks redirect
-to the interviewer login page, which explains that candidates should use their
-invitation link. They do not redirect into a public candidate dashboard. Legacy
+to the interviewer login page, which contains only interviewer sign-in guidance.
+They do not redirect into a public candidate dashboard. Legacy
 candidate JWTs are not restored as web sign-ins; a candidate response from an older
 server is also rejected and its stored web token cleared.
 

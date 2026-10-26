@@ -60,6 +60,11 @@ class SupervisorChatRequest(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
+class InterviewSelectionState(BaseModel):
+    job_posting_id: int = Field(gt=0)
+    application_ids: list[int] = Field(default_factory=list, max_length=100)
+
+
 class SupervisorChatResponse(BaseModel):
     session_id: str
     phase: SupervisorPhase
@@ -75,4 +80,5 @@ class SupervisorChatResponse(BaseModel):
     sync_result: GoogleFormsSyncResponse | None = None
     screening_batch: ScreeningBatchResponse | None = None
     interview_batch_id: int | None = None
+    interview_selection: InterviewSelectionState | None = None
     assessment_links: list[dict[str, str]] = Field(default_factory=list)

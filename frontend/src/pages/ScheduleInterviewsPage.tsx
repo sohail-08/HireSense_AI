@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../api/apiClient";
 import { useSupervisor } from "../components/assistant/SupervisorProvider";
 import { JobPostingSelect } from "../components/candidates/JobPostingSelect";
@@ -15,6 +15,8 @@ type Candidate = { id: number; application_id: number; candidate_name: string; r
 type Ranking = { id: number; job_posting_id: number; status: string; results: Candidate[] };
 
 export function ScheduleInterviewsPage() {
+  const location = useLocation();
+  const appliedSelection = useRef<string | undefined>(undefined);
   const [params] = useSearchParams();
   const requestedJob = Number(params.get("job"));
   const appliedJob = useRef(0);
@@ -104,6 +106,20 @@ export function ScheduleInterviewsPage() {
   const count = (group: SchedulingFilter) => ranked.filter(candidate => schedulingStatus(schedules.get(candidate.application_id)).group === group).length;
   const selectedJob = jobs.find(job => job.id === jobId);
   const canSchedule = activeRanking?.status === "completed" && ranked.some(candidate => candidate.rank !== null);
+
+  // Apply only the latest chat-triggered navigation, after both async reads.
+  // Polls/restored chat history must not overwrite manual checkbox changes.
+  useEffect(() => {
+    const selection = (location.state as { interviewSelection?: { job_posting_id: number; application_ids: number[] } } | null)?.interviewSelection;
+    if (!selection || appliedSelection.current === location.key || selection.job_posting_id !== jobId
+      || !activeRanking || !statusesKnown || loadingSchedules || loadingRanking) return;
+    appliedSelection.current = location.key;
+    const ids = selection.application_ids.filter(id => ranked.some(candidate => candidate.application_id === id && candidate.rank !== null)
+      && (!schedules.has(id) || !blocksInvitation(schedules.get(id)!)));
+    setSelectedIds(ids); setStatusFilter("all");
+    const index = ranked.findIndex(candidate => ids.includes(candidate.application_id));
+    setPage(index < 0 ? 1 : Math.floor(index / pageSize) + 1);
+  }, [location.key, location.state, jobId, activeRanking, statusesKnown, loadingSchedules, loadingRanking, pageSize]);
 
   return <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
     <header className="flex flex-wrap items-start justify-between gap-4">

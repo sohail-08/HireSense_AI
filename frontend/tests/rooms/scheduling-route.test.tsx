@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import App from "../../src/App";
@@ -13,6 +13,7 @@ vi.mock("../../src/auth/AuthProvider", () => ({
   dashboardPath: () => `/${auth.role}/dashboard`,
 }));
 vi.mock("../../src/components/common/ApplicationNotifications", () => ({ ApplicationNotifications: () => null }));
+vi.mock("../../src/pages/InterviewerDashboard", () => ({ InterviewerDashboard: () => <h1>Hiring dashboard</h1> }));
 
 beforeEach(() => {
   auth.role = "interviewer"; sessionStorage.clear(); vi.clearAllMocks();
@@ -54,6 +55,52 @@ it("provides the new page's job and candidate selection to the central assistant
   await waitFor(() => expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path === "/supervisor/chat")).toBe(true));
   const chat = vi.mocked(apiRequest).mock.calls.find(([path]) => path === "/supervisor/chat");
   expect(JSON.parse(chat![1]!.body as string)).toMatchObject({ page_context: "interviews", selected_job_posting_id: 1, selected_application_ids: [7] });
+});
+
+it("checks the assistant's named selection once without overwriting later manual changes", async () => {
+  const original = vi.mocked(apiRequest).getMockImplementation()!;
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => path === "/supervisor/chat" ? {
+    session_id: "named-selection", route: "interviews", phase: "interview_schedule", outcome: "info",
+    assistant_message: "Selected Synthetic Candidate. Please provide a date and time.", messages: [], refresh_required: false,
+    interview_selection: { job_posting_id: 1, application_ids: [7] },
+  } : original(path, options));
+  render(<MemoryRouter initialEntries={["/interviewer/schedule-interviews"]}><App /></MemoryRouter>);
+  const checkbox = await screen.findByRole("checkbox", { name: "Select Synthetic Candidate for interview" }) as HTMLInputElement;
+  expect(checkbox.checked).toBe(false);
+  const input = screen.getByLabelText("Message HireSense assistant");
+  fireEvent.change(input, { target: { value: "schedule interview with Synthetic Candidate" } });
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(checkbox.checked).toBe(true));
+  expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path.includes("/confirm"))).toBe(false);
+  fireEvent.click(checkbox);
+  expect(checkbox.checked).toBe(false);
+  fireEvent.focus(window);
+  await waitFor(() => expect(vi.mocked(apiRequest).mock.calls.filter(([path]) => path === "/interviews/schedules?job_posting_id=1").length).toBeGreaterThan(1));
+  expect(checkbox.checked).toBe(false);
+});
+
+it("waits for the named job's ranking and statuses before selecting, and never selects blocked candidates", async () => {
+  const original = vi.mocked(apiRequest).getMockImplementation()!;
+  let finishStatuses!: (value: unknown) => void;
+  vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+    if (path === "/supervisor/chat") return { session_id: "named-selection", route: "interviews", phase: "interview_schedule", outcome: "info", messages: [],
+      interview_selection: { job_posting_id: 1, application_ids: [7, 8] } };
+    if (path === "/interviews/schedules?job_posting_id=1") return new Promise(resolve => { finishStatuses = resolve; });
+    if (path === "/scoring/runs/10") return { id: 10, job_posting_id: 1, status: "completed", results: [
+      { id: 1, application_id: 7, rank: 1, display_score: "85.00", candidate_name: "Synthetic Candidate" },
+      { id: 2, application_id: 8, rank: 2, display_score: "80.00", candidate_name: "Already Scheduled" },
+    ] };
+    return original(path, options);
+  });
+  render(<MemoryRouter initialEntries={["/interviewer/dashboard"]}><App /></MemoryRouter>);
+  const input = screen.getByLabelText("Message HireSense assistant");
+  fireEvent.change(input, { target: { value: "schedule Synthetic Candidate" } }); fireEvent.submit(input.closest("form")!);
+  const checkbox = await screen.findByRole("checkbox", { name: "Select Synthetic Candidate for interview" }) as HTMLInputElement;
+  expect(checkbox.checked).toBe(false);
+  await act(async () => finishStatuses([{ id: 22, application_id: 8, job_posting_id: 1, status: "scheduled", stage: "technical", local_start: "2030-01-01T08:00:00", timezone: "Asia/Dhaka" }]));
+  await waitFor(() => expect(checkbox.checked).toBe(true));
+  const blocked = screen.getByRole("checkbox", { name: "Select Already Scheduled for interview" }) as HTMLInputElement;
+  expect(blocked.disabled).toBe(true); expect(blocked.checked).toBe(false);
 });
 
 it("does not expose scheduling to candidate accounts", async () => {
