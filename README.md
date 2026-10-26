@@ -56,9 +56,9 @@ and LiveKit captions are documented in [live transcription](docs/live-transcript
 - Private named-volume foundation for candidate documents
 - Semantic company-knowledge ingestion using Ollama embeddings
 - pgvector storage and database-side cosine similarity search with an HNSW index
-- Gemini-powered, RAG-backed requirement discovery and JD generation
+- Gemini-powered, RAG-backed JD generation with internal structured requirements
 - Persisted LangGraph supervisor with native Gemini tool calling and shared workflow state
-- Interviewer UI for previous-JD knowledge, requirement review and JD approval
+- Interviewer UI for previous-JD knowledge, job-description review and JD approval
 - Reviewed Discord job-post previews with persistent publication status
 - Job-scoped PDF/DOCX CV parsing, requirement screening and semantic ranking
 
@@ -214,8 +214,11 @@ existing session state. Tools reuse the current services, including pgvector
 knowledge retrieval, job-specific Google Forms intake, background CV screening,
 and Discord publishing through the MCP server.
 
-Editable diagrams for all four actual graphs are available in
-[`docs/langgraphs/hiresense-all-langgraphs.drawio`](docs/langgraphs/hiresense-all-langgraphs.drawio).
+The application has seven distinct LangGraph workflows; see the current
+[graph inventory](docs/langgraphs/README.md). The separate requirement-discovery
+graph and `/api/requirements/chat` endpoint are retired. Direct RAG drafting,
+structured requirement profiles and historical session records are preserved.
+Older draw.io bundles are retained as historical diagrams, not a current inventory.
 
 ## Discord job posting
 
@@ -256,7 +259,7 @@ To publish:
 
 1. Open an approved job description under **Jobs**.
 2. In the central **HireSense assistant** chat, enter a command such as
-   **Post this job**. The same chat is used for requirement discovery and job
+   **Post this job**. The same chat is used for job-description creation and job
    posting; no separate posting chatbot is shown.
 3. Provide the application link and application deadline when the assistant
    asks. The heading, contact email, location, and instructions come from the

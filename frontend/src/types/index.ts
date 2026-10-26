@@ -36,27 +36,6 @@ export interface RequirementProfileDraft {
   selection_criteria: RequirementItem[];
 }
 
-export type RequirementChatStatus =
-  | "active"
-  | "awaiting_changes"
-  | "awaiting_confirmation"
-  | "confirmed"
-  | "error";
-
-export interface RequirementChatResponse {
-  session_id: string;
-  status: RequirementChatStatus;
-  assistant_message: string;
-  profile: RequirementProfileDraft;
-  missing_fields: string[];
-  requirement_profile_id: number | null;
-  error: string | null;
-  error_code: string | null;
-  knowledge_status: "not_searched" | "found" | "empty" | "error";
-  proposal_ready: boolean;
-  source_references: JobDescriptionEvidence[];
-}
-
 export type KnowledgeSourceType = "previous_job_description";
 
 export interface KnowledgeDocumentResponse {
