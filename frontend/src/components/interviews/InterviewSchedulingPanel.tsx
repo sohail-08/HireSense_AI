@@ -40,7 +40,10 @@ export function InterviewSchedulingPanel({ jobId, rankingRunId, selectedIds = []
     onBusyChange?.(busy || batch?.status === "sending");
     return () => onBusyChange?.(false);
   }, [busy, batch?.status, onBusyChange]);
-  useEffect(() => { setSelection(undefined); setPreview(undefined); setBatch(undefined); setError(undefined); setModal(undefined); }, [jobId, rankingRunId, selectedKey, scheduleKey]);
+  // Refreshing candidate eligibility after confirmation may clear checked IDs.
+  // Keep the delivery receipt/poller so that sending progress is not lost.
+  useEffect(() => { setSelection(undefined); setPreview(undefined); setError(undefined); setModal(undefined); }, [jobId, rankingRunId, selectedKey, scheduleKey]);
+  useEffect(() => { setBatch(undefined); }, [jobId, rankingRunId, scheduleKey]);
   useEffect(() => {
     if (!batch?.id || batch.status !== "sending") return;
     let active = true;
