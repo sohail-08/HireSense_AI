@@ -90,8 +90,10 @@ Application: http://localhost:5173
 API documentation: http://localhost:8000/docs
 Health check: http://localhost:8000/api/health
 
-The backend runs migrations and seeds the Interviewer automatically.
-All public registrations create Candidates.
+Compose starts a private Ollama container and automatically downloads/verifies
+the Nomic embedding model on first setup. The backend waits for model readiness,
+runs migrations and seeds the Interviewer automatically. Candidates join using
+their invitation links; there is no public signup.
 
 The repository-root `.env` is the only active environment file. `.env.example`
 is a tracked template, not a second configuration file. Do not create
@@ -118,17 +120,25 @@ key, recreate the backend container:
 docker compose up -d --build --force-recreate backend
 ```
 
-Semantic knowledge embeddings remain local through Ollama. Start Ollama and
-pull the embedding model before ingesting or retrieving previous job descriptions:
+Semantic knowledge and CV embeddings run locally in the Compose `ollama` service,
+using the same `nomic-embed-text:latest` model and 768-dimensional vectors. No
+host Ollama installation, manual `ollama pull`, GPU configuration or host-network
+mapping is needed for the Docker deployment. CPU execution is the portable default.
+The first startup needs internet and disk space for the image/model downloads.
+The model is cached in the persistent `ollama_data` volume for later offline reuse.
 
-```powershell
-ollama serve
-ollama pull nomic-embed-text
-```
+The one-shot `ollama-init` service downloads only a missing model, checks its pinned
+digest and runs a synthetic embedding readiness probe before the backend starts.
+An incompatible model or failed download blocks startup instead of using the host
+service or silently mixing incompatible vectors. The Ollama image is pinned to a
+multi-architecture release/digest. Its unauthenticated API is **not published** on
+the host or public tunnel. See [container setup and recovery](docs/ollama-container.md).
 
-When the backend runs in Docker, `OLLAMA_DOCKER_BASE_URL` must point to the
-host service. The default is `http://host.docker.internal:11434`; local
-non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
+Compose always sets the backend URL to `http://ollama:11434`; legacy
+`OLLAMA_DOCKER_BASE_URL` entries in an existing root `.env` are ignored. Non-Docker
+backend processes continue to use `OLLAMA_BASE_URL` and need their own reachable
+Ollama service. Existing API keys and integration credentials remain required;
+containerizing Ollama does not provision Gemini, Google, Discord or LiveKit accounts.
 
 ## Knowledge embeddings with pgvector
 
@@ -218,7 +228,10 @@ The application has seven distinct LangGraph workflows; see the current
 [graph inventory](docs/langgraphs/README.md). The separate requirement-discovery
 graph and `/api/requirements/chat` endpoint are retired. Direct RAG drafting,
 structured requirement profiles and historical session records are preserved.
-Older draw.io bundles are retained as historical diagrams, not a current inventory.
+The draw.io bundles in `docs/langgraphs/hiresense-all-langgraphs.drawio` and
+`docs/hiresense-langgraph-workflow.drawio` contain all seven current graphs, using
+their actual registered nodes and edges. Individual diagrams and a read-only
+topology checker are linked in the inventory.
 
 ## Discord job posting
 

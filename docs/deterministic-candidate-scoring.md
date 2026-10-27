@@ -205,7 +205,7 @@ approval and screening against the new requirement version.
    Test with `pytest tests/test_scoring.py`, then the complete backend suite.
 3. `frontend/src/components/candidates/CandidateScoringPanel.tsx`,
    `frontend/src/pages/ScreeningPage.tsx`, `README.md`, this document,
-   `docs/langgraphs/05-candidate-scoring.drawio`, `docs/langgraphs/README.md`,
+   `docs/langgraphs/04-candidate-scoring.drawio`, `docs/langgraphs/README.md`,
    `docs/langgraphs/hiresense-all-langgraphs.drawio`,
    `docs/hiresense-langgraph-workflow.drawio`. Check with `npm run build` and
    `npm run test:scoring` (decimal total and score-display regression tests).

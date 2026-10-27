@@ -23,6 +23,39 @@ services:
 
     restart: unless-stopped
 
+  # CPU-compatible default; no host Ollama installation or public API port.
+  ollama:
+    image: ollama/ollama:0.40.11@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    expose: ["11434"]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # Downloads only a missing model; verifies identity, dimensions and inference.
+  # No database, candidate storage or external-service credentials are provided.
+  ollama-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ollama-init
+    entrypoint: ["python", "-m", "app.bootstrap_ollama"]
+    command: []
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text:latest}
+      OLLAMA_MODEL_DIGEST: ${OLLAMA_MODEL_DIGEST:-0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
   backend:
     build: ./backend
 
@@ -106,7 +139,7 @@ services:
       GOOGLE_FORMS_CV_COLUMN: ${GOOGLE_FORMS_CV_COLUMN:-Upload CV}
       GOOGLE_FORMS_PHOTO_COLUMN: ${GOOGLE_FORMS_PHOTO_COLUMN:-Candidate photo}
       GOOGLE_FORMS_JOB_COLUMN: ${GOOGLE_FORMS_JOB_COLUMN:-Job Posting}
-      OLLAMA_BASE_URL: ${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text:latest}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-60}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -133,6 +166,10 @@ services:
           create_host_path: false
 
     depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       job-posting-mcp:
@@ -257,3 +294,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

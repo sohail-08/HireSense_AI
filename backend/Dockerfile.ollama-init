@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+# Only the standard-library bootstrap is needed, not app dependencies or data.
+COPY app/bootstrap_ollama.py ./app/bootstrap_ollama.py
+USER 65534:65534
+
+ENTRYPOINT ["python", "-m", "app.bootstrap_ollama"]
