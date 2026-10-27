@@ -5,7 +5,7 @@ import json
 import math
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 from cryptography.fernet import Fernet
@@ -15,7 +15,6 @@ from app.database import SessionLocal
 from app.identity.face import FaceError, get_engine, image_bytes
 from app.models.identity import FaceReference, IdentityCheck
 from app.models.interview import InterviewSchedule, CandidateInterviewSession
-from app.models.candidate import CandidateApplication
 from app.services.interview_rooms import InterviewRooms, RoomConflict, RoomAccessError
 from app.services.interview_content import utc
 from app.services.interview_links import secret_hash

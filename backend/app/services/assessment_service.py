@@ -10,7 +10,6 @@ from app.agents.interview_analysis import digest
 from app.assessments.sources import owned_application, resolve_sources
 from app.assessments.workflow import ConsolidatedAssessmentGraph, PROMPT_VERSION, POLICY
 from app.models.assessment import AssessmentRun, AssessmentReview, AssessmentComparison, ReportArtifact
-from app.models.candidate import CandidateApplication
 from app.models.interview import InterviewSchedule
 from app.schemas.assessment import GenerateAssessment
 from app.services.interview_content import utc

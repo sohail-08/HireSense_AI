@@ -573,6 +573,7 @@ are maintained alongside it:
 | --- | --- |
 | Access and workspaces | [Account access](docs/account-access.md), [dashboard](docs/interviewer-dashboard.md), [Jobs](docs/jobs-workspace.md), [workflow navigation](docs/workflow-navigation.md) |
 | Architecture and integrations | [LangGraphs and diagrams](docs/langgraphs/README.md), [MCP configuration](docs/mcp-configuration.md), [Ollama](docs/ollama-container.md) |
+| AI prompts | [System prompt catalog](docs/system-prompts.md), [parent and child implementation prompts](docs/implementation-prompt-blueprint.md) |
 | Applications and CVs | [Profile integrity](docs/application-profile-integrity.md), [application notifications](docs/application-notifications.md), [semantic screening](docs/robust-cv-screening.md), [OCR](docs/cv-ocr.md), [CV scoring](docs/deterministic-candidate-scoring.md) |
 | Interviews | [Scheduling](docs/interview-scheduling.md), [room access](docs/interview-rooms.md), [LiveKit Cloud](docs/livekit-cloud.md), [interview copilot](docs/interview-copilot.md), [transcription](docs/live-transcription.md) |
 | Assessment | [Answer analysis](docs/interview-analysis.md), [live practical exercises](docs/live-work-samples.md), [final rankings and reports](docs/consolidated-assessments.md) |

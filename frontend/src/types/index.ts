@@ -135,19 +135,6 @@ export interface DiscordJobPost {
   updated_at: string;
 }
 
-export type DiscordPostingAssistantStatus =
-  | "awaiting_details"
-  | "awaiting_approval"
-  | "awaiting_changes"
-  | "published";
-
-export interface DiscordPostingAssistantResponse {
-  status: DiscordPostingAssistantStatus;
-  assistant_message: string;
-  missing_fields: ("application_url" | "application_deadline")[];
-  posting: DiscordJobPost | null;
-}
-
 export type SupervisorPhase =
   | "job_details"
   | "requirements"
@@ -366,37 +353,4 @@ export interface ScreeningBatch {
     status: Exclude<ScreeningRunStatus, "pending">;
     error_message: string | null;
   }[];
-}
-
-export interface RequirementMatchResult {
-  requirement_key: string;
-  category: string;
-  name: string;
-  details: string | null;
-  weight: number;
-  status: "met" | "partially_met" | "unmet" | "unable_to_determine";
-  explanation: string;
-  evidence: { block_id: string; locator: string; quote: string }[];
-  evidence_gaps: string[];
-  review_flags: string[];
-}
-
-export interface ScreeningRunDetail {
-  id: number;
-  application_id: number;
-  status: Exclude<ScreeningRunStatus, "pending">;
-  requirement_coverage: number | null;
-  extracted_profile: Record<string, unknown> | null;
-  source_blocks: { id: string; locator: string; text: string }[];
-  suitability_summary: string | null;
-  strengths: { requirement_key: string; text: string }[];
-  gaps: { requirement_key: string; text: string }[];
-  points_to_verify: { requirement_key: string; text: string }[];
-  review_flags: string[];
-  error_message: string | null;
-  model_name: string | null;
-  prompt_version: string;
-  calculation_version: string;
-  requirement_snapshot: Record<string, unknown>;
-  matches: RequirementMatchResult[];
 }

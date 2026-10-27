@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from email_validator import EmailNotValidError, validate_email
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings

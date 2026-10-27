@@ -4,7 +4,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.models.candidate import CandidateApplication
 from app.models.job import JobPosting, JobDescription
 from app.schemas.assessment import GenerateAssessment, CompareAssessments, ReviewAssessment, ExportReport, BuildFinalRanking
 from app.security import require_interviewer

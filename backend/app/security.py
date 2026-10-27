@@ -105,15 +105,3 @@ def require_interviewer(
         )
 
     return user
-
-
-def require_candidate(
-    user: User = Depends(get_current_user),
-) -> User:
-    if user.role != UserRole.CANDIDATE:
-        raise HTTPException(
-            status_code=403,
-            detail="Candidate access required",
-        )
-
-    return user

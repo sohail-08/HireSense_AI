@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.security import require_interviewer
 from app.routes.interview_rooms import COOKIE_NAME, candidate_origin, sensitive, run, limiter
-from app.services.candidate_identity import CandidateIdentityService, NOTICE
+from app.services.candidate_identity import CandidateIdentityService
 
 router = APIRouter(tags=["Candidate identity"])
 

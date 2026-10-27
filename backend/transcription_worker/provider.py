@@ -4,7 +4,6 @@ No plugin-internal reconnection: the runner owns retries and a fresh timeline an
 for every new Deepgram connection. No diarization or model/language detection.
 """
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass
@@ -16,10 +15,6 @@ class TranscriptEvent:
     request_id: str
     confidence: float | None
     words: list
-
-
-class TranscriptionProvider(Protocol):
-    def open(self, context: dict): ...
 
 
 def failure_code(error):
