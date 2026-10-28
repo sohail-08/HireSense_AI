@@ -6,21 +6,18 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  if (!user) return null;
+  if (!user || user.role !== "interviewer") return null;
 
-  const prefix = `/${user.role}`;
+  const prefix = "/interviewer";
 
-  const links =
-    user.role === "interviewer"
-      ? [
-          { page: "jobs", label: "Jobs" },
-          { page: "candidates", label: "Candidates" },
-          { page: "assessments", label: "CV Screening" },
-          { page: "schedule-interviews", label: "Schedule Interviews" },
-          { page: "interviews", label: "Interview" },
-          { page: "reports", label: "Assessment" },
-        ]
-      : [{ page: "dashboard", label: "Dashboard" }, { page: "interviews", label: "Interviews" }];
+  const links = [
+    { page: "jobs", label: "Jobs" },
+    { page: "candidates", label: "Candidates" },
+    { page: "assessments", label: "CV Screening" },
+    { page: "schedule-interviews", label: "Schedule Interviews" },
+    { page: "interviews", label: "Interview" },
+    { page: "reports", label: "Assessment" },
+  ];
 
   function handleLogout() {
     logout();

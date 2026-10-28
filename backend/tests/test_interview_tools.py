@@ -112,6 +112,128 @@ class LocalMCP:
         raise AssertionError("Unexpected tool")
 
 
+@pytest.mark.parametrize("name", ["Candidate 2", "candidate   2", '"Candidate 2"'])
+def test_chat_selects_named_candidate_not_checked_candidate_and_keeps_selection(setup, name):
+    db, owner, _, posting, apps, _, service, sender = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        command = InterviewCommand(intent="selection", candidate_name="Candidate 2")
+        def interpret(self, message, context): return self.command.model_copy(deep=True)
+    model = Commands()
+    assistant = InterviewAssistantService(model, lambda _: client)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    result = assistant.handle(db, supervisor, owner.id, f"schedule interview with {name}", [{"id": posting.id}], posting.id, [apps[0].id])
+    workflow = supervisor.state_json["interview_workflow"]
+    assert result["phase"] == "interview_schedule"
+    assert workflow["rule"]["application_ids"] == [apps[1].id]
+    assert [item["application_id"] for item in workflow["selection_preview"]["selected"]] == [apps[1].id]
+    assert "above which score" not in result["assistant_message"]
+    # A schedule-only follow-up with an invented stale name/manual mode must
+    # preserve the resolved IDs, even if other candidates remain checked.
+    supervisor.phase = result["phase"]
+    model.command = InterviewCommand(intent="selection", candidate_name="Candidate 1", selection_mode="manual",
+        date=(date.today() + timedelta(days=20)).isoformat(), start_time="10:00", duration_minutes=30)
+    result = assistant.handle(db, supervisor, owner.id, "20 days later at 10:00, 30 minutes", [{"id": posting.id}], posting.id, [apps[0].id])
+    supervisor.phase = result["phase"]
+    assert result["phase"] == "interview_approval"
+    assert [item["application_id"] for item in supervisor.state_json["interview_workflow"]["preview"]["recipients"]] == [apps[1].id]
+    assert not sender.calls and db.scalar(select(func.count(InterviewSchedule.id))) == 0
+    model.command = InterviewCommand(intent="approve", candidate_name="Candidate 3")
+    with pytest.raises(ValueError, match="new preview"):
+        assistant.handle(db, supervisor, owner.id, "confirm but use Candidate 3", [{"id": posting.id}], posting.id, [])
+    model.command = InterviewCommand(intent="approve")
+    assistant.handle(db, supervisor, owner.id, "confirm", [{"id": posting.id}], posting.id, [])
+    assert [row.application_id for row in db.scalars(select(InterviewSchedule))] == [apps[1].id]
+    assert not sender.calls  # Uses the normal outbox; no actual email/provider call.
+
+
+def test_chat_multiple_names_partial_names_and_ambiguity_never_fall_back(setup):
+    db, owner, _, posting, apps, _, service, _ = setup
+    client = LocalMCP(db, owner.id, service)
+    class Commands:
+        command = InterviewCommand(candidate_names=["Candidate 2", "Candidate 3"])
+        def interpret(self, message, context): return self.command.model_copy(deep=True)
+    model = Commands()
+    assistant = InterviewAssistantService(model, lambda _: client)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    result = assistant.handle(db, supervisor, owner.id, "schedule Candidate 2 and Candidate 3", [{"id": posting.id}], posting.id, [])
+    assert supervisor.state_json["interview_workflow"]["rule"]["application_ids"] == [apps[1].id, apps[2].id]
+    model.command = InterviewCommand(candidate_name="Candidate")
+    result = assistant.handle(db, supervisor, owner.id, "select Candidate", [{"id": posting.id}], posting.id, [apps[0].id])
+    assert result["phase"] == "interview_selection" and "more than one candidate" in result["assistant_message"]
+    assert "application #" in result["assistant_message"]
+    assert "selection_preview" not in supervisor.state_json["interview_workflow"]
+    model.command = InterviewCommand(application_ids=[apps[2].id])
+    assistant.handle(db, supervisor, owner.id, f"select application #{apps[2].id}", [{"id": posting.id}], posting.id, [])
+    assert supervisor.state_json["interview_workflow"]["rule"]["application_ids"] == [apps[2].id]
+    calls = client.calls.count("preview_candidate_selection")
+    model.command = InterviewCommand(candidate_name="Unknown Person")
+    result = assistant.handle(db, supervisor, owner.id, "select Unknown Person", [{"id": posting.id}], posting.id, [apps[0].id])
+    assert "No candidate named" in result["assistant_message"]
+    assert "application_ids" not in supervisor.state_json["interview_workflow"]["rule"]
+    assert client.calls.count("preview_candidate_selection") == calls
+
+
+def test_name_resolution_is_authorized_and_ineligible_candidates_stay_excluded(setup):
+    db, owner, other, posting, apps, _, service, _ = setup
+    command = InterviewCommand(candidate_names=["Candidate 2"])
+    with pytest.raises(LookupError):
+        InterviewAssistantService.resolve_candidates(db, other.id, posting.id, command)
+    ids, question = InterviewAssistantService.resolve_candidates(db, owner.id, posting.id, command)
+    assert ids == [apps[1].id] and question is None
+    # A unique partial name is accepted, not an approximate spelling.
+    ids, question = InterviewAssistantService.resolve_candidates(db, owner.id, posting.id, InterviewCommand(candidate_names=["2"]))
+    assert ids == [apps[1].id] and question is None
+    _, question = InterviewAssistantService.resolve_candidates(db, owner.id, posting.id, InterviewCommand(application_ids=[999999]))
+    assert "not in this job" in question
+    from app.models.candidate import ApplicationStatus
+    apps[1].status = ApplicationStatus.WITHDRAWN
+    db.commit()
+    class Commands:
+        def interpret(self, message, context): return command.model_copy(deep=True)
+    supervisor = SimpleNamespace(state_json={}, phase="published")
+    result = InterviewAssistantService(Commands(), lambda _: LocalMCP(db, owner.id, service)).handle(
+        db, supervisor, owner.id, "schedule Candidate 2", [{"id": posting.id}], posting.id, [])
+    assert result["phase"] == "interview_selection"
+    assert supervisor.state_json["interview_workflow"]["selection_preview"]["recipient_count"] == 0
+    assert "withdrawn or rejected" in result["assistant_message"]
+
+
+def test_duplicate_full_names_require_application_choice_and_never_choose_first(setup, monkeypatch):
+    from app.services.scoring_service import ScoringService
+    db, owner, _, posting, apps, _, _, _ = setup
+    monkeypatch.setattr(ScoringService, "detail", lambda *args, **kwargs: {"results": [
+        {"application_id": apps[0].id, "candidate_name": "Sohail Ahmed"},
+        {"application_id": apps[1].id, "candidate_name": "Sohail Ahmed"},
+    ]})
+    ids, question = InterviewAssistantService.resolve_candidates(db, owner.id, posting.id, InterviewCommand(candidate_names=["sohail ahmed"]))
+    assert not ids and "more than one candidate" in question
+    assert f"application #{apps[0].id}" in question and f"application #{apps[1].id}" in question
+
+
+@pytest.mark.parametrize("phase,route,outcome,expected", [
+    ("interview_schedule", "interviews", "info", True),
+    ("interview_selection", "interviews", "info", True),
+    ("interview_approval", "interviews", "info", True),
+    ("interview_sent", "interviews", "success", False),
+    ("interview_schedule", "help", "info", False),
+    ("interview_schedule", "interviews", "failure", False),
+])
+def test_chat_response_exposes_only_selected_ids_not_private_tokens(phase, route, outcome, expected):
+    from app.services.supervisor_service import SupervisorService
+    service = object.__new__(SupervisorService)
+    service.screening_service = None
+    service._requirement_state = lambda *args: {}
+    service._current_job = lambda *args: None
+    service._current_posting = lambda *args: None
+    supervisor = SimpleNamespace(id="test", phase=phase, interviewer_user_id=1, requirement_profile_id=None,
+        state_json={"interview_workflow": {"rule": {"job_posting_id": 3}, "selection_token": "private-token",
+            "selection_preview": {"selected": [{"application_id": 7}], "excluded": [{"application_id": 8}]}}})
+    response = service._response(None, supervisor=supervisor, route=route, assistant_message="Ready", outcome=outcome, refresh_required=False)
+    assert response["interview_selection"] == ({"job_posting_id": 3, "application_ids": [7]} if expected else None)
+    assert "private-token" not in str(response)
+
+
 def test_chat_collects_details_previews_and_requires_real_user_confirmation(setup):
     db, owner, _, posting, apps, _, service, sender = setup
     client = LocalMCP(db, owner.id, service)

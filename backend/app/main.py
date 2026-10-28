@@ -19,7 +19,6 @@ from app.routes.candidates import router as candidates_router
 from app.routes.job_descriptions import router as job_descriptions_router
 from app.routes.job_postings import router as job_postings_router
 from app.routes.knowledge import router as knowledge_router
-from app.routes.requirements import router as requirements_router
 from app.routes.screening import router as screening_router
 from app.routes.scoring import router as scoring_router
 from app.routes.interviews import router as interviews_router
@@ -112,7 +111,6 @@ app.include_router(candidates_router)
 app.include_router(job_descriptions_router)
 app.include_router(job_postings_router)
 app.include_router(knowledge_router)
-app.include_router(requirements_router)
 app.include_router(screening_router)
 app.include_router(scoring_router)
 app.include_router(interviews_router)

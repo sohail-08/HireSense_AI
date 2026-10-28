@@ -1,0 +1,876 @@
+<mxfile host="app.diagrams.net" agent="HireSense" pages="3">
+  <diagram id="system-architecture" name="01  Application architecture">
+    <mxGraphModel dx="3739" dy="1874" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1910" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=center;verticalAlign=top;fontFamily=Arial;fontSize=40;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="HireSense Application architecture" vertex="1">
+          <mxGeometry height="65" width="2280" x="60" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="interviewer" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="180" width="310" x="60" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="interviewer-title" parent="interviewer" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Interviewer" vertex="1">
+          <mxGeometry height="44" width="274" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="interviewer-body" parent="interviewer" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Sign-in · approve drafts&#xa;Review candidate evidence" vertex="1">
+          <mxGeometry height="96" width="274" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="candidate" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="180" width="310" x="60" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="candidate-title" parent="candidate" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Candidate" vertex="1">
+          <mxGeometry height="44" width="274" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="candidate-body" parent="candidate" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Private interview link&#xa;Consent · join · submit task" vertex="1">
+          <mxGeometry height="96" width="274" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="web" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="205" width="430" x="470" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="web-title" parent="web" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Web application" vertex="1">
+          <mxGeometry height="44" width="394" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="web-body" parent="web" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="React · TypeScript · Tailwind&#xa;Interviewer and candidate consoles&#xa;" vertex="1">
+          <mxGeometry height="121" width="394" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="205" width="540" x="1020" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="api-title" parent="api" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="API &amp; access control" vertex="1">
+          <mxGeometry height="44" width="504" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="api-body" parent="api" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="FastAPI&#xa;Interviewer JWT · candidate cookie&#xa;Ownership + scoped room access" vertex="1">
+          <mxGeometry height="121" width="504" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="supervisor" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="205" width="650" x="1690" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="supervisor-title" parent="supervisor" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Assistant orchestration" vertex="1">
+          <mxGeometry height="44" width="614" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="supervisor-body" parent="supervisor" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="LangGraph supervisor · Gemini tools&#xa;Central chat + interview-scoped tools&#xa;Explicit approval before sensitive actions" vertex="1">
+          <mxGeometry height="121" width="614" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="backend" parent="1" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="635" width="1910" x="430" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="backend-label" parent="backend" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="BACKEND BUSINESS MODULES  |  logical services inside the FastAPI process" vertex="1">
+          <mxGeometry height="42" width="1866" x="22" y="18" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="20" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs-title" parent="jobs" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Job design &amp; publishing" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs-body" parent="jobs" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Historical-JD RAG → draft&#xa;Versioned JD + requirement profile&#xa;Approve → Discord via MCP" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cv" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="495" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-title" parent="cv" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Application intake &amp; CV" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-body" parent="cv" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Google Sheets / Drive import&#xa;PDF / DOCX + Tesseract OCR&#xa;Evidence retrieval + saved scores" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="schedule" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="970" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="schedule-title" parent="schedule" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Interview scheduling" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="schedule-body" parent="schedule" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Select → preview → confirm&#xa;SMTP invitation + calendar file&#xa;Private links + delivery status" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="room" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="1445" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="room-title" parent="room" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Interview room" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="room-body" parent="room" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Admission + LiveKit tokens&#xa;Transcript session controls&#xa;Local face match, interviewer only" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="answers" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="220" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="answers-title" parent="answers" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Answer analysis" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="answers-body" parent="answers" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Pair questions + final transcript&#xa;Answer-guide RAG + AI validation&#xa;Citations + saved numeric scores" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="practical" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="740" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="practical-title" parent="practical" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Practical assessment" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="practical-body" parent="practical" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Assistant-drafted short tasks&#xa;One submission · ≤15 minutes&#xa;AI review → interviewer approval" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ranking" parent="backend" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="215" width="445" x="1260" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="ranking-title" parent="ranking" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Final ranking &amp; reports" vertex="1">
+          <mxGeometry height="44" width="409" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="ranking-body" parent="ranking" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Read current saved component scores&#xa;60% interview · 30% CV · 10% task&#xa;Evidence summary + PDF" vertex="1">
+          <mxGeometry height="131" width="409" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="database" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="230" width="420" x="60" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="database-title" parent="database" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="PostgreSQL + pgvector" vertex="1">
+          <mxGeometry height="44" width="384" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="database-body" parent="database" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Jobs · applicants · transcripts&#xa;Evidence · scores · workflow state&#xa;Encrypted face references" vertex="1">
+          <mxGeometry height="146" width="384" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="retrieval" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="230" width="420" x="525" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="retrieval-title" parent="retrieval" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Retrieval layer" vertex="1">
+          <mxGeometry height="44" width="384" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="retrieval-body" parent="retrieval" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Typed shared knowledge chunks&#xa;Isolated candidate CV passages&#xa;Semantic + lexical retrieval" vertex="1">
+          <mxGeometry height="146" width="384" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="230" width="420" x="990" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama-title" parent="ollama" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Local embeddings" vertex="1">
+          <mxGeometry height="44" width="384" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama-body" parent="ollama" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Ollama container&#xa;nomic-embed-text · 768 dimensions&#xa;Used for indexing + queries" vertex="1">
+          <mxGeometry height="146" width="384" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="230" width="420" x="1455" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini-title" parent="gemini" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Gemini API" vertex="1">
+          <mxGeometry height="44" width="384" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini-body" parent="gemini" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="Drafting + tool selection&#xa;Evidence-grounded assessments&#xa;Independent score verification" vertex="1">
+          <mxGeometry height="146" width="384" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="storage" parent="1" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="230" width="420" x="1920" y="1540" as="geometry" />
+        </mxCell>
+        <mxCell id="storage-title" parent="storage" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" value="Private file storage" vertex="1">
+          <mxGeometry height="44" width="384" x="18" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="storage-body" parent="storage" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" value="CVs · knowledge PDFs · reports&#xa;Face encryption key + Google key" vertex="1">
+          <mxGeometry height="146" width="384" x="18" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="interviewer-web" edge="1" parent="1" source="interviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" target="web" value="">
+          <mxGeometry relative="1" x="0.0039" as="geometry">
+            <mxPoint y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="candidate-web" edge="1" parent="1" source="candidate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" target="web" value="">
+          <mxGeometry relative="1" x="0.0443" as="geometry">
+            <mxPoint y="-20" as="offset" />
+            <Array as="points">
+              <mxPoint x="410" y="580" />
+              <mxPoint x="410" y="503.8" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="web-api" edge="1" parent="1" source="web" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="api" value="REST">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-supervisor" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="supervisor" value="tools">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-business" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;entryX=0.405;entryY=0;" target="backend" value="shared services">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-110" as="offset" />
+            <mxPoint x="1203.55" y="556.23" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tools-business" edge="1" parent="1" source="supervisor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.83;entryY=0;" target="backend" value="scoped operations">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="135" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="business-db" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.06;exitY=1;entryX=0.5;entryY=0;" target="database" value="saved records">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-24" as="offset" />
+            <Array as="points">
+              <mxPoint x="545" y="1440" />
+              <mxPoint x="270" y="1440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="business-retrieval" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.26;exitY=1;entryX=0.5;entryY=0;" target="retrieval" value="evidence search">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="-24" as="offset" />
+            <Array as="points">
+              <mxPoint x="926.6" y="1450" />
+              <mxPoint x="735" y="1450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="retrieval-ollama" edge="1" parent="1" source="retrieval" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="ollama" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="business-gemini" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.647;exitY=0.997;entryX=0.5;entryY=0;exitDx=0;exitDy=0;exitPerimeter=0;" target="gemini" value="AI requests">
+          <mxGeometry relative="1" x="0.0371" as="geometry">
+            <mxPoint x="110" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="business-storage" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.89;exitY=1;entryX=0.5;entryY=0;exitDx=0;exitDy=0;exitPerimeter=0;" target="storage" value="private files">
+          <mxGeometry relative="1" x="0.0786" as="geometry">
+            <mxPoint x="115" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="retrieval-vectors" edge="1" parent="1" source="database" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="retrieval" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="recruitment-evidence" name="02  Recruitment &amp; evidence flow">
+    <mxGraphModel dx="2400" dy="2440" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="2440" math="0" shadow="0" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="02  Recruitment &amp; evidence flow" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=40;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="35" width="2280" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="The original six-stage journey, expanded into three traceable scoring pipelines" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=24;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="110" width="2280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="design" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="design-title" value="1  Create job" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="design">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="design-body" value="RAG-assisted JD&#xa;Interviewer approves" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="design">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="publish" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="450" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="publish-title" value="2  Publish" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="publish">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="publish-body" value="Discord job post&#xa;Google Form application" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="publish">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="screen" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="840" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="screen-title" value="3  Screen CVs" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="screen">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="screen-body" value="Import · OCR · evidence&#xa;Save CV ranking" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="screen">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="interview" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="interview-title" value="4  Interview" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="interview">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="interview-body" value="Invite · admit · live room&#xa;Transcript + practical task" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="interview">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="compare" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="compare-title" value="5  Analyze" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="compare">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="compare-body" value="Save verified scores&#xa;Compare current results" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="compare">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="report" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2010" y="210" width="340" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="report-title" value="6  Report" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="report">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="report-body" value="Weighted final ranking&#xa;Human hiring decision" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="report">
+          <mxGeometry x="18" y="70" width="304" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-lane" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="500" width="720" height="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-lane-label" value="CV ASSESSMENT  ·  30%" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-lane">
+          <mxGeometry x="22" y="18" width="676" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-input" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="cv-lane">
+          <mxGeometry x="40" y="80" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-input-title" value="Application sources" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-input">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-input-body" value="Sheets row + Drive CV / photo&#xa;Posting-linked, idempotent import" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-input">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-parse" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="cv-lane">
+          <mxGeometry x="40" y="325" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-parse-title" value="Extract readable content" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-parse">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-parse-body" value="PDF / DOCX text + page references&#xa;Local OCR with confidence checks" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-parse">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-evidence" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="cv-lane">
+          <mxGeometry x="40" y="570" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-evidence-title" value="Find &amp; verify evidence" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-evidence">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-evidence-body" value="Private CV passage retrieval&#xa;Gemini requirement matching + audit" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-evidence">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-saved" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="cv-lane">
+          <mxGeometry x="40" y="815" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-saved-title" value="Save deterministic CV score" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-saved">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cv-saved-body" value="Validated met / partial / unmet coverage&#xa;Python category weights + explanation" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="cv-saved">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="answers-lane" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="840" y="500" width="720" height="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="answers-lane-label" value="INTERVIEW ASSESSMENT  ·  60%" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answers-lane">
+          <mxGeometry x="22" y="18" width="676" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-input" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="answers-lane">
+          <mxGeometry x="40" y="80" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-input-title" value="Final transcript segments" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-input">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-input-body" value="Speaker labels + timestamps&#xa;Only final text is persisted" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-input">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-pair" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="answers-lane">
+          <mxGeometry x="40" y="325" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-pair-title" value="Pair questions &amp; answers" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-pair">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-pair-body" value="Recover context from imperfect speech&#xa;Exclude greetings and device checks" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-pair">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-evidence" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="answers-lane">
+          <mxGeometry x="40" y="570" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-evidence-title" value="Assess against references" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-evidence">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-evidence-body" value="Answer-guide RAG + source citations&#xa;Gemini scoring + support validation" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-evidence">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-saved" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="answers-lane">
+          <mxGeometry x="40" y="815" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-saved-title" value="Save interview score" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-saved">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="answer-saved-body" value="Relevance · accuracy · completeness · quality&#xa;0–100 each; equal-weight average" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="answer-saved">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="practical-lane" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="500" width="720" height="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="practical-lane-label" value="PRACTICAL ASSESSMENT  ·  10%" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="practical-lane">
+          <mxGeometry x="22" y="18" width="676" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="task-draft" value="" style="rounded=1;arcSize=8;html=0;fillColor=#fff8e7;strokeColor=#d5ac4b;strokeWidth=2;" vertex="1" parent="practical-lane">
+          <mxGeometry x="40" y="80" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="task-draft-title" value="Draft &amp; approve a short task" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#795410;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-draft">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="task-draft-body" value="Assistant uses job + knowledge context&#xa;Interviewer selects, approves and shares" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-draft">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="task-live" value="" style="rounded=1;arcSize=8;html=0;fillColor=#fff8e7;strokeColor=#d5ac4b;strokeWidth=2;" vertex="1" parent="practical-lane">
+          <mxGeometry x="40" y="325" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="task-live-title" value="Complete live in the room" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#795410;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-live">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="task-live-body" value="≤15 minutes · server-side autosave&#xa;One immutable submission" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-live">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="task-review" value="" style="rounded=1;arcSize=8;html=0;fillColor=#fff8e7;strokeColor=#d5ac4b;strokeWidth=2;" vertex="1" parent="practical-lane">
+          <mxGeometry x="40" y="570" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="task-review-title" value="Verify task correctness" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#795410;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-review">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="task-review-body" value="Gemini numerical grade + verifier&#xa;Traceable response quotes / lines" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-review">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="task-saved" value="" style="rounded=1;arcSize=8;html=0;fillColor=#fff8e7;strokeColor=#d5ac4b;strokeWidth=2;" vertex="1" parent="practical-lane">
+          <mxGeometry x="40" y="815" width="640" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="task-saved-title" value="Approve the saved AI score" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#795410;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-saved">
+          <mxGeometry x="18" y="16" width="604" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="task-saved-body" value="Interviewer discusses work verbally&#xa;Only approved verified marks count" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="task-saved">
+          <mxGeometry x="18" y="70" width="604" height="101" as="geometry" />
+        </mxCell>
+        <mxCell id="policy" value="SCORING RULES" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=24;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="2160" width="350" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="policy-body" value="Verified off-topic / unanswered interview answers → 0. Greetings and device checks do not enter the average.&#xa;Unreadable documents, missing evidence, provider failures or unapproved practical marks remain incomplete—not fabricated zeros." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="2210" width="2280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="final" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="770" y="1880" width="860" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="final-title" value="FinalRankingService" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="final">
+          <mxGeometry x="18" y="16" width="824" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="final-body" value="Read saved, current scores — no AI regrading here&#xa;Final = interview × 0.60 + CV × 0.30 + approved practical × 0.10&#xa;Missing / stale required components remain unranked" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="final">
+          <mxGeometry x="18" y="70" width="824" height="121" as="geometry" />
+        </mxCell>
+        <mxCell id="report-note" value="OUTPUT  ·  Ranked candidates + concise strengths, weaknesses, evidence gaps and verification needs&#xa;Private HTML / PDF reports retain evidence references. Final hiring decisions remain with the interviewer." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="2330" width="2280" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="journey-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="design" target="publish" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="journey-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="publish" target="screen" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="journey-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="screen" target="interview" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="journey-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="interview" target="compare" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="journey-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="compare" target="report" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cv-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="cv-input" target="cv-parse" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cv-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="cv-parse" target="cv-evidence" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cv-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="cv-evidence" target="cv-saved" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="answers-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="answer-input" target="answer-pair" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="answers-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="answer-pair" target="answer-evidence" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="answers-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="answer-evidence" target="answer-saved" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="practical-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="task-draft" target="task-live" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="practical-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="task-live" target="task-review" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="practical-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="task-review" target="task-saved" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cv-to-final" value="30%" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.1;entryY=0;" edge="1" source="cv-saved" target="final" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-30" y="36" as="offset" />
+            <Array as="points">
+              <mxPoint x="420" y="1805" />
+              <mxPoint x="856" y="1805" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="answer-to-final" value="60%" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="answer-saved" target="final" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="44" y="65" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="task-to-final" value="10%" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0.9;entryY=0;" edge="1" source="task-saved" target="final" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="30" y="36" as="offset" />
+            <Array as="points">
+              <mxPoint x="1980" y="1805" />
+              <mxPoint x="1544" y="1805" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="deployment-trust" name="03  Deployment &amp; integrations">
+    <mxGraphModel dx="2600" dy="2400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2600" pageHeight="2400" math="0" shadow="0" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="03  Deployment &amp; integrations" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=40;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="35" width="2480" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Actual runtime boundaries · website / API traffic is separate from live audio and video" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=24;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="110" width="2480" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="docker" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="470" y="190" width="1360" height="1450" as="geometry" />
+        </mxCell>
+        <mxCell id="docker-label" value="LOCAL DOCKER COMPOSE NETWORK" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="docker">
+          <mxGeometry x="22" y="18" width="1316" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="providers" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1920" y="190" width="620" height="1230" as="geometry" />
+        </mxCell>
+        <mxCell id="providers-label" value="EXTERNAL PROVIDERS" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="providers">
+          <mxGeometry x="22" y="18" width="576" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="270" width="340" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="browser-title" value="Browser" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="browser">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="browser-body" value="Interviewer: authenticated access&#xa;Candidate: private interview link&#xa;REST requests + status polling" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="browser">
+          <mxGeometry x="18" y="70" width="304" height="141" as="geometry" />
+        </mxCell>
+        <mxCell id="web" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="60" y="80" width="380" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="web-title" value="frontend" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="web">
+          <mxGeometry x="18" y="16" width="344" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="web-body" value="Nginx + React build&#xa;localhost:5173 → container :80&#xa;/api → backend:8000" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="web">
+          <mxGeometry x="18" y="70" width="344" height="141" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="570" y="80" width="740" height="315" as="geometry" />
+        </mxCell>
+        <mxCell id="api-title" value="backend :8000" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="api">
+          <mxGeometry x="18" y="16" width="704" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="api-body" value="FastAPI · shared business services&#xa;LangGraph + in-process background jobs&#xa;Local OCR + local face matching&#xa;Database access + report generation&#xa;REST control + internal worker callbacks" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="api">
+          <mxGeometry x="18" y="70" width="704" height="231" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="providers">
+          <mxGeometry x="30" y="80" width="560" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini-title" value="Gemini" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="gemini">
+          <mxGeometry x="18" y="16" width="524" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini-body" value="Drafts · tool calls · assessments&#xa;Evidence checks + numerical grading" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="gemini">
+          <mxGeometry x="18" y="70" width="524" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="google" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="providers">
+          <mxGeometry x="30" y="360" width="560" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="google-title" value="Google Sheets + Drive" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="google">
+          <mxGeometry x="18" y="16" width="524" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="google-body" value="Read-only application import&#xa;CVs, candidate photo + form responses" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="google">
+          <mxGeometry x="18" y="70" width="524" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="smtp" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="providers">
+          <mxGeometry x="30" y="640" width="560" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="smtp-title" value="SMTP server" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="smtp">
+          <mxGeometry x="18" y="16" width="524" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="smtp-body" value="Interview invitations + calendar files&#xa;Delivery status saved by backend" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="smtp">
+          <mxGeometry x="18" y="70" width="524" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="discord" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="providers">
+          <mxGeometry x="30" y="920" width="560" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="discord-title" value="Discord" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="discord">
+          <mxGeometry x="18" y="16" width="524" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="discord-body" value="Approved job publication&#xa;Bot token stays in posting MCP service" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="discord">
+          <mxGeometry x="18" y="70" width="524" height="106" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="60" y="660" width="380" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama-title" value="ollama :11434" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="ollama">
+          <mxGeometry x="18" y="16" width="344" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="ollama-body" value="nomic-embed-text · 768 dimensions&#xa;Private embedding endpoint&#xa;Model cache: ollama_data" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="ollama">
+          <mxGeometry x="18" y="70" width="344" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="init" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f5efff;strokeColor=#a58bd1;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="60" y="1040" width="380" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="init-title" value="ollama-init" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#513078;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="init">
+          <mxGeometry x="18" y="16" width="344" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="init-body" value="One-time model provisioning&#xa;Pull → digest + inference checks&#xa;Backend starts after successful init" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="init">
+          <mxGeometry x="18" y="70" width="344" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="posting-mcp" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="570" y="660" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="posting-mcp-title" value="job-posting-mcp :8001" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="posting-mcp">
+          <mxGeometry x="18" y="16" width="294" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="posting-mcp-body" value="Streamable HTTP MCP&#xa;Publish approved jobs&#xa;Private service → Discord" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="posting-mcp">
+          <mxGeometry x="18" y="70" width="294" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="interview-mcp" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="980" y="660" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="interview-mcp-title" value="interview-mcp :8002" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="interview-mcp">
+          <mxGeometry x="18" y="16" width="294" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="interview-mcp-body" value="Streamable HTTP MCP&#xa;Scheduling / rescheduling tools&#xa;Delegated JWT → backend APIs" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="interview-mcp">
+          <mxGeometry x="18" y="70" width="294" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="570" y="1130" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-title" value="PostgreSQL + pgvector" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="postgres">
+          <mxGeometry x="18" y="16" width="294" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-body" value="RAG + private CV vectors&#xa;Scores + encrypted face data&#xa;Volume: postgres_data" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="postgres">
+          <mxGeometry x="18" y="70" width="294" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="files" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="docker">
+          <mxGeometry x="980" y="1130" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="files-title" value="Private host storage" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="files">
+          <mxGeometry x="18" y="16" width="294" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="files-body" value="CVs · PDFs · reports&#xa;Face weights + encryption key&#xa;Read-only Google credentials" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="files">
+          <mxGeometry x="18" y="70" width="294" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="local-note" value="Data boundaries: shared knowledge and candidate CV passages use separate retrieval scopes.&#xa;Face reference photos / embeddings are encrypted in PostgreSQL; model weights and the key are private files." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="510" y="1565" width="1280" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="tunnel" value="" style="rounded=1;arcSize=8;html=0;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="710" width="340" height="245" as="geometry" />
+        </mxCell>
+        <mxCell id="tunnel-title" value="Optional public demo" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="tunnel">
+          <mxGeometry x="18" y="16" width="304" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="tunnel-body" value="Cloudflare tunnel → frontend&#xa;Website / API, not WebRTC&#xa;Mailpit: optional mail testing" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="tunnel">
+          <mxGeometry x="18" y="70" width="304" height="161" as="geometry" />
+        </mxCell>
+        <mxCell id="media" value="" style="rounded=1;arcSize=4;html=0;fillColor=#fafbfd;strokeColor=#cbd5e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1750" width="2480" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="media-label" value="LIVE MEDIA &amp; TRANSCRIPTION  |  optional transcription-worker profile" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=25;fontColor=#334155;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="media">
+          <mxGeometry x="22" y="18" width="2436" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="media-browser" value="" style="rounded=1;arcSize=8;html=0;fillColor=#edf3ff;strokeColor=#7397df;strokeWidth=2;" vertex="1" parent="media">
+          <mxGeometry x="30" y="100" width="480" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="media-browser-title" value="Interview browsers" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#173667;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="media-browser">
+          <mxGeometry x="18" y="16" width="444" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="media-browser-body" value="Camera / microphone → LiveKit&#xa;Both participants consent to captions&#xa;No raw audio / video is recorded" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="media-browser">
+          <mxGeometry x="18" y="70" width="444" height="131" as="geometry" />
+        </mxCell>
+        <mxCell id="livekit" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="media">
+          <mxGeometry x="670" y="100" width="480" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="livekit-title" value="LiveKit Cloud" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="livekit">
+          <mxGeometry x="18" y="16" width="444" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="livekit-body" value="Direct browser WebRTC media&#xa;Scoped room tokens from backend&#xa;Backend controls agent dispatch" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="livekit">
+          <mxGeometry x="18" y="70" width="444" height="131" as="geometry" />
+        </mxCell>
+        <mxCell id="worker" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="media">
+          <mxGeometry x="1310" y="100" width="480" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="worker-title" value="transcription-worker" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="worker">
+          <mxGeometry x="18" y="16" width="444" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="worker-body" value="LiveKit Agents microphone subscriber&#xa;Only trusted participant audio&#xa;Final text → internal FastAPI endpoint" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="worker">
+          <mxGeometry x="18" y="70" width="444" height="131" as="geometry" />
+        </mxCell>
+        <mxCell id="deepgram" value="" style="rounded=1;arcSize=8;html=0;fillColor=#ecfbf5;strokeColor=#38a57f;strokeWidth=2;" vertex="1" parent="media">
+          <mxGeometry x="1950" y="100" width="480" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="deepgram-title" value="Deepgram" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=26;fontColor=#11634b;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="deepgram">
+          <mxGeometry x="18" y="16" width="444" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="deepgram-body" value="Speech-to-text API · Nova-3&#xa;Only the worker holds the API key&#xa;Speaker + timestamped final text" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="deepgram">
+          <mxGeometry x="18" y="70" width="444" height="131" as="geometry" />
+        </mxCell>
+        <mxCell id="media-note" value="The worker callback uses a private secret; Nginx blocks /api/internal/transcription/ from public website access.&#xa;Candidate photo verification stays local, is visible only to the interviewer, and does not affect assessment scores." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="media">
+          <mxGeometry x="30" y="365" width="2420" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Slate: application / persistence   ·   Purple dashed: AI / embeddings   ·   Teal: media / transcript   ·   Grey dashed: optional route" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;fontFamily=Arial;fontSize=22;fontColor=#334155;fontStyle=0;strokeColor=none;fillColor=none;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="2310" width="2480" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="browser-web" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="browser" target="web" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="web-api" value="/api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="web" target="api" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-gemini" value="AI" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=1;exitY=0.17;entryX=0;entryY=0.25;" edge="1" source="api" target="gemini" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-24" as="offset" />
+            <Array as="points">
+              <mxPoint x="1870" y="323.55" />
+              <mxPoint x="1870" y="317.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-google" value="import" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="api" target="google" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="0" as="offset" />
+            <Array as="points">
+              <mxPoint x="1840" y="427.5" />
+              <mxPoint x="1840" y="645" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-smtp" value="email" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.8;entryX=0;entryY=0.5;" edge="1" source="api" target="smtp" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="0" as="offset" />
+            <Array as="points">
+              <mxPoint x="1810" y="522" />
+              <mxPoint x="1810" y="925" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-ollama" value="embeddings" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0;exitY=0.8;entryX=1;entryY=0.5;" edge="1" source="api" target="ollama" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-105" y="0" as="offset" />
+            <Array as="points">
+              <mxPoint x="970" y="522" />
+              <mxPoint x="970" y="965" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="init-model" value="provision" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#8b65b8;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" source="init" target="ollama" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="85" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-posting" value="MCP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.22;exitY=1;entryX=0.5;entryY=0;" edge="1" source="api" target="posting-mcp" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-42" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-interview" value="MCP + JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.77;exitY=1;entryX=0.5;entryY=0;" edge="1" source="api" target="interview-mcp" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="posting-discord" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" source="posting-mcp" target="discord" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-24" as="offset" />
+            <Array as="points">
+              <mxPoint x="1205" y="1170" />
+              <mxPoint x="1870" y="1170" />
+              <mxPoint x="1870" y="1205" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-database" value="SQL + vectors" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="api" target="postgres" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-120" y="190" as="offset" />
+            <Array as="points">
+              <mxPoint x="1000" y="427.5" />
+              <mxPoint x="1000" y="1435" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api-files" value="files" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=1;entryX=1;entryY=0.5;" edge="1" source="api" target="files" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-42" y="240" as="offset" />
+            <Array as="points">
+              <mxPoint x="1800" y="585" />
+              <mxPoint x="1800" y="1435" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tunnel-web" value="website" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#64748b;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=1;exitY=0.35;entryX=0;entryY=0.8;" edge="1" source="tunnel" target="web" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-60" y="40" as="offset" />
+            <Array as="points">
+              <mxPoint x="440" y="795.75" />
+              <mxPoint x="440" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="browser-livekit" value="WebRTC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=2.5;strokeColor=#198b81;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="media-browser" target="livekit" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="livekit-worker" value="audio" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#198b81;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="livekit" target="worker" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="worker-deepgram" value="STT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;startArrow=block;startFill=1;strokeWidth=2.5;strokeColor=#198b81;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="worker" target="deepgram" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="0" y="-20" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="worker-internal" value="final text + heartbeat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#198b81;fontFamily=Arial;fontSize=20;fontColor=#42506a;labelBackgroundColor=#ffffff;jumpStyle=arc;jumpSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=1;entryY=0.95;" edge="1" source="worker" target="api" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-130" y="0" as="offset" />
+            <Array as="points">
+              <mxPoint x="1610" y="1690" />
+              <mxPoint x="1890" y="1690" />
+              <mxPoint x="1890" y="569.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

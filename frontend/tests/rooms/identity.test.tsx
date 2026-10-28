@@ -91,6 +91,60 @@ test("capture remains disabled before a consented candidate joins", async () => 
   expect(api.capture).not.toHaveBeenCalled();
 });
 
+test("matched card shows a clear photo-only result, readable check time and compact recapture action", async () => {
+  api.read.mockResolvedValue({ ...state, status: "matched", message: "Reference photo matched", checked_at: "2026-10-26T08:51:10Z",
+    capture_allowed: true, similarity: .97, threshold: .5 });
+  render(<IdentityOverview interviewId={44} />);
+  await screen.findByText("Reference photo matched");
+  expect(screen.getByRole("region", { name: "Candidate identity status" }).getAttribute("data-state")).toBe("matched");
+  expect(screen.getByText("Checked 26 Oct 2026 at 2:51 PM (Dhaka time)")).toBeTruthy();
+  expect(screen.getByText("Compared with application photo")).toBeTruthy();
+  expect(screen.getByText("No effect on assessment scores")).toBeTruthy();
+  expect(screen.getByText("Not legal-ID verification or continuous monitoring.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Capture face again" }).querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Confirm identity manually" })).toBeNull();
+  expect(api.capture).not.toHaveBeenCalled();
+});
+
+test("manual confirmation stays visually and textually separate from a biometric match", async () => {
+  api.read.mockResolvedValue({ ...state, status: "manual", message: "Manually confirmed by interviewer", checked_at: "2026-10-26T08:51:10Z" });
+  render(<IdentityOverview interviewId={44} />);
+  await screen.findByText("Manually confirmed by interviewer");
+  expect(screen.getByRole("region", { name: "Candidate identity status" }).getAttribute("data-state")).toBe("manual");
+  expect(screen.getByText("Human confirmation · not a photo match")).toBeTruthy();
+  expect(screen.queryByText("Reference photo matched")).toBeNull();
+});
+
+test("an inconclusive result keeps retry and explicit manual confirmation available", async () => {
+  const user = userEvent.setup();
+  api.read.mockResolvedValue({ ...state, status: "low_similarity", message: "Unable to verify a match. Retry or ask for manual verification.",
+    checked_at: "2026-10-26T08:51:10Z", capture_allowed: true });
+  api.manual.mockResolvedValue({ ...state, status: "manual", message: "Manually confirmed by interviewer", checked_at: "2026-10-26T08:55:00Z" });
+  render(<IdentityOverview interviewId={44} />);
+  await screen.findByText(/Unable to verify a match/);
+  expect(screen.getByRole("region", { name: "Candidate identity status" }).getAttribute("data-state")).toBe("low_similarity");
+  expect((screen.getByRole("button", { name: "Capture face again" }) as HTMLButtonElement).disabled).toBe(false);
+  const toggle = screen.getByRole("button", { name: "Confirm identity manually" });
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  await user.click(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  const save = screen.getByRole("button", { name: "Save manual confirmation" });
+  expect((save as HTMLButtonElement).disabled).toBe(true);
+  await user.type(screen.getByRole("textbox", { name: "How did you confirm the joining candidate?" }), "Confirmed during the live interview.");
+  await user.click(save);
+  expect(api.manual).toHaveBeenCalledWith(44, "Confirmed during the live interview.");
+  await screen.findByText("Human confirmation · not a photo match");
+});
+
+test("unavailable status never displays a successful-match presentation", async () => {
+  api.read.mockRejectedValue(new Error("private service details"));
+  render(<IdentityOverview interviewId={44} />);
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Identity check unavailable. Do not assume a match.");
+  expect(screen.getByRole("region", { name: "Candidate identity status" }).getAttribute("data-state")).toBe("unavailable");
+  expect(screen.queryByText("Reference photo matched")).toBeNull();
+  expect(screen.queryByText(/private service details/)).toBeNull();
+});
+
 function camera() {
   vi.stubGlobal("MediaStream", class { constructor(public tracks: unknown[]) {} });
   vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(async function (this: HTMLVideoElement) {

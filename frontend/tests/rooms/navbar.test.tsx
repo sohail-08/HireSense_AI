@@ -30,10 +30,9 @@ it("highlights Assessment at the existing reports URL", () => {
   expect(screen.getByRole("link", { name: "Jobs", exact: true }).className).toContain("border-transparent");
 });
 
-it("leaves candidate navigation unchanged", () => {
+it("does not expose account navigation for legacy candidate accounts", () => {
   auth.user.role = "candidate";
   render(<MemoryRouter initialEntries={["/candidate/dashboard"]}><Navbar /></MemoryRouter>);
-  const links = within(screen.getByRole("navigation", { name: "Main navigation" })).getAllByRole("link");
-  expect(links.map(link => link.textContent)).toEqual(["Dashboard", "Interviews"]);
-  expect(links.map(link => link.getAttribute("href"))).toEqual(["/candidate/dashboard", "/candidate/interviews"]);
+  expect(screen.queryByRole("navigation")).toBeNull();
+  expect(screen.queryByRole("link")).toBeNull();
 });

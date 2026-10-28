@@ -22,6 +22,8 @@ def _values(enum_type: type[Enum]) -> list[str]:
 
 
 class RequirementDiscoverySession(Base):
+    # Historical records/FKs only. New jobs use direct RAG drafting; the
+    # standalone discovery graph and chat endpoint have been retired.
     __tablename__ = "requirement_discovery_sessions"
 
     id: Mapped[str] = mapped_column(

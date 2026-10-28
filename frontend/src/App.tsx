@@ -13,10 +13,8 @@ import {
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 
-import { CandidateLayout } from "./layouts/CandidateLayout";
 import { InterviewerLayout } from "./layouts/InterviewerLayout";
 
-import { CandidateDashboard } from "./pages/CandidateDashboard";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewerDashboard } from "./pages/InterviewerDashboard";
 import { InterviewsPage } from "./pages/InterviewsPage";
@@ -25,11 +23,9 @@ const CandidateInterviewPage = lazy(() => import("./pages/CandidateInterviewPage
 const InterviewerConsolePage = lazy(() => import("./pages/InterviewerConsolePage").then((module) => ({ default: module.InterviewerConsolePage })));
 import { JobDescriptionPage } from "./pages/JobDescriptionPage";
 import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
 import { ScreeningPage } from "./pages/ScreeningPage";
 import { ReportPageBoundary } from "./components/assessments/ReportPageBoundary";
 const ConsolidatedAssessmentsPage = lazy(() => import("./pages/ConsolidatedAssessmentsPage").then(module => ({ default: module.ConsolidatedAssessmentsPage })));
-import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 function HomeRedirect() {
@@ -64,7 +60,7 @@ export default function App() {
 
       <Route
         path="/register"
-        element={<RegisterPage />}
+        element={<Navigate to="/login" replace />}
       />
 
       <Route
@@ -113,35 +109,7 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route
-        element={
-          <ProtectedRoute allowedRole="candidate" />
-        }
-      >
-        <Route
-          path="/candidate"
-          element={<CandidateLayout />}
-        >
-          <Route
-            index
-            element={
-              <Navigate to="dashboard" replace />
-            }
-          />
-
-          <Route
-            path="dashboard"
-            element={<CandidateDashboard />}
-          />
-
-          <Route
-            path="interviews"
-            element={
-              <PlaceholderPage title="My interviews" />
-            }
-          />
-        </Route>
-      </Route>
+      <Route path="/candidate/*" element={<Navigate to="/login" replace />} />
 
       <Route
         path="*"

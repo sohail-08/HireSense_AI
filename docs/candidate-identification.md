@@ -53,6 +53,15 @@ Final weights remain interview 60%, CV 30%, practical 10%.
    They retain the compact consent checkbox and privacy details; no outcome is
    revealed after recapture. Captions and saved transcripts are interviewer-only.
 
+The interviewer status card uses a soft white/green surface and shield/check mark
+for a reference-photo match, a distinct human-confirmation icon for manual checks,
+and amber attention styling for inconclusive/error states. The original result
+message stays visible; color and icons never replace text. Check timestamps use
+the shared readable Dhaka-time format. Compact camera actions retain the existing
+consent, joined-candidate, pending-request and version guards. The interviewer-only
+badge and photo-only/no-score-impact notices remain visible. This is a frontend
+presentation change, with no changes to matching thresholds, scores or saved data.
+
 ## Privacy and security
 
 - The interviewer-only Candidate info panel displays the application's uploaded

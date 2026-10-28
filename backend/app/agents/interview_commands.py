@@ -18,6 +18,8 @@ class InterviewCommand(BaseModel):
     threshold: str | None = None
     operator: Literal["gt", "gte"] | None = None
     candidate_name: str | None = None
+    candidate_names: list[str] = Field(default_factory=list, max_length=50)
+    application_ids: list[int] = Field(default_factory=list, max_length=50)
     schedule_ids: list[int] = Field(default_factory=list, max_length=100)
     stage: str | None = None
     date: str | None = None
@@ -42,6 +44,12 @@ missing scheduling details must be null. Dates must be ISO YYYY-MM-DD and local
 times HH:MM. Resolve relative dates against current_time. Do not invent dates,
 times, time zones, duration, scheduling mode, application IDs or emails. Initial
 requests are selection, not approval. More than/greater than/above means gt;
+For a new interview requested with a candidate's name, extract candidate_name
+(or candidate_names for multiple people) and use selection/manual. Never ask
+for top-N or a score cutoff when a person is named. Names are resolved by the
+service against the selected job's saved ranking; never invent application IDs.
+Use application_ids only for explicit application #ID selections, not interview IDs.
+Do not repeat candidate names from prior context in date/time-only follow-ups.
 Top N means the original first N candidates in the saved ranking, without
 replacing excluded candidates with lower-ranked candidates.
 at least/greater than or equal means gte. All interviews use sequential individual

@@ -190,7 +190,8 @@ export function SupervisorProvider({ children }: { children: ReactNode }) {
       // A restored session, poll or response arriving after the user navigated
       // elsewhere must never pull them away from their current work.
       if (destination && currentLocation.current === origin) {
-        navigate(`${destination.path}#${destination.section}`, { state: { workflowSection: destination.section }, replace: destination.path.split("?")[0] === pathname });
+        navigate(`${destination.path}#${destination.section}`, { state: { workflowSection: destination.section,
+          interviewSelection: value.route === "interviews" ? value.interview_selection : undefined }, replace: destination.path.split("?")[0] === pathname });
         if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
       }
     } catch (error) {

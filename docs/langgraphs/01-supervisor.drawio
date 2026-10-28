@@ -1,23 +1,86 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" agent="Codex" version="24.7.17" type="device">
-  <diagram id="supervisor" name="HireSenseSupervisorGraph">
-    <mxGraphModel dx="1000" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="850" math="0" shadow="0">
+<mxfile host="app.diagrams.net" agent="HireSense" pages="1">
+  <diagram id="supervisor" name="1. HireSenseSupervisorGraph">
+    <mxGraphModel dx="1100" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1200" math="0" shadow="0" background="#ffffff">
       <root>
-        <mxCell id="0"/>
-        <mxCell id="1" parent="0"/>
-        <mxCell id="edge-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;strokeColor=#64748b;fontColor=#334155;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="__start__" target="supervisor_agent"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
-        <mxCell id="edge-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;strokeColor=#64748b;fontColor=#334155;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="capture_tool_result" target="supervisor_agent"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="60" y="640"/><mxPoint x="60" y="230"/></Array></mxGeometry></mxCell>
-        <mxCell id="edge-2" value="end" tooltip="A tool result has been captured and the final response is ready" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;dashed=1;dashPattern=6 4;strokeColor=#2563eb;fontColor=#1d4ed8;exitX=0.875;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="supervisor_agent" target="__end__"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="610" y="350"/><mxPoint x="540" y="350"/><mxPoint x="540" y="740"/></Array></mxGeometry></mxCell>
-        <mxCell id="edge-3" value="handle_error" tooltip="An agent or tool error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;dashed=1;dashPattern=6 4;strokeColor=#2563eb;fontColor=#1d4ed8;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="supervisor_agent" target="handle_error"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="780" y="230"/><mxPoint x="780" y="350"/></Array></mxGeometry></mxCell>
-        <mxCell id="edge-4" value="tools" tooltip="A valid single native tool call" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;dashed=1;dashPattern=6 4;strokeColor=#2563eb;fontColor=#1d4ed8;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="supervisor_agent" target="tools"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="410" y="330"/><mxPoint x="280" y="330"/></Array></mxGeometry></mxCell>
-        <mxCell id="edge-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;strokeColor=#64748b;fontColor=#334155;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="tools" target="capture_tool_result"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
-        <mxCell id="edge-6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=2;fontFamily=Courier New;fontSize=14;labelBackgroundColor=#ffffff;strokeColor=#64748b;fontColor=#334155;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="handle_error" target="__end__"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="780" y="600"/><mxPoint x="740" y="600"/></Array></mxGeometry></mxCell>
-        <mxCell id="__start__" value="START" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#dcfce7;strokeColor=#16a34a;" vertex="1" parent="1"><mxGeometry x="450" y="40" width="80" height="80" as="geometry"/></mxCell>
-        <mxCell id="supervisor_agent" value="supervisor_agent" tooltip="Gemini with bind_tools(): tool_choice=any before execution, none after execution" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#eff6ff;strokeColor=#2563eb;" vertex="1" parent="1"><mxGeometry x="330" y="190" width="320" height="80" as="geometry"/></mxCell>
-        <mxCell id="tools" value="tools&#xa;(ToolNode)" tooltip="LangGraph native ToolNode executing the eight @tool definitions" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#f3e8ff;strokeColor=#9333ea;" vertex="1" parent="1"><mxGeometry x="130" y="400" width="300" height="80" as="geometry"/></mxCell>
-        <mxCell id="capture_tool_result" value="capture_tool_result" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#eff6ff;strokeColor=#2563eb;" vertex="1" parent="1"><mxGeometry x="130" y="600" width="300" height="80" as="geometry"/></mxCell>
-        <mxCell id="handle_error" value="handle_error" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#fee2e2;strokeColor=#dc2626;" vertex="1" parent="1"><mxGeometry x="650" y="410" width="260" height="80" as="geometry"/></mxCell>
-        <mxCell id="__end__" value="END" style="ellipse;aspect=fixed;whiteSpace=wrap;html=0;fontFamily=Courier New;fontSize=16;fontStyle=1;fontColor=#0f172a;strokeWidth=2;spacing=10;fillColor=#f1f5f9;strokeColor=#64748b;" vertex="1" parent="1"><mxGeometry x="700" y="700" width="80" height="80" as="geometry"/></mxCell>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="doc-kicker" value="HIRESENSE / LANGGRAPH 1 OF 7" style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;strokeColor=none;fillColor=none;spacing=0;fontFamily=Helvetica;fontColor=#182136;fontSize=11;fontStyle=1;fontColor=#6354b5;" vertex="1" parent="1">
+          <mxGeometry x="56" y="36" width="988" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="doc-title" value="HireSenseSupervisorGraph" style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;strokeColor=none;fillColor=none;spacing=0;fontFamily=Helvetica;fontColor=#182136;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="56" y="72" width="988" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="doc-source" value="backend/app/agents/supervisor.py" style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;strokeColor=none;fillColor=none;spacing=0;fontFamily=Helvetica;fontColor=#182136;fontSize=13;fontFamily=Consolas;fontColor=#626d85;" vertex="1" parent="1">
+          <mxGeometry x="56" y="128" width="988" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="doc-subtitle" value="Exact registered nodes and directed edges · Solid = unconditional · Dashed = conditional" style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;strokeColor=none;fillColor=none;spacing=0;fontFamily=Helvetica;fontColor=#182136;fontSize=12;fontColor=#626d85;" vertex="1" parent="1">
+          <mxGeometry x="56" y="168" width="988" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="__start__" value="START" style="ellipse;whiteSpace=wrap;html=0;fontFamily=Helvetica;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#ecfdf5;strokeColor=#6ee7b7;fontColor=#065f46;" vertex="1" parent="1">
+          <mxGeometry x="420" y="228" width="76" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="supervisor_agent" value="supervisor_agent" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Consolas;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#f3f1ff;strokeColor=#b4a7e9;fontColor=#352d80;" vertex="1" parent="1">
+          <mxGeometry x="260" y="328" width="400" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="tools" value="tools" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Consolas;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#ede9fe;strokeColor=#a78bfa;fontColor=#5b21b6;" vertex="1" parent="1">
+          <mxGeometry x="260" y="538" width="400" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="capture_tool_result" value="capture_tool_result" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Consolas;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#ecfdf5;strokeColor=#6ee7b7;fontColor=#065f46;" vertex="1" parent="1">
+          <mxGeometry x="260" y="748" width="400" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="handle_error" value="handle_error" style="rounded=1;arcSize=16;whiteSpace=wrap;html=0;fontFamily=Consolas;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#fff1f2;strokeColor=#fda4af;fontColor=#9f1239;" vertex="1" parent="1">
+          <mxGeometry x="770" y="538" width="270" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="__end__" value="END" style="ellipse;whiteSpace=wrap;html=0;fontFamily=Helvetica;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;strokeWidth=1.5;spacing=10;fillColor=#eff0f5;strokeColor=#c9cedd;fontColor=#4d5870;" vertex="1" parent="1">
+          <mxGeometry x="420" y="968" width="76" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="doc-footer" value="4 registered nodes · 7 edges · START / END excluded from node count&#xa;Topology checked against the compiled graph. No conceptual service steps added." style="text;html=0;align=left;verticalAlign=middle;whiteSpace=wrap;strokeColor=none;fillColor=none;spacing=0;fontFamily=Helvetica;fontColor=#182136;fontSize=12;fontColor=#626d85;" vertex="1" parent="1">
+          <mxGeometry x="56" y="1100" width="988" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#8992a9;fontColor=#4d5870;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="__start__" target="supervisor_agent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#8992a9;fontColor=#4d5870;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="capture_tool_result" target="supervisor_agent">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="120" y="784" />
+              <mxPoint x="120" y="364" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-2" value="end" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#6354b5;fontColor=#4d5870;dashed=1;dashPattern=6 4;exitX=0.85;exitY=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="supervisor_agent" target="__end__">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="450" />
+              <mxPoint x="700" y="450" />
+              <mxPoint x="700" y="988" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-3" value="handle_error" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#6354b5;fontColor=#4d5870;dashed=1;dashPattern=6 4;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="supervisor_agent" target="handle_error">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="364" />
+              <mxPoint x="720" y="466" />
+              <mxPoint x="905" y="466" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-4" value="tools" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#6354b5;fontColor=#4d5870;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="supervisor_agent" target="tools">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#8992a9;fontColor=#4d5870;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="tools" target="capture_tool_result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=0;endArrow=block;endFill=1;strokeWidth=1.7;fontFamily=Consolas;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#8992a9;fontColor=#4d5870;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="handle_error" target="__end__">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1060" y="574" />
+              <mxPoint x="1060" y="1052" />
+              <mxPoint x="458" y="1052" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

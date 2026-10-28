@@ -769,6 +769,14 @@ class SupervisorService:
         refresh_required: bool,
     ) -> dict[str, Any]:
         state_json = supervisor.state_json or {}
+        workflow = state_json.get("interview_workflow") or {}
+        selection = workflow.get("selection_preview")
+        interview_selection = None
+        if route == "interviews" and outcome != "failure" and supervisor.phase in {"interview_selection", "interview_schedule", "interview_approval"}:
+            job_id = workflow.get("rule", {}).get("job_posting_id")
+            if job_id and (selection or workflow.get("selection_source") == "named"):
+                interview_selection = {"job_posting_id": job_id,
+                    "application_ids": [item["application_id"] for item in (selection or {}).get("selected", [])]}
         screening_batch = None
         if self.screening_service and state_json.get("last_screening_batch_id"):
             try:
@@ -796,6 +804,7 @@ class SupervisorService:
             "refresh_required": refresh_required,
             "screening_batch": screening_batch,
             "interview_batch_id": (state_json.get("interview_workflow") or {}).get("last_batch_id"),
+            "interview_selection": interview_selection,
         }
 
     def _requirement_state(

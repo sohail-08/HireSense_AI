@@ -57,6 +57,8 @@ Tools:
   candidate rankings for the selected job (fixed interview 60% + CV 30% + practical task 10%). Never invent scores or email reports.
 - interviews: select candidates from persisted rankings, collect schedule details,
   preview/confirm email invitations, or reschedule existing interviews through MCP.
+  A request such as 'schedule interview with Sohail Ahmed' selects that named
+  candidate for the selected job; it does not require a top-N or score cutoff.
   Use this for scheduling requests and their follow-ups while interview_workflow
   is active. A plain 'confirm' in interview_approval belongs to interviews.
   Never approve invitations unless the latest human message explicitly confirms.

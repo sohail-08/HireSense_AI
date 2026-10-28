@@ -1,530 +1,591 @@
 # HireSense
 
-Evidence-grounded semantic CV matching, private pgvector passages, stable result
-reuse, and calibration checks are described in [robust CV screening](docs/robust-cv-screening.md).
+**AI-assisted recruitment, from job description to evidence-backed candidate assessment.**
 
-Final candidate rankings (interview 60% + CV 30% + practical task 10%), question scores, optional evidence,
-and private HTML/PDF reports are documented in [Feature 6](docs/consolidated-assessments.md).
+HireSense brings job preparation, application intake, CV screening, interview scheduling,
+live interviews and final assessment into one interviewer workspace. A conversational
+assistant coordinates supported actions, while saved evidence, explicit approvals and
+versioned results keep the interviewer in control.
 
-Interview answer analysis, evidence citations, requirement coverage, follow-up suggestions,
-and interviewer correction/version history are documented in [Feature 5](docs/interview-analysis.md).
+Candidates apply through Google Forms and attend interviews using private invitation
+links. They do not need a HireSense account. The platform supports technical and
+nontechnical roles, including short live practical exercises for engineering, HR and sales.
 
-## Current milestone
+The interviewer dashboard summarizes job activity, pending screening and upcoming
+interviews. Per-job application notifications highlight responses waiting to be synced.
 
-Optional [candidate photo verification and profile overview](docs/candidate-identification.md)
-uses local models with explicit consent inside the app before the interview.
-It is separate from assessment scores and supports manual verification.
-An opt-in [local recruitment example loader](docs/recruitment-examples.md) fills
-the existing screens with complete, privately traceable recruitment scenarios.
+HireSense assists recruitment decisions; it does not autonomously hire or reject people,
+guarantee model accuracy, or treat a missing assessment as a zero score.
 
-### Innovation Feature — Live Work-Sample Studio
+## Contents
 
-The interview console includes a practical-exercise workspace for technical and
-nontechnical roles: assistant-suggested or manual task preparation, reusable private
-templates, candidate readiness, a maximum 15-minute working period, live read-only
-work, autosave and one immutable submission. The LLM verifies the saved work and
-proposes a correctness score (0–100); the interviewer only approves that score.
-Unverified or unapproved scores remain pending. Final ranking uses
-60% interview, 30% CV and 10% practical; pending decisions remain unranked.
-No candidate code is executed and no AI-use
-or cheating detection is performed. See [setup and safeguards](docs/live-work-samples.md).
+- [Capabilities and recruitment workflow](#capabilities-and-recruitment-workflow)
+- [Architecture and technology](#architecture-and-technology)
+- [AI orchestration and LangGraph workflows](#ai-orchestration-and-langgraph-workflows)
+- [Scoring and evidence](#scoring-and-evidence)
+- [Quick start](#quick-start)
+- [Integration setup](#integration-setup)
+- [Project structure](#project-structure)
+- [Testing and verification](#testing-and-verification)
+- [Operations and data persistence](#operations-and-data-persistence)
+- [Security, privacy and limitations](#security-privacy-and-limitations)
+- [Documentation](#documentation)
+- [License](#license)
 
-Candidate selection, interview scheduling, confirmed SMTP invitations, `.ics`
-calendar attachments and rescheduling are implemented. Both the central assistant
-(via authenticated MCP) and manual UI use the same services. See
-[setup, workflow, tools, delivery safeguards and commit increments](docs/interview-scheduling.md).
-Candidate waiting rooms and assigned interviewer consoles use LiveKit for
-one-to-one camera/microphone interviews. LiveKit Cloud handles remote calls;
-no local LiveKit media server is required. See
-[Cloud setup and remote demo steps](docs/livekit-cloud.md). Secure HireSense join links
-are included in confirmed invitations. See [interview room setup, tests, security,
-file manifest and Git checkpoints](docs/interview-rooms.md).
+## Capabilities and recruitment workflow
 
-The interviewer console also includes [private candidate information and a RAG question assistant](docs/interview-copilot.md), backed by a separately indexed synthetic interview question bank.
-The interviewer navigation bar shows [new application notifications](docs/application-notifications.md), including per-job counts of Google Form responses waiting to be synced.
-Configure SMTP and LiveKit in the root `.env`; local Mailpit testing is opt-in.
-No external calendar API or recording is connected. Consented Deepgram transcription
-and LiveKit captions are documented in [live transcription](docs/live-transcription.md).
+### 1. Prepare and publish a job
 
-- Candidate-only registration
-- Email/password sign-in
-- JWT authentication
-- One seeded Interviewer account
-- Role-based dashboards and navigation
-- Persistent PostgreSQL storage
-- Alembic-managed database migrations
-- Private named-volume foundation for candidate documents
-- Semantic company-knowledge ingestion using Ollama embeddings
-- pgvector storage and database-side cosine similarity search with an HNSW index
-- Gemini-powered, RAG-backed requirement discovery and JD generation
-- Persisted LangGraph supervisor with native Gemini tool calling and shared workflow state
-- Interviewer UI for previous-JD knowledge, requirement review and JD approval
-- Reviewed Discord job-post previews with persistent publication status
-- Job-scoped PDF/DOCX CV parsing, requirement screening and semantic ranking
+Upload previous job descriptions as private reference PDFs, then describe the role to
+the central assistant. Retrieval-augmented generation (RAG) uses relevant sources to
+draft a job description. When more information is needed, the assistant asks follow-up
+questions. Screening requirements are derived internally; there is no separate
+requirement-discovery approval workflow.
 
-## Requirements
+Review, edit and approve the draft, or create a job description manually. Approved
+versions remain preserved when a new draft is created. Prepare a Discord post and
+review its destination, application link and deadline before explicitly approving
+publication through the job-posting MCP service.
 
-Deterministic technical/experience/qualification scoring is available on CV Screening.
-Select a job, set three category weights, and choose **Rank candidates**.
-Pending CVs are processed automatically; evidence is available only when requested.
-See [scoring formulas, immutable snapshots and reviewer steps](docs/deterministic-candidate-scoring.md).
+### 2. Collect applications
 
-Docker Desktop running with Linux containers.
+Import responses from the Google Sheet linked to the application form. HireSense
+downloads PDF/DOCX CVs from Google Drive and routes each response to its job posting.
+Candidate search, posting filters, pagination, private document access and application
+deletion are available in the Candidates workspace.
 
-## Startup
+Application profiles are isolated: a repeated email address does not allow one person's
+submission to overwrite another's information. Re-sync is idempotent, and conservative
+repeat detection preserves original submissions and assessment history.
 
-1. Copy `.env.example` to `.env`.
-2. Set your own database password, JWT secret, interviewer password and
-   `GEMINI_API_KEY` and a separate `INTERVIEW_LINK_SECRET` in the root `.env`.
-   For interviews, fill `LIVEKIT_CLOUD_URL`,
-   `LIVEKIT_CLOUD_API_KEY` and `LIVEKIT_CLOUD_API_SECRET` from your Cloud project.
-   See [the Cloud setup guide](docs/livekit-cloud.md). These settings also work
-   when the website is opened locally at `http://localhost:5173`.
-3. Run:
+### 3. Screen CVs and rank candidates
+
+Approve the technical-skills, experience and qualifications weights, then select
+**Rank candidates**. Native PDF/DOCX extraction and automatic, confidence-gated OCR for
+scanned PDF pages preserve page/block references for evidence.
+
+Private CV passages are retrieved semantically, matched against job requirements and
+checked against their sources. Validated results are reused when their inputs remain
+compatible. Unreadable documents and provider failures are shown as processing issues,
+not fabricated zero scores. Successful applications can still be ranked in a mixed batch.
+
+### 4. Schedule interviews
+
+Select named candidates, checked applications, top-ranked candidates or a score
+threshold. The scheduling workspace distinguishes unscheduled, scheduled and completed
+interviews. Preview recipients, times, email content and calendar attachments before
+confirming SMTP delivery. Rescheduling preserves history and issues confirmed updates.
+
+The assistant and manual controls use the same scheduling services. Invitations contain
+private HireSense links and `.ics` attachments; there is no external calendar-booking
+integration. Delivery states distinguish sent, failed, pending and uncertain outcomes.
+
+### 5. Conduct the interview
+
+Candidates check devices, review the compact permissions notice and wait for admission.
+The interviewer console opens on candidate information, including the application photo,
+saved CV score and CV-backed topics to explore. LiveKit Cloud provides one-to-one
+audio/video, with a large participant view, switchable self-preview and compact controls.
+
+The private interview assistant can suggest job-relevant questions, analyze saved
+answers and prepare practical tasks. Candidates do not see the transcript, analysis,
+interviewer assistant or photo-match results.
+
+### 6. Analyze answers and candidate performance
+
+With both participants' consent and the interviewer starting transcription, a separate
+worker sends microphone audio to Deepgram and saves final transcript text. The app
+does not record interview audio or video.
+
+**Analyze answers** identifies substantive exchanges, scores supported answers and saves
+their results. Greetings, device checks and unrelated small talk are excluded; job-related
+HR, sales and behavioral questions remain eligible. Concise performance summaries group
+strengths, areas to improve, evidence gaps and points needing verification, with traceable
+sources. Transcription gaps and uncertain wording remain visible.
+
+### 7. Run a live practical exercise
+
+The **Live Work-Sample Studio** adds an observable work product to CV and verbal evidence:
+
+1. Ask the interview assistant for short tasks based on the current posting and select
+   **Use this task**, or prepare a draft manually/from a saved private template.
+2. Review and **Approve & share task**. The candidate reads it and confirms readiness;
+   the interviewer starts the server-controlled working period, capped at 15 minutes.
+3. The candidate works in a text/code workspace with autosave. The interviewer sees
+   server-saved work and can ask for explanations verbally.
+4. The candidate submits once. Submission locks the response; there are no additional
+   candidate attempts. Expiry freezes the latest saved work with an explicit status.
+5. The LLM proposes a correctness score from 0–100, supported by response quotations.
+   A separate model check verifies its support. The interviewer reviews and approves
+   the saved score; they do not enter or edit marks.
+
+Tasks can be a focused code correction, HR scenario, sales response or another short,
+job-relevant exercise. The workspace does not execute code, run tests, detect AI use or
+prove that outside assistance was absent. Pending or unverified reviews remain unscored.
+
+### 8. Compare final assessments
+
+**Calculate final ranking** combines saved CV, interview and approved practical scores.
+It does not call the LLM to regrade interviews. Missing or stale interview scores direct
+the interviewer back to **Analyze answers**. Private HTML/PDF reports retain component
+scores, evidence, limitations and their saved scoring policy.
+
+### Optional candidate photo verification
+
+With the candidate's in-app consent, the interviewer can request a face capture and
+compare it with the expected application's uploaded photo using local YuNet/SFace
+models. Results are interviewer-only; manual verification remains available.
+
+This is optional one-to-one photo comparison, not legal-identity verification, liveness
+detection or continuous monitoring. It never changes assessment scores or blocks an
+interview. Leaving the permissions checkbox unchecked does not prevent joining.
+
+## Architecture and technology
+
+The browser uses the frontend's `/api` proxy to reach FastAPI. Business services enforce
+authorization, persist workflow state and coordinate model/provider calls.
+
+```mermaid
+flowchart LR
+    Browser[Interviewer / candidate browser] --> Web[React frontend / Nginx]
+    Web --> API[FastAPI backend]
+    API --> DB[(PostgreSQL + pgvector)]
+    API --> Files[Private application storage]
+    API --> Ollama[Docker Ollama / Nomic embeddings]
+    API --> Gemini[Gemini / generation and assessment]
+    API --> Google[Google Sheets and Drive / read-only intake]
+    API <--> MCP[Private MCP services]
+    MCP --> Discord[Discord job publication]
+    API --> SMTP[SMTP / confirmed invitations]
+    Browser <--> LiveKit[LiveKit Cloud / audio and video]
+    Worker[Optional transcription worker] <--> LiveKit
+    Worker --> Deepgram[Deepgram / speech recognition]
+    Worker <--> API
+```
+
+This is a component overview, not a LangGraph topology. Interview-scheduling MCP tools
+forward authorized requests to the backend; job-posting MCP owns the Discord integration.
+Website tunneling and media transport are separate.
+
+| Layer | Implementation |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, LiveKit components |
+| Backend | Python 3.12, FastAPI, Pydantic, SQLAlchemy, Alembic |
+| Orchestration | LangGraph, LangChain Gemini tool calling, MCP over Streamable HTTP |
+| Generation and assessment | Configured Gemini model; validated structured responses |
+| Embeddings | `nomic-embed-text:latest` through private Docker Ollama; 768 dimensions |
+| Database and retrieval | PostgreSQL 16 with pgvector; shared knowledge and private CV indexes |
+| Document processing | PDF/DOCX extraction, Poppler, Tesseract OCR, HTML/PDF reporting |
+| Interviews and integrations | LiveKit Cloud, optional Deepgram worker, Google Sheets/Drive, Discord, SMTP |
+| Deployment and verification | Docker Compose, Nginx, pytest, Vitest, React Testing Library, Node test runner |
+
+## AI orchestration and LangGraph workflows
+
+HireSense uses a tool-calling supervisor and specialized workflow graphs, not a group
+of independent agents making autonomous hiring decisions. The central assistant and
+interview assistant reuse the supervisor definition with different tool scopes.
+
+The central scope exposes job-description generation, editing and approval, job posting,
+response sync, CV screening, interview scheduling, candidate assessments and help.
+The interview scope exposes question suggestions, answer analysis, practical-task
+suggestions and help. One business tool can execute per supervisor chat request;
+consequential actions retain their service-level review and confirmation checks.
+
+There are seven distinct graph definitions:
+
+| Graph | Responsibility |
+| --- | --- |
+| `HireSenseSupervisorGraph` | Select a scoped tool, execute it and return its result |
+| `JobPostingAssistantGraph` | Interpret publication requests and validate details |
+| `ScreeningWorkflow` | Extract CV content, match requirements and validate evidence |
+| `CandidateScoringWorkflow` | Calculate deterministic CV category scores and rankings |
+| `InterviewAnalysisGraph` | Analyze transcript answers and their supporting evidence |
+| `ConsolidatedAssessmentGraph` | Assemble assessment components and reports |
+| `WorkSampleGraph` | Generate a focused practical-task draft |
+
+The standalone requirement-discovery graph is retired. RAG-backed job drafting and
+structured screening profiles remain implemented. Editable diagrams of actual nodes
+and edges are in [the graph inventory](docs/langgraphs/README.md), with
+[one combined draw.io file](docs/langgraphs/hiresense-all-langgraphs.drawio).
+
+## Scoring and evidence
+
+### CV assessment
+
+CV scoring is deterministic after evidence validation: **Met = 1**, **Partially met = 0.5**,
+and **Unmet = 0**. Approved requirement weights produce category coverage; the three
+category percentages produce the CV score. Default category weights are technical
+skills **50%**, experience **30%** and qualifications **20%**, adjustable to total 100%.
+A category without weighted requirements must receive 0%, with its weight redistributed.
+
+Embedding similarity retrieves passages; it is not a candidate score. Missing, corrupt,
+unreadable or failed CV processing does not receive a numerical score or rank. Accepted
+OCR evidence retains original page references and a warning to verify important details.
+
+### Interview assessment
+
+The LLM assigns supported 0–100 marks for **relevance, accuracy, completeness and quality**,
+each weighted 25%. Application code averages these marks and then the included question
+scores. Met/partial/unmet badges describe findings; they do not restrict numeric marks
+to 0/50/100. Different-quality answers can receive different scores despite similar badges.
+
+Verified off-topic answers and genuinely unanswered questions receive zero. Procedural
+conversation is excluded. Provider failures, ambiguous transcription and missing scoring
+references are not proof of an incorrect answer and remain explicit incomplete states.
+Answer guides/technical references support correctness checks; unchanged validated marks
+are reused rather than regenerated on every page load.
+
+### Final ranking
+
+```text
+Final score = Interview score × 0.60 + CV score × 0.30 + Practical score × 0.10
+```
+
+For example, interview 80, CV 70 and an approved practical score of 90 produce **78.00%**.
+Missing, stale, failed or unapproved required components keep a candidate unranked;
+they are not silently converted to zero. Exact totals determine ties, with shared ranks
+such as 1, 1, 3. Historical reports retain their saved weights and policy versions.
+
+Saved provenance includes source references, input/model/prompt identities and scoring
+snapshots. Reuse improves consistency, but neither caching nor an independent model
+check guarantees correctness. Comparable rankings require consistent job requirements
+and assessment policies. See [CV scoring](docs/deterministic-candidate-scoring.md),
+[interview analysis](docs/interview-analysis.md) and [final assessments](docs/consolidated-assessments.md).
+
+## Quick start
+
+### Prerequisites
+
+- Docker with Compose v2 and Linux containers; Docker Desktop is suitable on Windows.
+- Internet for initial image/model downloads and any configured cloud integrations.
+- Sufficient RAM and disk for the application, PostgreSQL and local embedding inference.
+  Images can be several GB; the Nomic model download is approximately 274 MB.
+- A Gemini API key for AI features. Other credentials depend on the integrations used.
+
+Host Python, Node.js, Ollama and GPU configuration are not required for the Docker
+deployment. Python 3.12 and Node.js 22 are used by the repository's container builds
+and are suitable for local development/test environments.
+
+### 1. Configure the root environment
+
+From the repository root, create `.env` only if it does not already exist:
 
 ```powershell
-docker compose up --build
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Application: http://localhost:5173
-API documentation: http://localhost:8000/docs
-Health check: http://localhost:8000/api/health
+Set your own `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `INTERVIEWER_EMAIL`,
+`INTERVIEWER_PASSWORD`, `INTERVIEW_LINK_SECRET` and `GEMINI_API_KEY`. Use independent,
+strong JWT and interview-link secrets of at least 32 characters. Select a
+`GEMINI_CHAT_MODEL` available to your account; provider quota and billing remain external.
 
-The backend runs migrations and seeds the Interviewer automatically.
-All public registrations create Candidates.
+Keep `FRONTEND_URL` and `INTERVIEW_JOIN_BASE_URL` at `http://localhost:5173` for local use.
+The template sets `CANDIDATE_COOKIE_SECURE=false` for local HTTP; use secure cookies and
+the correct HTTPS origin for remote access. The demo helper manages those overrides.
 
-The repository-root `.env` is the only active environment file. `.env.example`
-is a tracked template, not a second configuration file. Do not create
-`backend/.env` or `frontend/.env`. Local backend and Discord MCP processes load
-the root file regardless of their working directory; process environment
-variables take precedence. Docker Compose reads the same root file and passes
-only each service's settings into its container, without copying secrets into
-images or exposing them to the frontend. `DATABASE_URL` is the local connection;
-Compose supplies the backend's internal PostgreSQL URL separately.
+The single repository-root `.env` is the active environment file. Do not create
+`backend/.env` or `frontend/.env`, commit credentials, or put secrets in `VITE_*` variables.
+Compose injects each service's settings; the frontend receives no provider API keys.
 
-Requirement extraction and job-description generation use the Gemini API.
-Create a key in Google AI Studio and place it only in the root `.env` file:
-
-```dotenv
-GEMINI_API_KEY=your-real-api-key
-GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
-```
-
-Do not put the key in `frontend/.env`, source code, or any variable beginning
-with `VITE_`; those values can be exposed to the browser. After changing the
-key, recreate the backend container:
-
-```powershell
-docker compose up -d --build --force-recreate backend
-```
-
-Semantic knowledge embeddings remain local through Ollama. Start Ollama and
-pull the embedding model before ingesting or retrieving previous job descriptions:
-
-```powershell
-ollama serve
-ollama pull nomic-embed-text
-```
-
-When the backend runs in Docker, `OLLAMA_DOCKER_BASE_URL` must point to the
-host service. The default is `http://host.docker.internal:11434`; local
-non-Docker backend runs continue to use `OLLAMA_BASE_URL`.
-
-## Knowledge embeddings with pgvector
-
-PostgreSQL stores previous-JD chunk embeddings in
-`knowledge_chunks.embedding` as `vector(768)`. Ollama continues to generate
-the embeddings using `nomic-embed-text:latest`; pgvector handles storage and
-similarity search. Queries use cosine distance (`<=>`), model metadata filtering,
-and a database `ORDER BY ... LIMIT` rather than loading every vector into Python.
-The HNSW index uses `vector_cosine_ops`; small datasets may use a sequential scan
-because PostgreSQL chooses the lowest-cost plan. HNSW is an approximate index.
-See the [pgvector documentation](https://github.com/pgvector/pgvector#hnsw).
-
-The PostgreSQL image is built from `postgres/Dockerfile`, retaining PostgreSQL 16
-and Alpine while installing pgvector 0.8.2. For an existing checkout, run:
+### 2. Build and start
 
 ```powershell
 docker compose up -d --build
+docker compose ps -a
 ```
 
-Migration `0014_pgvector_knowledge` enables the extension, converts the existing
-JSON embeddings in place, and creates the index. The existing `postgres_data`
-volume is reused. Migration stops without deleting records if an existing vector
-does not have 768 dimensions. No new API key or separate vector database is needed.
-When running PostgreSQL outside Docker, install pgvector on that server before
-running Alembic, and use a migration account able to create the extension.
+Compose starts PostgreSQL, private Ollama, a lightweight model initializer, the backend,
+both MCP services and the frontend. The initializer downloads Nomic only when missing,
+verifies its pinned digest and a finite 768-dimensional embedding, then exits with **0**.
+The backend waits for successful initialization, applies Alembic migrations and seeds
+the configured interviewer account. First startup can take several minutes or longer
+on slower connections.
 
-The database requires 768-dimensional embeddings. Switching to a different model
-requires compatible dimensions and re-embedding existing knowledge; vectors from
-different models are excluded from each other's searches. SQLite remains a JSON
-fallback for offline tests only. CV screening and ranking continue to use the
-existing requirement assessment workflow; this migration affects previous-JD RAG.
+| Local endpoint | Purpose |
+| --- | --- |
+| [localhost:5173](http://localhost:5173) | Interviewer sign-in and application |
+| [localhost:8000/docs](http://localhost:8000/docs) | FastAPI interactive API documentation |
+| [localhost:8000/api/health](http://localhost:8000/api/health) | API/database health check |
 
-The Gemini unpaid tier should be used only with synthetic or non-sensitive
-demo content. Do not submit real CVs, candidate personal information, or
-confidential company material through the unpaid tier.
+The Docker backend always uses `http://ollama:11434`. No host Ollama installation or
+manual model pull is needed, and its API is not published to the host. Existing
+`OLLAMA_DOCKER_BASE_URL` entries are ignored. `OLLAMA_BASE_URL` remains relevant to a
+non-Docker backend only. See [Ollama setup and recovery](docs/ollama-container.md).
 
-## Job-description workflow
+### 3. Sign in and prepare reference data
 
-1. Sign in as the Interviewer and open **Jobs**.
-2. Open **Reference documents**, select an approved historical job
-   description PDF, and upload it. The PDF must contain selectable text; scanned
-   image-only documents need OCR before upload. The default limits are 15 MB and
-   100 pages and can be changed with `KNOWLEDGE_PDF_MAX_FILE_SIZE_MB` and
-   `KNOWLEDGE_PDF_MAX_PAGES`.
-3. Use the central supervisor chat and describe the role, for example: `I want to hire a
-   backend engineer.`
-4. HireSense checks the knowledge base and drafts the job description directly from
-   relevant sources. If no suitable reference is found, it asks for the skills and
-   duties needed, then drafts from your reply. There is no separate requirements
-   proposal, approval or generation step. Screening data is derived internally.
-5. Review the draft. Request edits in
-   natural language, such as `Remove Kubernetes from preferred skills`, then
-   explicitly tell it to **approve the job description**.
-6. Use the saved job cards to reopen records after a reload. **Create job description manually**
-   remains available alongside the assistant without requiring AI or embeddings.
-   Drafts can be edited directly; editing an approved JD creates a new draft
-   version so the approved version remains unchanged.
+Sign in using the interviewer email/password configured before first startup.
+There is no public signup. Changing `INTERVIEWER_PASSWORD` afterward does not reset
+an existing account's password. Candidates join using their private invitation links.
 
-The supervisor uses Gemini's native tool calling via `ChatGoogleGenerativeAI`.
-`bind_tools()` exposes JD drafting, JD editing, JD approval, Discord posting,
-response syncing, candidate screening and help, with interview/assessment tools
-when configured. There is no requirements-discovery tool in this supervisor.
-LangGraph's built-in `ToolNode` executes the selected tool and returns
-a `ToolMessage` to the supervisor before it produces its final answer.
-
-The graph is `START -> supervisor_agent -> tools -> capture_tool_result ->
-supervisor_agent -> END`, with conditional branches for tool execution,
-completion, and errors. Exactly one business tool can execute per chat request.
-The final response model disables further tool calls; a response-generation
-failure falls back to the completed tool's result without losing refresh or
-background-screening signals. Business services receive the actual interviewer
-message, and approval checks reject fabricated or absent approval instructions.
-See the [official Gemini integration documentation](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai#tool-calling).
-
-The existing `GEMINI_API_KEY` and `GEMINI_CHAT_MODEL` settings are reused. Its
-persistent session stores the drafting role, internal screening profile, active
-JD, active posting, current phase, and conversation history. The browser keeps
-the supervisor session ID in session storage so refreshing the page restores
-the same workflow.
-
-The supervisor also stores the last native tool-call name and arguments in its
-existing session state. Tools reuse the current services, including pgvector
-knowledge retrieval, job-specific Google Forms intake, background CV screening,
-and Discord publishing through the MCP server.
-
-Editable diagrams for all four actual graphs are available in
-[`docs/langgraphs/hiresense-all-langgraphs.drawio`](docs/langgraphs/hiresense-all-langgraphs.drawio).
-
-## Discord job posting
-
-HireSense publishes through a dedicated MCP server and the Discord Bot API.
-The application backend is an MCP client; it no longer sends Discord requests
-directly. The MCP server exposes only a configuration check and a
-`publish_job_post` tool locked to one configured channel.
-
-Create an application and bot in the Discord Developer Portal, install the bot
-in the target server, and grant it **View Channel**, **Send Messages**, and
-**Embed Links** permissions for the target channel. Enable Discord developer
-mode and copy the channel ID. Put the bot token and channel ID only in the root
-`.env` file:
-
-```dotenv
-DISCORD_BOT_TOKEN=your-private-bot-token
-DISCORD_CHANNEL_ID=your-numeric-channel-id
-DISCORD_DEFAULT_HEADING=BJIT is Hiring!
-JOB_POST_DEFAULT_APPLICATION_URL=
-JOB_POST_DEFAULT_CONTACT_EMAIL=
-JOB_POST_DEFAULT_LOCATION=
-JOB_POST_DEFAULT_APPLICATION_DEADLINE=
-JOB_POST_DEFAULT_INSTRUCTIONS=
-```
-
-The bot token is supplied only to the `job-posting-mcp` container. The main
-backend reads both MCP endpoints and timeouts from the root `mcp.json` registry,
-mounted read-only in Docker. See [MCP configuration](docs/mcp-configuration.md).
-Do not place the token in `frontend/.env`, a
-`VITE_*` variable, source code, screenshots, or logs. Recreate the MCP server
-and backend after changing the configuration:
+Upload selectable-text historical JD PDFs under **Jobs → Reference documents**.
+Automatic OCR applies to candidate CVs, not these knowledge PDFs. For synthetic
+reference documents and interview questions with answer guides, explicitly run:
 
 ```powershell
-docker compose up -d --build --force-recreate job-posting-mcp backend
+docker compose exec -T backend python -m app.seed_knowledge
+docker compose exec -T backend python -m app.seed_interview_questions
 ```
 
-To publish:
+These commands write demonstration knowledge to the database and generate local
+embeddings. A separate, opt-in [recruitment example loader](docs/recruitment-examples.md)
+can populate complete fictional workflows. Example scores and authored judgments are
+not evidence of real-model accuracy. None of these examples are loaded automatically.
 
-1. Open an approved job description under **Jobs**.
-2. In the central **HireSense assistant** chat, enter a command such as
-   **Post this job**. The same chat is used for requirement discovery and job
-   posting; no separate posting chatbot is shown.
-3. Provide the application link and application deadline when the assistant
-   asks. The heading, contact email, location, and instructions come from the
-   configured reusable defaults.
-4. Review the automatically refreshed Discord preview. Tell the assistant about
-   any application-link or deadline change if needed.
-5. Type **approve** to publish the reviewed preview automatically. Typed
-   approval is the explicit publication confirmation. Successful and failed
-   tasks are reported in the central chat, and publication status is refreshed.
-6. Review the saved `published`, `failed`, or `uncertain` status after the
-   request or after refreshing the page.
+## Integration setup
 
-The existing **Prepare job post** editor remains available for manual preview
-creation. It can edit all configured footer values and uses the same protected
-preview and publication services as the assistant.
+Configure only the services you intend to use. Containerized embeddings do not provision
+Google, Gemini, Discord, SMTP, LiveKit or Deepgram accounts.
 
-After explicit interviewer approval, the backend calls the MCP
-`publish_job_post` tool over Streamable HTTP. The MCP server publishes one
-message using Discord content plus one embed and forces
-`allowed_mentions.parse` to an empty list. It rejects oversized posts rather
-than truncating the approved job description. Discord currently limits message content to 2,000 characters,
-embed titles to 256, embed descriptions to 4,096, individual field values to
-1,024, and combined embed text to 6,000 characters. See Discord's official
-[authentication](https://docs.discord.com/developers/reference#authentication)
-and [message](https://docs.discord.com/developers/resources/message) documentation.
+| Integration | Main settings | Setup |
+| --- | --- | --- |
+| Gemini | `GEMINI_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_TIMEOUT_SECONDS` | AI generation, screening and assessment; credentials stay backend-only |
+| Ollama | `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_MODEL_DIGEST` | Automatic in Docker; keep the pinned Nomic identity unless planning re-embedding |
+| Google Forms intake | `GOOGLE_FORMS_SPREADSHEET_ID`, `GOOGLE_FORMS_SHEET_NAME`, `GOOGLE_FORMS_*_COLUMN` | Read-only Sheets/Drive access; see below |
+| Discord | `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`, `JOB_POST_DEFAULT_*` | Fixed destination, reviewed publication; token is supplied only to job-posting MCP |
+| Invitations | `SMTP_*`, `INTERVIEW_REPLY_TO_EMAIL` | Configure a real SMTP service or opt-in local Mailpit |
+| Audio/video | `LIVEKIT_CLOUD_URL`, `LIVEKIT_CLOUD_API_KEY`, `LIVEKIT_CLOUD_API_SECRET` | [LiveKit Cloud setup](docs/livekit-cloud.md); no bundled local media server |
+| Transcription | `TRANSCRIPTION_ENABLED`, `TRANSCRIPTION_WORKER_SECRET`, `DEEPGRAM_API_KEY` | Optional worker and explicit participant consent |
+| Photo verification | `IDENTITY_ENABLED`, `IDENTITY_*` | Optional local models, private storage and candidate consent |
 
-Known limitations: the MCP server targets one configured Discord channel and
-exposes job publication only. A network timeout after sending is recorded as `uncertain`;
-check Discord before explicitly preparing another publication. A Discord link
-is shown only when Discord returns server, channel, and message identifiers.
+### Google Forms and Drive
 
-For a repeatable local demo, load the six clearly labelled fictional Northstar
-Digital documents included with the project:
+1. Place the service-account key at `backend/secrets/google-service-account.json`.
+   Share the linked response spreadsheet and uploaded-file folders with its
+   `client_email` as a viewer. API enablement alone does not grant file access.
+2. Set `GOOGLE_FORMS_SPREADSHEET_ID` and, if necessary, the response tab/header settings.
+3. Include a required **Job Posting** form question. Prefer a value such as `Post #12`;
+   an exact title is accepted only when it resolves unambiguously.
+4. Accept PDF/DOCX CV uploads. For optional photo verification, add **Candidate photo**
+   with one JPG/PNG upload and grant the service account access. Consent is collected
+   inside HireSense, not through the Google Form.
+5. Open **Candidates → Sync responses**, or ask the assistant to sync.
+
+The integration does not alter form responses or delete original Drive uploads.
+See [application-profile integrity](docs/application-profile-integrity.md) and
+[candidate photo verification](docs/candidate-identification.md).
+
+### Optional services
+
+The following commands change local services; finish active interviews and pending
+deliveries/jobs before applying configuration changes. While a public demo is active,
+follow its origin-preserving procedure instead of plain base Compose commands.
+
+- **Test email:** the template points SMTP at `mailpit`, which is not started by default.
+  Start it with `docker compose --profile mail-test up -d mailpit` and inspect messages
+  at [localhost:8025](http://localhost:8025). This does not deliver mail to real inboxes.
+- **Transcription:** configure Deepgram, a separate worker secret and
+  `TRANSCRIPTION_ENABLED=true`, then start with
+  `docker compose --profile transcription up -d --build`. Both participants must consent,
+  and the interviewer must start transcription. See [the transcription guide](docs/live-transcription.md).
+- **Face models:** explicitly provision checksum-verified YuNet/SFace weights with
+  `docker compose exec -T backend python -m app.identity.provision`. Runtime matching
+  never downloads them automatically. See [identity setup and safeguards](docs/candidate-identification.md).
+- **Remote website demo:** with the local app running, use
+  `./scripts/start-cloudflare-demo.ps1`. It configures a temporary HTTPS origin; LiveKit
+  Cloud carries audio/video separately. Use synthetic data and follow [the demo guide](docs/cloudflare-demo.md).
+
+MCP endpoints and timeouts are centralized in [`mcp.json`](mcp.json), with separate
+local and Docker addresses. Review [MCP configuration](docs/mcp-configuration.md) rather
+than hardcoding endpoints or placing integration tokens in the frontend.
+
+## Project structure
+
+```text
+hiresense/
+├── backend/
+│   ├── app/
+│   │   ├── agents/          # Supervisor and specialized AI graphs
+│   │   ├── assessments/     # Consolidation, final scoring and report templates
+│   │   ├── identity/        # Local photo comparison and model provisioning
+│   │   ├── integrations/    # External-service adapters
+│   │   ├── interview_mcp/   # Authorized scheduling MCP tools
+│   │   ├── job_posting_mcp/ # Fixed-destination Discord MCP service
+│   │   ├── models/          # SQLAlchemy persistence models
+│   │   ├── rag/             # Knowledge embeddings and retrieval
+│   │   ├── routes/          # FastAPI endpoints
+│   │   ├── schemas/         # Validated request/response schemas
+│   │   ├── scoring/         # CV scoring workflow
+│   │   ├── screening/       # CV parsing, OCR and semantic evidence
+│   │   └── services/        # Shared business rules and workflow coordination
+│   ├── alembic/             # Database migrations
+│   ├── scripts/             # Verification, benchmarks and explicit example loaders
+│   ├── tests/               # Backend regression and opt-in integration tests
+│   ├── secrets/             # Private local credentials; ignored by Git
+│   └── storage/             # Private runtime files; ignored by Git
+├── frontend/                # React application, components and frontend tests
+├── postgres/                # PostgreSQL image with pgvector
+├── scripts/                 # PowerShell demo lifecycle and safety checks
+├── docs/                    # Feature guides and editable graph diagrams
+├── docker-compose.yml       # Local application and optional profiles
+├── docker-compose.cloudflare.yml
+├── mcp.json                 # Shared MCP endpoint registry
+└── .env.example             # Configuration template, not an active secret file
+```
+
+## Testing and verification
+
+Default automated tests use synthetic data, isolated databases and mocked providers.
+They are not a claim of real-candidate scoring accuracy or a completed two-device
+audio/video test. Live benchmarks and provider probes require explicit opt-in and may
+consume quota; read their instructions before running them.
+
+### Backend
+
+Against the source packaged in the running backend image:
 
 ```powershell
-docker compose exec backend python -m app.seed_knowledge
+docker compose exec -T backend python -m pytest -q
 ```
 
-The command is idempotent: rerunning it reports the documents as already
-present instead of creating duplicates. The dataset contains six historical
-engineering job descriptions. It is development/demo data only and must not be
-represented as real company information.
-
-Uploaded source PDFs are private runtime data under
-`backend/storage/knowledge/` and are ignored by Git. HireSense extracts their
-text, stores searchable chunks in PostgreSQL, and records source metadata such
-as the original filename and page count. Removing an uploaded knowledge
-document deletes its database record, indexed chunks, and stored source PDF.
-
-The chatbot does not treat the LLM's own completeness claim as authoritative.
-The backend checks required skills, qualifications, experience and selection
-criteria before confirmation is enabled. Confirmed profiles retain source
-references, model metadata and interviewer overrides for traceability.
-
-On startup, the backend runs `alembic upgrade head` before starting FastAPI.
-The first migration creates the existing authentication schema on a clean
-database and adopts the existing `users` table when upgrading a database that
-was created by the original development milestone.
-
-## Google Forms candidate and CV intake
-
-HireSense can import candidate responses from the Google Sheet linked to the
-application form and download uploaded PDF/DOCX CVs from Google Drive. Candidate
-records and application metadata are stored in PostgreSQL. CV files are stored
-under `backend/storage/cvs/`; both that directory and `backend/secrets/` are
-excluded from Git.
-
-Complete these one-time setup steps:
-
-1. Open `backend/secrets/google-service-account.json` and copy its
-   `client_email` value. Share the response spreadsheet and the Google Forms
-   upload folder with that address as a viewer. Enabling the APIs alone does not
-   grant the service account access to those files.
-2. Copy the spreadsheet ID from the response Sheet URL. It is the value between
-   `/d/` and `/edit`.
-3. Add the ID to the project `.env` file:
-
-   ```dotenv
-   GOOGLE_FORMS_SPREADSHEET_ID=your-spreadsheet-id
-   ```
-
-4. Add a required Google Form question named `Job Posting` (or configure its
-   exact name with `GOOGLE_FORMS_JOB_COLUMN`). Each answer must contain either
-   a HireSense posting ID, such as `Post #12`, or an exact job title. Posting
-   IDs are recommended because job titles can be repeated.
-5. If the response tab is not named `Form Responses 1`, set
-   `GOOGLE_FORMS_SHEET_NAME`. Header names are detected from common Google Form
-   labels. The exact labels can also be configured with the
-   `GOOGLE_FORMS_*_COLUMN` variables shown in `.env.example`.
-6. Restart the backend, open **Candidates**, and choose **Sync responses**.
-
-The Candidates page opens directly on a searchable table, with filters for each
-job posting and ten applications per page by default. Always-visible pagination
-includes Previous/Next, numbered page buttons on larger screens, and a choice of
-5, 10, 20 or 50 candidates per page. Search and job filters return to page one;
-row numbers continue across pages. Choose **Inspect** to see contact
-details, application information, and CV files in a keyboard-accessible modal.
-**Open CV** opens a PDF in a new tab; Word CVs download to open on your device.
-Rows are numbered, and each row offers **Inspect** and **Delete**. Choose
-**Select candidates** to show checkboxes and delete up to 100 selected applications
-with one confirmation. Selection continues across pages and clears when filters
-change. The table omits CV counts and collection setup notes; CVs remain available
-in the details modal, which only shows relevant contact fields. Sync remains available.
-Bulk deletion checks ownership of every selected application before changing any
-records, commits the changes together, and only then removes their private CV files.
-
-CV files are served through
-`GET /api/candidates/applications/{application_id}/cvs/{document_id}` with the
-interviewer's authorization header. The server checks posting ownership, both
-record IDs, private storage boundaries, file format and checksum. Responses are
-not cached; no public storage URL or token-bearing link is created. The frontend
-uses temporary blob URLs and retains the usual expired-login handling.
-
-The sync is idempotent: importing the same Sheet row into the same job posting
-again does not create a duplicate application. Every row is routed independently
-using its job value. Missing, unknown, inaccessible, or ambiguous job values are
-reported and are never assigned to another posting.
-
-The service account has read-only Sheets and Drive scopes. The API never serves
-the private CV directory as static content. Each accepted file is size-checked,
-restricted to PDF/DOCX, given a safe local filename, and recorded with a SHA-256
-digest for later parsing and ranking.
-
-Deleting a collected application removes its application and CV records from
-PostgreSQL, deletes its locally stored CV files, and removes the candidate when
-they have no other applications or documents. HireSense retains only a hashed
-import exclusion so the unchanged Google Sheet row is not imported again.
-
-Other web-app delete actions are also persistent: deleting a knowledge document
-removes its indexed chunks, while deleting a job description removes its local
-postings, applications and CV records. A Discord message already published to
-an external server remains on Discord.
-
-## CV screening and semantic ranking
-
-The shared assistant stays available across **Jobs**, **Candidates**, and
-**Assessments**, keeping the same conversation as you navigate. You can ask:
-
-- “Sync responses” to import the configured Google Sheet and download CVs. Each
-  response is routed using the existing Job Posting answer; sync is not restricted
-  to the job selected on Assessments.
-- “Screen candidates for Frontend Engineer” or “Screen Post #12” to start a
-  background batch for that posting's pending applications.
-- “Screen candidates for the selected job” to use the Assessments job selector.
-
-The assistant asks for a posting when the target is missing or ambiguous, rejects
-applications from another job, and prevents a second conversational batch while
-one is already running for that job. It reports import warnings and task failures,
-shows screening progress, and refreshes applications and ranking after completion.
-An active conversational batch can be restored after reloading the page.
-
-1. Import applications and CVs with **Candidates → Sync responses** or the shared
-   assistant. Syncing routes responses across all jobs using their Job Posting answers.
-   CV Screening focuses on weights and ranking, without sync or application-list controls.
-2. Open **CV Screening** and select the job in the ranking section. HireSense
-   uses only applications routed to that posting and requires its confirmed
-   requirement profile and approved job description.
-3. Set the **Technical skills**, **Experience**, and **Qualifications** percentages
-   (total 100%) in the compact weights row. Choose **Rank candidates** to explicitly approve
-   them. Pending CVs are prepared in the background and scored after screening;
-   existing screening results are reused when current.
-4. Read the single ranking table. Choose **Inspect evidence** only if you want
-   category scores, short explanations, focused CV quotations and PDF page/DOCX
-   block locations in a keyboard-accessible modal. Met is green, Partially met
-   is amber, and Unmet is red. Full-source expanders and the previous-ranking
-   selector are not shown; historical snapshots remain saved, and the page
-   loads the latest ranking. Closing the modal returns focus to its Inspect button.
-   Rankings show 10 candidates per page by default, with 5/10/20/50 row options,
-   numbered pages and Previous/Next controls. Rank values stay unchanged across
-   pages. A new ranking returns to page one. Interview selection and scheduling
-   are available separately under **Schedule Interviews**, immediately after
-   **CV Screening** in the navbar.
-5. Open **Schedule Interviews**, choose a job, and select candidates from its
-   latest CV ranking. Selections persist across pages. Use the scheduling form
-   to choose checked candidates, the highest-ranked candidates, or candidates
-   above a score. Preview recipients, times and email before confirming delivery.
-   The shared assistant receives the selected job and candidates on this page.
-   **Interview** remains the page for meeting details, delivery and rescheduling.
-
-Application dropdowns share rounded, viewport-aware menus with selected-state
-indicators and keyboard navigation (arrows, Home/End, Enter, Escape and type-ahead).
-Page-size controls stay compact. Transcript multi-selects support checking and
-unchecking passages without Ctrl/Cmd-click. Menus avoid clipped cards and remain
-inside the active dialog when opened there. LiveKit device controls retain their
-SDK-provided meeting theme.
-
-PDF and DOCX text are parsed only from the private `backend/storage/cvs/`
-directory. Image-only PDFs, corrupt or encrypted files, unsafe paths, unsupported
-formats and documents outside the configured size/page/text limits are recorded as
-processing failures. They receive zero evidence coverage and stay in the ranking,
-with the processing issue disclosed when evidence is inspected. The screening prompt treats CV text
-as untrusted data, validates cited quotes against parsed source blocks, and runs
-a separate model check before positive evidence is accepted.
-
-Ranking uses auditable category-weighted coverage: Met = 1, Partially Met = 0.5,
-and Unmet = 0. New scores normalize ambiguous or missing requirement matches to
-Unmet, without requiring manual confirmation. No candidates are held for review;
-failed processing has zero coverage, not a judgment of candidate capability.
-Within-category coverage uses approved
-requirement weights, then the three category percentages produce the final score.
-Unmapped selection criteria stay evidence-only. Ties share the same rank and are
-ordered stably by application ID. Results
-persist with the CV hash, requirement snapshot, model, prompt version and
-calculation version. Unchanged compatible results are reused; changed CVs or job
-requirements are screened again.
-
-The limits can be configured in the root `.env` file:
-
-```dotenv
-CV_MAX_PAGES=40
-CV_MAX_CHARACTERS=150000
-CV_MIN_EXTRACT_CHARACTERS=80
-SCREENING_BATCH_MAX_APPLICATIONS=50
-```
-
-Gemini receives CV content during screening. Use only data that your privacy and
-data-processing policy permits sending to the configured model provider. Real
-candidate data should not be sent through an unpaid/demo API tier.
-
-## Tests
+For local source tests, install `backend/requirements.txt` in a Python 3.12 virtual
+environment. From `backend`, run:
 
 ```powershell
-docker compose exec backend python -m pytest -q
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe scripts/check_langgraph_diagrams.py
 ```
 
-The migration and storage tests also run against isolated SQLite databases.
+The graph checker validates all seven individual diagrams and both bundles against
+compiled graphs without invoking workflows, providers or database operations.
+Source-only diagram/Compose tests can be skipped inside runtime images where those
+repository files are not packaged. Rebuild images after source changes before assuming
+container tests cover the working tree.
 
-The default suite uses isolated SQLite databases; real pgvector integration tests
-are skipped unless `PGVECTOR_TEST_SERVER_URL` is supplied. To run those tests,
-point that variable at a disposable PostgreSQL server with pgvector installed.
-The test account needs permission to create databases. Each integration test
-creates and removes its own randomly named database; it never migrates the
-database named in the supplied connection URL.
+Real PostgreSQL/pgvector integration tests require `PGVECTOR_TEST_SERVER_URL` pointing
+to a disposable server with pgvector and permission to create databases. They create
+and remove randomly named test databases. Do not use production credentials for tests.
 
-## Stop
+### Frontend
 
-For a temporary HTTPS website demo on another device, see
-[Cloudflare demo setup](docs/cloudflare-demo.md). Audio/video connects separately
-to LiveKit Cloud when configured; the tunnel exposes the website. Stop the tunnel
-with `./scripts/stop-cloudflare-demo.ps1` when finished.
+From `frontend`, with Node.js 22 and npm installed:
+
+```powershell
+npm ci
+npm run test:scoring
+npm run test:interviews
+npm run test:rooms
+npm run build
+```
+
+These cover score presentation, scheduling helpers, React interview/workflow behavior,
+TypeScript checks and the production build. The repository does not define a generic
+`npm test` script; use the named commands above.
+
+For the offline PowerShell demo-helper checks, run from the repository root:
+
+```powershell
+./scripts/test-cloudflare-demo.ps1
+```
+
+## Operations and data persistence
+
+### Storage boundaries
+
+| Data | Location | Persistence |
+| --- | --- | --- |
+| Application records, scores and vectors | PostgreSQL `postgres_data` named volume | Retained across container replacement and normal `compose down` |
+| Nomic model cache | Ollama `ollama_data` named volume | Reused across restarts; no registry pull when a compatible model is cached |
+| CVs, knowledge PDFs, reports and identity files | Host bind mount `backend/storage/` | Private runtime files; not bundled in images or committed |
+| Google service-account key | Host bind mount `backend/secrets/` | Read-only inside the backend; ignored by Git |
+
+Back up the database and private storage together, including the identity encryption
+key when that feature is used. A database-only backup does not restore document files
+or decrypt templates without their key. Changing the embedding model requires a safe
+re-embedding plan for both shared knowledge and private CV passages, even if dimensions
+remain 768. Do not disable digest checks to mix incompatible vectors.
+
+### Service checks and shutdown
+
+```powershell
+docker compose ps -a
+docker compose logs --tail 30 ollama-init
+docker compose exec -T ollama ollama list
+```
+
+An initializer that exited with code 0 is normal. A failed digest/download/inference
+check blocks normal backend startup; investigate and retry rather than bypassing it.
+
+Finish active interviews and resolve pending deliveries/background processing before
+rebuilding or restarting services. Backend source is copied into images, not live-mounted.
+Do not repeatedly resend an invitation or republish a post marked **uncertain**; verify
+the external outcome before an explicit retry.
+
+For a remote demo, stop the tunnel and restore the local origin first:
+
+```powershell
+./scripts/stop-cloudflare-demo.ps1
+```
+
+Then, when safe, stop the application:
 
 ```powershell
 docker compose down
 ```
 
-Database data persists in the named Docker volume.
+Normal shutdown retains database/model volumes and host-mounted files. **Do not use
+`docker compose down -v` unless you deliberately intend to delete named-volume data,
+including the database and model cache.**
 
-Do not use `docker compose down -v` unless you intend to delete the database.
+When the demo is active, plain base Compose recreation can restore localhost URLs.
+Use the [Cloudflare lifecycle guide](docs/cloudflare-demo.md) for rebuilds and origin
+changes. Tunnel hostnames may change; existing invitation links are not automatically
+rewritten or emailed again. Finish calls before replacing links or origins.
 
-## Notes
+## Security, privacy and limitations
 
-- Changing INTERVIEWER_PASSWORD after the first startup does not change
-  the existing account's password.
-- Database changes must be introduced through Alembic migrations.
-- Offline tests use deterministic embeddings; the running application uses
-  `nomic-embed-text` through Ollama for semantic retrieval.
-- Candidate documents are stored under the host-mounted private
-  `backend/storage/cvs/` directory. Do not place CVs, credentials or exported
-  candidate data in the repository.
-- JWTs use sessionStorage for this local milestone.
-- Logout removes the browser session but does not revoke a previously
-  issued token. Tokens expire after their configured lifetime.
-- Before public deployment, add HTTPS, rate limiting, password reset
-  and a reviewed session/token-revocation design.
-- Copilot and recruitment features are deferred.
-## Live interview transcription
+- Interviewer actions require JWT authentication, role checks and record ownership.
+  Candidate links exchange for expiring, scoped HttpOnly cookies and still require
+  admission. Public registration and candidate password accounts are not supported.
+- Interviewer JWTs use browser session storage. Signing out clears the browser session
+  but does not revoke an already issued JWT. Production use requires a reviewed
+  authentication, password-recovery, HTTPS, deployment-wide rate-limiting and
+  token-revocation design.
+- Private CVs, photos, transcripts and reports are not public static assets. Do not
+  commit `.env`, service-account keys, invitation tokens, runtime files or exported
+  candidate data. Internal Ollama/MCP/worker ports are not published by default.
+- Embeddings, OCR and photo matching run locally. Gemini receives relevant text for
+  generation/assessment; LiveKit carries interview media, and consented transcription
+  sends microphone audio to Deepgram. The system is not wholly offline.
+- Use only data approved for the configured providers and processing arrangements.
+  Use synthetic, non-sensitive information for public demos and unpaid/demo APIs.
+- Final transcript text and practical work have configurable retention (30 days by
+  default). Identity data has separate retention and withdrawal controls. Expiry or
+  deletion of source evidence can invalidate derived reports; retain required evidence
+  through authorized policies, not by disabling cleanup casually.
+- Photo comparison does not establish official identity or provide anti-spoofing/liveness
+  guarantees. Unclear matches require human review and never affect marks.
+- Speech recognition and LLM assessment can be wrong. Validated evidence, bounded
+  retries and cached results improve auditability but do not guarantee perfect grading,
+  fairness, candidate capability or future job performance.
+- Practical submissions are text/code artifacts, not executed programs. There is no
+  plagiarism/AI-use detector, automatic hiring decision, external calendar synchronization
+  or interview audio/video recording.
+- Quota exhaustion, connectivity errors, missing guides and unreadable sources remain
+  visible failures/incomplete states. Do not turn infrastructure errors into zero marks.
 
-Optional consent-based Deepgram Nova-3 captions are documented in
-[docs/live-transcription.md](docs/live-transcription.md), including the worker
-profile, private environment settings, tests, retention and benchmark procedure.
-The feature is disabled by default and does not record audio or video.
+## Documentation
+
+The README is the project entry point; detailed implementation and setup references
+are maintained alongside it:
+
+| Area | Guides |
+| --- | --- |
+| Access and workspaces | [Account access](docs/account-access.md), [dashboard](docs/interviewer-dashboard.md), [Jobs](docs/jobs-workspace.md), [workflow navigation](docs/workflow-navigation.md) |
+| Architecture and integrations | [LangGraphs and diagrams](docs/langgraphs/README.md), [MCP configuration](docs/mcp-configuration.md), [Ollama](docs/ollama-container.md) |
+| AI prompts | [System prompt catalog](docs/system-prompts.md), [parent and child implementation prompts](docs/implementation-prompt-blueprint.md) |
+| LLM usage planning | [Full-flow token estimate](docs/llm-token-usage-estimate.md) |
+| Applications and CVs | [Profile integrity](docs/application-profile-integrity.md), [application notifications](docs/application-notifications.md), [semantic screening](docs/robust-cv-screening.md), [OCR](docs/cv-ocr.md), [CV scoring](docs/deterministic-candidate-scoring.md) |
+| Interviews | [Scheduling](docs/interview-scheduling.md), [room access](docs/interview-rooms.md), [LiveKit Cloud](docs/livekit-cloud.md), [interview copilot](docs/interview-copilot.md), [transcription](docs/live-transcription.md) |
+| Assessment | [Answer analysis](docs/interview-analysis.md), [live practical exercises](docs/live-work-samples.md), [final rankings and reports](docs/consolidated-assessments.md) |
+| Photo verification and demos | [Identification safeguards](docs/candidate-identification.md), [recruitment examples](docs/recruitment-examples.md), [Cloudflare demo](docs/cloudflare-demo.md) |
+
+Some feature guides retain migration histories and dated validation snapshots. For
+current behavior, use this overview together with the relevant guide and source code;
+historical benchmark results are not guarantees for a new model or deployment.
+
+## License
+
+This repository currently has no project-wide license file. Third-party dependencies
+and model weights retain their respective licenses; the identity-model provisioner
+stores the associated upstream license notices with the downloaded weights.

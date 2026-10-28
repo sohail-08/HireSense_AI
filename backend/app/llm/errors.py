@@ -23,6 +23,7 @@ MESSAGES = {
     "invalid_output": "The AI returned an incomplete or invalid scoring response. Your saved work is unchanged; retry scoring.",
     "evidence_mismatch": "The AI's evidence could not be matched to the saved work. No score was assigned; retry scoring.",
     "incomplete_checks": "The AI did not return all required evidence checks. No score was assigned; retry analysis.",
+    "missing_reference": "The AI did not provide the required supporting guide citations. No score was assigned; retry analysis.",
     "context_limit": "The scoring input is too large for one analysis. Reduce the reference material before retrying.",
     "unknown": "The AI review could not be completed. Your saved work is unchanged; retry scoring.",
 }

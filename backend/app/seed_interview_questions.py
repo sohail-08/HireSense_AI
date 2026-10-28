@@ -21,11 +21,14 @@ def seed_interview_questions(db, embedding_provider=None):
         existing = db.scalar(select(KnowledgeDocument).where(KnowledgeDocument.source_uri == uri))
         content = normalize_text(f"Synthetic interview question and answer guide\nRole: {item['role']}\nCompetency: {item['topic']}\n"
             f"Question: {item['question']}\nDiscussion focus: {item['focus']}\nAnswer guide: {item['answer_guide']}\n"
-            f"Expected elements: {'; '.join(item['expected_elements'])}\n"
+            f"Expected elements for the example question only: {'; '.join(item['expected_elements'])}\n"
+            "For a different spoken question, assess only its requested subparts using the applicable guide passages.\n"
+            + (f"Sources: {' '.join(item['sources'])}\n" if item.get('sources') else "") +
             "Scoring: Credit equivalent correct explanations and relevant examples. Partial coverage receives partial credit. "
             "Do not require identical wording or assess speech style.")
         metadata = {"synthetic": True, "dataset": "interview-questions-v2", "role": item["role"],
-                    "question": item["question"], "answer_guide": item["answer_guide"], "expected_elements": item["expected_elements"]}
+                    "question": item["question"], "answer_guide": item["answer_guide"], "expected_elements": item["expected_elements"],
+                    "sources": item.get("sources", [])}
         if existing:
             if existing.metadata_json.get("synthetic") is not True or existing.metadata_json.get("dataset") not in {"interview-questions-v1", "interview-questions-v2"}:
                 raise ValueError("Refusing to replace a question-bank source not owned by the synthetic dataset")

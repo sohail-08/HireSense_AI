@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from uuid import uuid4
 from app.agents.approval import is_explicit_approval
 from app.agents.interview_commands import GeminiInterviewCommandModel
@@ -6,6 +7,7 @@ from app.integrations.interview_mcp import InterviewMCPClient
 from app.schemas.interview import SelectionRequest, PrepareInvites, RescheduleRequest
 from app.services.interview_links import redact_join_links
 from app.services.date_time_display import format_time_range
+from app.services.scoring_service import ScoringService
 
 
 class InterviewAssistantService:
@@ -34,6 +36,8 @@ class InterviewAssistantService:
                 raise ValueError("Prepare a preview, then explicitly confirm sending invitations.")
             if "@" in message:
                 raise ValueError("Recipients must come from the database selection preview. Confirm without adding email addresses, or change the selection and preview again.")
+            if command.candidate_names or command.application_ids:
+                raise ValueError("Candidate selection changes need a new preview before confirmation.")
             for source, target in (("job_posting_id", "job_posting_id"), ("selection_mode", "mode"),
                 ("top_n", "top_n"), ("threshold", "threshold"), ("operator", "operator"), ("stage", "stage")):
                 value = getattr(command, source)
@@ -43,7 +47,7 @@ class InterviewAssistantService:
                 value = getattr(command, key)
                 if value is not None and value != workflow.get("schedule", {}).get(key):
                     raise ValueError("Scheduling changes need a new preview before confirmation.")
-            if workflow.get("rule", {}).get("mode") == "manual" and state.get("page_context") == "assessments" and set(selected_ids) != set(workflow["rule"].get("application_ids", [])):
+            if workflow.get("rule", {}).get("mode") == "manual" and workflow.get("selection_source") != "named" and state.get("page_context") == "assessments" and set(selected_ids) != set(workflow["rule"].get("application_ids", [])):
                 workflow.pop("preview", None)
                 return self.save(supervisor, state, workflow, "interview_selection", "Checked candidates changed. Preview the new selection before sending.")
             preview = workflow["preview"]
@@ -109,7 +113,21 @@ class InterviewAssistantService:
                         rule["operator"] = "gte"
                     elif re.search(r"more than|greater than|above|(?<!>)>(?!=)", lowered):
                         rule["operator"] = "gt"
-                if rule.get("mode") == "manual" and (selected_ids or not rule.get("application_ids")):
+                if command.candidate_names or command.application_ids:
+                    workflow["selection_source"] = "named"
+                    rule["mode"] = "manual"
+                    rule.pop("application_ids", None)
+                    workflow.pop("selection_preview", None)
+                    workflow.pop("selection_token", None)
+                    if rule.get("job_posting_id") in {job["id"] for job in jobs}:
+                        ids, question = self.resolve_candidates(db, user_id, rule["job_posting_id"], command)
+                        if question:
+                            workflow["rule"] = rule
+                            return self.save(supervisor, state, workflow, "interview_selection", question)
+                        rule["application_ids"] = ids
+                elif command.selection_mode:
+                    workflow.pop("selection_source", None)
+                if rule.get("mode") == "manual" and workflow.get("selection_source") != "named" and (selected_ids or not rule.get("application_ids")):
                     rule["application_ids"] = selected_ids
                 irrelevant = {"top_n": ("threshold", "operator", "application_ids"),
                     "threshold": ("top_n", "application_ids"), "manual": ("top_n", "threshold", "operator")}
@@ -120,7 +138,9 @@ class InterviewAssistantService:
                 if not rule.get("job_posting_id"):
                     questions.append("Which job posting should I use?")
                 if not rule.get("mode"):
-                    questions.append("How many candidates from the top should I select, or above which score should I select candidates?")
+                    questions.append("Name the candidate(s), or choose by ranking. How many candidates from the top should I select, or above which score should I select candidates?")
+                if rule.get("mode") == "manual" and not rule.get("application_ids"):
+                    questions.append("Name the candidate(s) again or select their checkboxes for this job.")
                 if rule.get("mode") == "top_n" and not rule.get("top_n"):
                     questions.append("How many candidates from the top should I select?")
                 if rule.get("mode") == "threshold" and rule.get("threshold") is None:
@@ -168,7 +188,18 @@ class InterviewAssistantService:
         score = re.search(r"(>=|>|\b(?:greater than or equal(?: to)?|more than or equal(?: to)?|at least|no less than|more than|greater than|above|over)\b)\s*(\d+(?:\.\d+)?)\s*%?", text)
         score_context = bool(re.search(r"\b(?:candidates?|applicants?|scores?|scored)\b", text) or bare_score)
         score_units = bool(score and re.match(r"(?:minutes?|mins?|hours?|hrs?|days?)\b", text[score.end():].lstrip()))
-        if not cue and not bare_score and not (score and score_context and not score_units):
+        names = [*(command.candidate_names or []), *([command.candidate_name] if command.candidate_name else [])]
+        # Names must be present in the human's latest message, never copied from
+        # workflow context. Normalize case/spacing, not spelling or identity.
+        normalized_message = InterviewAssistantService.normalize_name(message)
+        command.candidate_names = list(dict.fromkeys(name.strip() for name in names if name.strip()
+            and re.search(r"(?<!\w)" + re.escape(InterviewAssistantService.normalize_name(name)) + r"(?!\w)", normalized_message)))
+        explicit_ids = {int(value) for value in re.findall(r"\bapplication\s*#?\s*(\d+)\b", text)}
+        command.application_ids = [value for value in command.application_ids if value in explicit_ids]
+        if (command.candidate_names or command.application_ids) and command.intent != "reschedule":
+            command.selection_mode = "manual"
+            command.top_n = command.threshold = command.operator = None
+        elif not cue and not bare_score and not (score and score_context and not score_units):
             command.selection_mode = command.top_n = command.threshold = command.operator = None
         elif top:
             value = top.group(1)
@@ -179,6 +210,34 @@ class InterviewAssistantService:
             command.selection_mode, command.threshold = "threshold", score.group(2)
             command.operator = "gte" if score.group(1) in {">=", "at least", "no less than"} or "equal" in score.group(1) else "gt"
             command.top_n = None
+
+    @staticmethod
+    def normalize_name(value):
+        return " ".join(unicodedata.normalize("NFKC", value).casefold().split()).strip(" .,!?\"'“”‘’")
+
+    @staticmethod
+    def resolve_candidates(db, user_id, job_id, command):
+        """Read only the authorized job's latest saved ranking. Never fuzzy-pick a person."""
+        scoring = ScoringService()
+        runs = scoring.list_runs(db, user_id=user_id, job_id=job_id)
+        if not runs or runs[0]["status"] not in {"completed", "completed_with_review"}:
+            return [], "Rank the CVs for this job first, then name the candidate to schedule."
+        candidates = scoring.detail(db, user_id=user_id, run_id=runs[0]["id"])["results"]
+        authorized_ids = {item["application_id"] for item in candidates}
+        if not set(command.application_ids).issubset(authorized_ids):
+            return [], "Those application IDs are not in this job's saved ranking. Select candidates from this job."
+        selected = list(command.application_ids)
+        for name in command.candidate_names:
+            normalized = InterviewAssistantService.normalize_name(name)
+            exact = [item for item in candidates if InterviewAssistantService.normalize_name(item["candidate_name"]) == normalized]
+            matches = exact or [item for item in candidates if " " + normalized + " " in " " + InterviewAssistantService.normalize_name(item["candidate_name"]) + " "]
+            if not matches:
+                return [], f'No candidate named “{name}” was found in this job’s saved ranking. Check the name or choose another job.'
+            if len(matches) > 1:
+                choices = "; ".join(f'{item["candidate_name"]} (application #{item["application_id"]})' for item in matches)
+                return [], f'“{name}” matches more than one candidate: {choices}. Specify an application #ID or select the correct checkbox.'
+            selected.append(matches[0]["application_id"])
+        return list(dict.fromkeys(selected)), None
 
     @staticmethod
     def save(supervisor, state, workflow, phase, text, outcome="info"):

@@ -131,6 +131,24 @@ reusing old-format exports. No existing emails are resent by this change.
 
 Use the existing central assistant, including on Interviews:
 
+Say **“Schedule interview with Sohail Ahmed”** to select a named candidate from
+the selected job's latest saved CV ranking. Multiple names are supported. Matching
+ignores case and extra spaces; an exact full name wins, and a partial name is used
+only when it identifies one candidate. Duplicate/ambiguous names require an
+explicit **application #ID** or the correct row checkbox. Unknown names do not
+fall back to another candidate, another job, a score cutoff or previously checked
+rows. Scheduling eligibility and current-ranking validation still run through
+the existing signed MCP preview/confirmation flow.
+
+The chat response carries only the job ID and eligible application IDs to the
+scheduling page. It opens that job and checks the selected rows (including moving
+to the correct list page). This applies once per explicit assistant command, after
+ranking and interview-status reads finish; status polls and restored chats never
+reapply old selections over manual checkbox changes. Date/time follow-ups preserve
+the name-based selection. No invitation is sent without reviewing and explicitly
+confirming its preview. Name-resolution tests use isolated synthetic records and
+mocked command interpretation; they make no real AI/SMTP requests.
+
 The assistant automatically uses sequential slots and defaults to `Asia/Dhaka`;
 it asks for date, start time and duration, not scheduling mode or a missing time zone.
 An existing choice such as “top 3” or “candidates above 70” stays in persistent

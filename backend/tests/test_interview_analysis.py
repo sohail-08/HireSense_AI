@@ -281,11 +281,14 @@ def test_no_reference_accuracy_unverified_provisional_rubric_and_unassessed_requ
 def test_fabricated_quotes_and_valid_quotes_with_unsupported_conclusions(bad_quote, supported):
     result = execute(snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "I use transactions.")]), Model(bad_quote=bad_quote, supported=supported))
     pair = result["pairs"][0]
-    assert pair["state"] == "needs_clarification"
     assert "score" not in pair
+    if bad_quote:
+        assert pair["state"] == "analysis_failed" and pair["analysis_failure"]["code"] == "evidence_mismatch"
+        assert "assessment" not in pair
+        return
+    assert pair["state"] == "needs_clarification"
     assert pair["assessment"]["relevance"]["label"] == "not_assessed"
     assert pair["mappings"][0]["status"] == "insufficient_evidence"
-    if bad_quote: assert pair["assessment"]["relevance"]["citations"] == []
 
 
 def test_incremental_detection_reuses_completed_exchange_and_final_reconciliation():
@@ -463,14 +466,14 @@ def test_question_bank_guides_are_snapshotted_and_retrieved_without_per_intervie
     assert calls[0]["approved_references"] and all(r["document_id"] for r in calls[0]["approved_references"])
 
 
-def test_semantic_guide_retrieval_accepts_paraphrases_and_excludes_unretrieved_documents():
+def test_hybrid_guide_retrieval_keeps_semantic_paraphrases_and_direct_topic_matches():
     data = snapshot([segment(1, "INTERVIEWER", "Explain database transactions"), segment(2, "CANDIDATE", "I commit atomically.")])
     data["references"] = [{"id": f"knowledge:{i}", "source": "knowledge_base", "kind": "answer_guide", "title": title,
-                           "content": "Atomicity", "version": "v1"} for i, title in ((1, "Consistency"), (2, "Database transactions"))]
+                           "content": "Atomicity", "version": "v1"} for i, title in ((1, "Consistency"), (2, "Database transactions"), (3, "Holiday policy"))]
     model = Model()
     InterviewAnalysisGraph(model, retrieve=lambda question: ["knowledge:1"]).graph.invoke({"snapshot": data})
     context = next(context for title, context, _ in model.calls if title == "Assessment")
-    assert [ref["id"] for ref in context["approved_references"]] == ["knowledge:1"]
+    assert {ref["id"] for ref in context["approved_references"]} == {"knowledge:1", "knowledge:2"}
 
 
 def test_failure_and_restart_recovery_do_not_change_interview(saved):
@@ -558,7 +561,7 @@ def test_merge_split_exclusion_preserve_original_sources():
     assert original == before
 
 
-def test_reference_quote_provenance_and_provisional_elements():
+def test_reference_quote_provenance_rejects_invalid_completeness_before_audit():
     class Referenced(Model):
         def generate_json(self, **kwargs):
             result = super().generate_json(**kwargs)
@@ -568,10 +571,13 @@ def test_reference_quote_provenance_and_provisional_elements():
             return result
     data = snapshot([segment(1, "INTERVIEWER", "Explain transactions"), segment(2, "CANDIDATE", "Transactions are atomic.")])
     data["references"] = [{"id": "guide", "kind": "answer_guide", "title": "Transactions", "content": "Transactions are atomic.", "version": "approved-v1"}]
-    result = execute(data, Referenced())["pairs"][0]["assessment"]
-    assert result["accuracy"]["label"] == "supported" and result["accuracy"]["references"][0]["version"] == "approved-v1"
-    assert result["expected_elements_basis"] == "provisional"
-    assert "invalid_reference_rejected" in result["completeness"]["flags"]
+    model = Referenced()
+    pair = execute(data, model)["pairs"][0]
+    assert pair["state"] == "analysis_failed" and "score" not in pair
+    assert pair["analysis_failure"]["code"] == "evidence_mismatch"
+    assert sum(title == "Assessment" for title, _, _ in model.calls) == 2
+    valid = execute(data)["pairs"][0]["assessment"]
+    assert valid["accuracy"]["references"][0]["version"] == "approved-v1"
 
 
 def test_pair_correction_rejects_foreign_or_misattributed_segments(saved):

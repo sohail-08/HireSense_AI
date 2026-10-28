@@ -10,7 +10,6 @@ from app.agents.interview_scope import SCOPING_VERSION, apply_scoring_scope
 from app.assessments.sources import resolve_sources
 from app.assessments.final_scoring import FORMULA_VERSION, POLICY, rank_reports
 from app.models.assessment import AssessmentComparison, AssessmentRun
-from app.models.candidate import CandidateApplication
 from app.models.job import JobPosting, JobDescription
 from app.models.interview_analysis import InterviewAnalysisRun
 from app.schemas.assessment import GenerateAssessment

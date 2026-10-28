@@ -34,26 +34,6 @@ class CandidateResponse(CandidateCreate):
     updated_at: datetime
 
 
-class CandidateApplicationCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    job_posting_id: int = Field(gt=0)
-    candidate_id: int | None = Field(default=None, gt=0)
-    source: ApplicationSource = ApplicationSource.DIRECT_UPLOAD
-    source_reference: str | None = Field(default=None, max_length=255)
-    response_data: dict[str, Any] = Field(default_factory=dict)
-
-
-class CandidateApplicationResponse(CandidateApplicationCreate):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    status: ApplicationStatus
-    submitted_at: datetime
-    created_at: datetime
-    updated_at: datetime
-
-
 class CVDocumentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

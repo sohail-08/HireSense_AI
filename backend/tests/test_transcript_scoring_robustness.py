@@ -197,6 +197,7 @@ def test_traceable_weaknesses_require_supported_negative_labels_and_exact_source
             if kwargs["schema"]["title"] == "Assessment":
                 result["completeness"]["label"] = "partial"
                 result["completeness"]["justification"] = "Only one requested part was explained."
+                result["completeness"]["score"] = 50
             return result
     data = source()
     result = execute(data, Partial())
