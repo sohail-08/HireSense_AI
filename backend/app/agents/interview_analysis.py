@@ -10,8 +10,9 @@ from langgraph.graph import START, END, StateGraph
 from app.schemas.interview_analysis import Detection, Assessment, Mappings, SupportCheck, FollowUps
 from app.llm.errors import ScoringError, failure_detail, validation_hint
 from app.agents.interview_scope import SCOPING_VERSION, apply_scoring_scope, housekeeping_segment_ids, housekeeping_reply
+from app.agents.interview_references import retrieval_query, select_guides
 
-PROMPT_VERSION = "interview-analysis-v4-granular-answer-scores"
+PROMPT_VERSION = "interview-analysis-v5-complete-reference-evidence"
 PAIRING_VERSION = "question-coverage-turn-pairing-v2"
 LEGACY_RUBRIC_VERSION = "answer-coverage-equal-dimensions-v3-validated"
 RUBRIC_VERSION = "answer-quality-continuous-dimensions-v4"
@@ -90,6 +91,38 @@ def canonical_quote(quote, segments, allowed=None):
             "char_start": start, "char_end": start + len(quote["quote"]), "speaker": source["speaker"],
             "start_at": source["start_at"], "end_at": source["end_at"],
             "start_offset_ms": source["start_offset_ms"], "end_offset_ms": source["end_offset_ms"]}
+
+
+def validate_assessment_evidence(assessment, context):
+    """Retry incomplete/provenance-invalid output; never attach invented citations."""
+    segments = {s["id"]: s for s in context["transcript"]}
+    allowed = set(context["pair"]["answer_ids"])
+    for name in (*DIMENSIONS, "interpretation"):
+        item = assessment[name]
+        if not item["citations"] and item.get("score", 0) > 0:
+            raise ScoringError("evidence_mismatch", "Missing candidate evidence")
+        for quote in item["citations"]:
+            try:
+                canonical_quote(quote, segments, allowed)
+            except ValueError:
+                raise ScoringError("evidence_mismatch", "Candidate quote does not exist in the saved answer") from None
+    references = context["approved_references"]
+    if not references or assessment["relevance"]["label"] == "tangent" or assessment["interpretation"]["status"] == "uncertain":
+        return
+    sources = {ref["id"]: ref for ref in references}
+    for name in ("accuracy", "completeness"):
+        item = assessment[name]
+        unverified = (assessment["accuracy"]["label"] == "unable_to_verify"
+                      and assessment["accuracy"]["score"] == 0 and assessment["expected_elements_basis"] == "provisional")
+        if not item["references"]:
+            if unverified:
+                continue
+            raise ScoringError("missing_reference", "Missing required dimension reference")
+        for ref in item["references"]:
+            source = sources.get(ref["reference_id"])
+            kinds = {"answer_guide", "technical_reference"} if name == "accuracy" else {"answer_guide"}
+            if not source or source["kind"] not in kinds or not ref["quote"].strip() or ref["quote"] not in source["content"]:
+                raise ScoringError("evidence_mismatch", "Reference quote does not exist in the selected guide")
 
 
 DIMENSIONS = ("relevance", "accuracy", "completeness", "quality")
@@ -417,7 +450,7 @@ class InterviewAnalysisGraph:
                 "Join question fragments with question_continuation. Distinguish acknowledgements, procedural talk and candidate clarification "
                 "from substantive questions. Candidate questions are clarification, never interviewer questions. Preserve multi-part subparts; "
                 "Set scoring_scope for EVERY target: job_related for substantive job-competency assessment, non_assessment for greetings, "
-                "audio/video checks (such as 'Hello Ashok. Can you hear me clearly?'), introductions limited to names, small talk, "
+                "audio/video checks (such as 'Hello Ashok. Can you hear me clearly?'), generic introductions without a requested job competency, small talk, "
                 "scheduling, room/link logistics and questions unrelated to job performance. These must NOT be question or question_continuation; use procedural. "
                 "Technical wording alone does not make a device check assessable. Job-related HR, sales and behavioral/problem-solving "
                 "questions ARE assessable when relevant to the supplied requirements; nontechnical does not mean unrelated. "
@@ -482,12 +515,12 @@ class InterviewAnalysisGraph:
             previous = old.get(p["id"])
             if previous and previous.get("input_hash") == p["input_hash"]:
                 # Freeze retrieval as well as accepted judgments. Retry failures, not accepted grades.
-                for key in ("reference_ids",):
-                    if key in previous: p[key] = copy.deepcopy(previous[key])
                 checked = copy.deepcopy(previous)
                 score_pair(checked)
                 if checked.get("state") != "analyzed" or not checked.get("score"):
                     continue
+                for key in ("reference_ids",):
+                    if key in previous: p[key] = copy.deepcopy(previous[key])
                 for key in ("assessment", "mappings", "validation", "suggestions", "mapping_complete"):
                     if key in previous: p[key] = copy.deepcopy(previous[key])
                 p["assessment_reused"] = True
@@ -501,21 +534,21 @@ class InterviewAnalysisGraph:
         segments = {s["id"]: s for s in state["segments"]}
         for pair in state["pairs"]:
             if "reference_ids" in pair: continue
+            if pair["state"] != "ready_for_analysis":
+                pair["reference_ids"] = []
+                continue
             question = " ".join(segments[i]["text"] for i in pair["question_ids"])
-            retrieved = self.retrieve(question) if self.retrieve and any(r.get("source") == "knowledge_base" for r in references) else None
-            ranks = {identifier: index for index, identifier in enumerate(retrieved or [])}
-            query = set(re.findall(r"[a-z0-9+#]+", question.lower()))
-            scored = [(r, len(query & set(re.findall(r"[a-z0-9+#]+", (r["title"] + " " + r["content"]).lower())))) for r in references]
-            pair["reference_ids"] = [r["id"] for r, score in sorted(scored, key=lambda item:
-                (item[0]["kind"] != "answer_guide", ranks.get(item[0]["id"], 1000), -item[1], item[0]["id"]))
-                if (r["id"] in ranks if r.get("source") == "knowledge_base" and retrieved is not None else score > 0)][:6]
+            query = retrieval_query(question, state["snapshot"]["requirements"])
+            retrieved = self.retrieve(query) if self.retrieve and any(r.get("source") == "knowledge_base" for r in references) else None
+            pair["reference_ids"] = select_guides(question, references, retrieved)
         return {"references": references, "pairs": state["pairs"]}
 
     def context(self, state, pair):
         selected = set(pair["question_ids"] + pair["answer_ids"] + pair["context_ids"])
+        references = {r["id"]: r for r in state["references"]}
         return {"pair": {k: v for k, v in pair.items() if k != "suggestions"},
                 "transcript": [s for s in state["segments"] if s["id"] in selected],
-                "requirements": state["snapshot"]["requirements"], "approved_references": [r for r in state["references"] if r["id"] in pair.get("reference_ids", [])]}
+                "requirements": state["snapshot"]["requirements"], "approved_references": [references[i] for i in pair.get("reference_ids", []) if i in references]}
 
     def answer_analysis(self, state):
         for pair in state["pairs"]:
@@ -536,6 +569,9 @@ class InterviewAnalysisGraph:
                     "accuracy MUST be unable_to_verify. Generated expected elements MUST be provisional. Explain missing subparts, reasoning, "
                     "examples, tradeoffs and limitations without judging speech style. Use the retrieved knowledge-base answer guides to "
                     "evaluate equivalent correct explanations, not keyword repetition. Cite the guide for accuracy and completeness. "
+                    "Both accuracy.references and completeness.references must contain their own exact supporting guide quotations. "
+                    "A citation in one dimension does not support the other automatically. Do not return positive verified technical marks without citations. "
+                    "If no supplied guide applies, use accuracy=unable_to_verify with score=0 and provisional expected elements; this is an evidence gap, not a candidate zero. "
                     "Use fixed anchors: relevance direct=addresses the question, partial=addresses some parts, tangent=off-topic. "
                     "Accuracy supported=consistent with relevant approved references, partially_supported=some supported and some incorrect, "
                     "contradicted=explicitly conflicts with those references, unable_to_verify=no suitable reference or ambiguous meaning. "
@@ -548,7 +584,8 @@ class InterviewAnalysisGraph:
                     "Reference text alone cannot support an ASR repair. Preserve negations, numbers and uncertainty. "
                     "Score the supported meaning, never speech style. Keep every citation verbatim, including ASR errors. "
                     "Keep each justification to one concise, question-specific sentence; do not repeat the answer or rubric boilerplate.",
-                    self.context(state, pair), state["snapshot"])
+                    self.context(state, pair), state["snapshot"],
+                    validate=lambda value: validate_assessment_evidence(value, self.context(state, pair)))
             except ValueError as error:
                 pair["analysis_failure"] = {**failure_detail(error), "stage": "answer_analysis"}
                 pair["analysis_error"] = pair["analysis_failure"]["message"]

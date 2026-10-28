@@ -2,9 +2,13 @@
 import copy
 import re
 
-SCOPING_VERSION = "job-related-interview-scope-v1"
+SCOPING_VERSION = "job-related-interview-scope-v2-introductions"
 
 _SALUTATION = r"(?:hello|hi|hey|good morning|good afternoon|good evening)"
+_INTRODUCTION = re.compile(
+    r"(?:(?:please|kindly) )?(?:(?:can|could|would) you )?(?:briefly )?"
+    r"(?:introduce yourself|tell (?:me|us) about yourself|explain or introduce yourself)"
+    r"(?: (?:briefly|in short|in brief))?", re.IGNORECASE)
 _HOUSEKEEPING = re.compile(
     r"(?:"
     r"(?:can|could|do) you (?:hear me|see me|see my screen)(?: (?:clearly|now|okay|ok|well))?|"
@@ -25,7 +29,7 @@ def pure_housekeeping(text):
         return False
     for clause in clauses:
         # A salutation with a name may precede a device check in the same sentence.
-        if _HOUSEKEEPING.fullmatch(clause):
+        if _HOUSEKEEPING.fullmatch(clause) or _INTRODUCTION.fullmatch(clause):
             continue
         if re.fullmatch(_SALUTATION + r"(?:[ ,]+[a-z][a-z'-]*){0,3}", clause):
             if not re.search(r"\b(?:explain|describe|implement|design|debug|what|how|why|tell)\b", clause):

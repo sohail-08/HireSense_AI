@@ -25,7 +25,7 @@ candidate captions. Interim text never enters the analysis workflow.
    STT event does not. Use **Score this answer now** for an explicit boundary.
    Transcript gaps and analysis failures remain visible. Unanswered questions receive 0;
    procedural/excluded conversation and unfinished answers are not scored.
-   Greetings, name introductions, audio/video checks, small talk and interview
+   Greetings, generic self-introductions, audio/video checks, small talk and interview
    logistics are excluded from cards, counts and the score denominator. A conservative
    local guard catches known housekeeping phrases (including split ASR segments)
    before model assessment; obvious housekeeping-only transcripts need no AI calls.
@@ -35,7 +35,7 @@ candidate captions. Interim text never enters the analysis workflow.
    replies to real job questions remain answers and can earn zero, not an exclusion.
    Excluded speech stays in the live transcript and **Other transcript passages**.
    Older obvious housekeeping pairs are filtered on read without rewriting sources
-   or calling the provider. Scoping policy `job-related-interview-scope-v1` requests
+   or calling the provider. Scoping policy `job-related-interview-scope-v2-introductions` requests
    explicit reanalysis for persisted updated results; unchanged accepted marks are
    reused. A deployment does not start paid reanalysis by itself.
 5. Each completed answer receives a percentage and a four-part breakdown. Relevance,
@@ -165,13 +165,37 @@ review instead of silently changing the correction.
 Question-bank records marked with `metadata.answer_guide` are snapshotted with their
 document ID, chunk IDs, question, content hash and guide content. The background worker
 uses existing Ollama embeddings and pgvector question-bank search for each spoken
-question; at most six matching snapshots reach assessment. Semantic matches need no
-literal word overlap. GET/page refresh reads database snapshots without calling
+question with bounded job-competency context. Search-only normalization recognizes
+spoken API names such as `use effect` as `useEffect` without editing transcript text.
+Hybrid selection combines semantic ranks with specific, stop-word-filtered topic
+matches in the approved snapshot, rescuing a relevant guide missed by vector search.
+At most six matching snapshots reach assessment, ordered by relevance. Semantic matches need no
+literal word overlap. Failed exchanges retrieve again on retry; only accepted grades
+freeze their earlier guide selection. GET/page refresh reads database snapshots without calling
 embeddings or a model. Changed guides make earlier analyses stale. Seed upgrades retain
 document IDs and replace only synthetic dataset chunks after new embeddings succeed;
 the JD collection is unaffected. Legacy interview-scoped references remain readable
 for existing versions/API clients; there is no entry UI. Historical results receive
 the current deterministic scoring projection on read, without rewriting saved sources.
+
+Before accepting a model assessment, dimension-level reference validation requires
+separate exact citations for accuracy and completeness (an answer guide for the latter).
+Candidate quotations must also match their permitted saved answer segments before
+the response is accepted; paraphrased or misattributed quotations trigger a bounded retry.
+Missing or invalid citations trigger the existing bounded two-attempt response retry,
+not automatic source attachment or a candidate zero. A truly unsupported assessment
+may report `unable_to_verify`, zero *unverified* accuracy and provisional expectations;
+it remains an evidence gap, never a saved zero grade. Independent logical-support
+validation still follows successful provenance checks. Policy version
+`interview-analysis-v5-complete-reference-evidence` invalidates stale analysis inputs
+without automatically submitting historical answers to the provider.
+
+The existing frontend guides now separately cover semantic HTML, responsive layout,
+state/props, effects and form testing as well as their original example questions.
+Only requested subparts determine completeness. Their source metadata links to
+[React](https://react.dev/reference/react/useEffect),
+[MDN](https://developer.mozilla.org/en-US/docs/Glossary/Semantics), and
+[Testing Library](https://testing-library.com/docs/react-testing-library/example-intro/).
 
 Every retained quote must exist exactly within a permitted source segment. The backend
 adds interview/session IDs, a content-hash revision, speaker, authoritative segment

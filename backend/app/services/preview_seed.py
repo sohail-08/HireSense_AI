@@ -297,10 +297,14 @@ def _analysis(db, owner, interview, person, role, service):
         citation = canonical_quote({"segment_id": a["id"], "quote": a["text"]}, sources)
         labels = ("direct", "supported", "complete", "clear") if person["level"] == 2 else ("direct", "partially_supported", "partial", "clear") if person["level"] == 1 else ("partial", "contradicted", "incomplete", "clear")
         assessment = {}
-        for dimension, label in zip(("relevance", "accuracy", "completeness", "quality"), labels):
-            assessment[dimension] = {"label": label, "justification": "The response covers the expected approach." if person["level"] == 2 else "The response addresses part of the question but leaves key safeguards unestablished.",
+        # Authored offline example marks, not model output or a production label-to-score rule.
+        marks = (100, 100, 100, 100) if person["level"] == 2 else (100, 50, 50, 100) if person["level"] == 1 else (50, 0, 0, 100)
+        for dimension, label, mark in zip(("relevance", "accuracy", "completeness", "quality"), labels, marks):
+            assessment[dimension] = {"label": label, "score": mark, "justification": "The response covers the expected approach." if person["level"] == 2 else "The response addresses part of the question but leaves key safeguards unestablished.",
                 "citations": [citation], "references": [{"reference_id": guide["id"], "version": guide["version"], "kind": "answer_guide", "quote": guide["content"]}] if dimension in {"accuracy", "completeness"} else [],
                 "support_status": "supported_by_check", "evidence_gaps": [] if person["level"] == 2 else ["Ask for a concrete example covering the missing steps."]}
+        assessment["interpretation"] = {"status": "faithful", "meaning": a["text"], "citations": [citation],
+            "notes": [], "support_status": "supported_by_check"}
         pair = {"id": f"pair-{interview.id}-{n}", "question_ids": [q["id"]], "answer_ids": [a["id"]], "context_ids": [], "state": "analyzed", "flags": [],
             "question_requirement_ids": guide["requirement_ids"], "assessment": assessment, "suggestions": [],
             "mappings": [{"requirement_id": guide["requirement_ids"][0], "requirement_version": version, "status": "supporting_evidence" if person["level"] == 2 else "partial_evidence",
@@ -314,7 +318,8 @@ def _analysis(db, owner, interview, person, role, service):
 
 def _ranking(db, owner, job_id, reports, factory):
     sources = [resolve_sources(db, owner, r["application_id"], GenerateAssessment()) for r in reports]
-    fingerprint = digest([FORMULA_VERSION, FinalRankingService.scoring_policy(), [source_identity(s) for s in sources]])
+    readiness = FinalRankingService(session_factory=factory).answer_readiness(db, owner, sources)
+    fingerprint = digest([FORMULA_VERSION, FinalRankingService.scoring_policy(), [source_identity(s) for s in sources], readiness])
     if db.scalar(select(AssessmentComparison).where(AssessmentComparison.job_posting_id == job_id, AssessmentComparison.fingerprint == fingerprint)):
         return
     ordered, issue = rank_reports(reports)
@@ -323,6 +328,7 @@ def _ranking(db, owner, job_id, reports, factory):
         "scoring_run_id": source["cv"]["scoring_run_id"], "interview_ids": [i["id"] for i in source["interviews"]],
         "analysis_ids": [i["analysis"]["id"] for i in source["interviews"]]} for r, source in zip(reports, sources)]
     snapshot = {"kind": "final_ranking", "status": "completed", "stage": "completed", "policy": FINAL_POLICY,
+        "analysis_readiness": readiness,
         "scoring_policy": FinalRankingService.scoring_policy(), "basis": "Final candidate ranking", "formula_version": FORMULA_VERSION,
         "plans": plans, "selected_cohort_application_ids": [r["application_id"] for r in reports], "source_interview_ids": [i for p in plans for i in p["interview_ids"]],
         "assessment_ids": [r["id"] for r in ordered], "assessments": ordered, "incompatibilities": [], "interview_incompatibilities": [],
